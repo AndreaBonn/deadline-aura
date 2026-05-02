@@ -40,9 +40,17 @@ function runMigrations(database) {
 
   // 002: add web_url column (idempotent)
   const columns = database.pragma('table_info(tasks)');
-  const hasWebUrl = columns.some((col) => col.name === 'web_url');
-  if (!hasWebUrl) {
+  const columnNames = new Set(columns.map((col) => col.name));
+
+  if (!columnNames.has('web_url')) {
     database.exec('ALTER TABLE tasks ADD COLUMN web_url TEXT');
+  }
+
+  // 004: add ai_cognitive_type column (idempotent)
+  if (!columnNames.has('ai_cognitive_type')) {
+    database.exec(
+      "ALTER TABLE tasks ADD COLUMN ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative'))",
+    );
   }
 }
 
@@ -91,14 +99,14 @@ function markStale(source, activeIds) {
     .run(source, ...activeIds);
 }
 
-function updateAiScores(taskId, { stress, category, reasoning }) {
+function updateAiScores(taskId, { stress, category, reasoning, cognitive_type }) {
   getDb()
     .prepare(
       `UPDATE tasks SET
-      ai_stress = ?, ai_category = ?, ai_reasoning = ?, ai_scored_at = ?
+      ai_stress = ?, ai_category = ?, ai_reasoning = ?, ai_cognitive_type = ?, ai_scored_at = ?
      WHERE id = ?`,
     )
-    .run(stress, category, reasoning, Date.now(), taskId);
+    .run(stress, category, reasoning, cognitive_type || null, Date.now(), taskId);
 }
 
 function saveGlobalScore(score) {

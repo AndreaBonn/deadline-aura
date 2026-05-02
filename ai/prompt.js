@@ -1,6 +1,8 @@
 'use strict';
 
 function buildScoringPrompt(events) {
+  const now = new Date().toISOString();
+
   const eventList = events
     .map((e, i) => {
       const parts = [`${i + 1}. "${e.title}"`];
@@ -14,7 +16,7 @@ function buildScoringPrompt(events) {
         try {
           const raw = JSON.parse(e.raw_json);
           if (raw.description) {
-            parts.push(`description: ${raw.description.slice(0, 200)}`);
+            parts.push(`desc: ${raw.description.slice(0, 200)}`);
           }
           if (raw.location) {
             parts.push(`location: ${raw.location}`);
@@ -39,45 +41,143 @@ function buildScoringPrompt(events) {
     })
     .join('\n');
 
-  return `You are a cognitive load analyzer. Evaluate the following list of upcoming calendar events and tasks for a knowledge worker.
+  return `You are a clinical psychologist specializing in occupational stress assessment. Your framework combines Cognitive Load Theory (Sweller), Attention Residue research (Leroy), and decision fatigue literature (Baumeister). You assess real psychological impact, not surface-level busyness.
 
-Current time: ${new Date().toISOString()}
+Current time: ${now}
 
-Events/Tasks:
+SCHEDULE:
 ${eventList}
 
-Analyze the HOLISTIC cognitive and psychological load. Consider:
-- Context switching frequency (many different topics/clients = higher load)
-- Cognitive complexity of each event (deep work vs routine meeting vs admin)
-- Time fragmentation (many short gaps vs focused blocks)
-- Emotional weight (performance reviews, client escalations, deadlines vs casual syncs)
-- Cumulative pressure (dense schedule compounds stress)
-- Type of work required (creative/analytical vs passive/attendance)
+CALIBRATION ANCHORS (use these — do NOT inflate):
+1-2: Light. Few low-stakes items, ample recovery time between tasks.
+3-4: Normal sustainable workload. Moderate tasks, adequate breaks.
+5-6: Elevated. Multiple demanding items, limited breaks, noticeable context switching. Fatigue by end of day.
+7-8: High strain. Dense schedule, frequent domain switches between demanding tasks, emotional labor present. Recovery deficit accumulating.
+9-10: Overload. Back-to-back high-stakes items, no recovery windows, decision fatigue certain. Unsustainable if repeated.
 
-Respond with ONLY valid JSON, no markdown:
+EVALUATION DIMENSIONS:
+1. Cognitive complexity per event: deep analytical work (high) vs routine meeting (low) vs passive attendance (minimal)
+2. Context switching cost: each topic/client/domain transition costs ~23min recovery. Adjacent events in unrelated domains = compounding tax
+3. Time architecture: gaps <20min between demanding tasks = no real recovery. Fragmented schedules (many short gaps) drain more than dense-but-blocked ones
+4. Emotional labor: events requiring performance, conflict management, evaluation, or high-stakes decisions carry hidden load beyond their duration
+5. Cumulative compounding: a moderate task after three demanding ones hits harder than the same task after rest. Score later events in context of what precedes them
+6. Invisible patterns: sequences the person cannot see from inside — creative tasks clustered without breaks, all high-stakes items in one half-day, no transition buffers before important events
+
+Respond with ONLY valid JSON, no markdown, no text before or after:
 {
-  "global_stress": <1-10>,
+  "global_stress": <1-10 integer>,
   "daily_breakdown": [
-    { "date": "YYYY-MM-DD", "stress": <1-10>, "reasoning": "<brief>" }
+    {
+      "date": "YYYY-MM-DD",
+      "stress": <1-10>,
+      "peak_window": "HH:MM-HH:MM",
+      "reasoning": "2-3 sentences: what compounds, where recovery is missing, what makes this day specifically heavy or light"
+    }
   ],
   "per_event": [
-    { "id": "<event id>", "stress": <1-10>, "category": "work-critical|work-routine|personal|admin", "reasoning": "<brief>" }
+    {
+      "id": <event index number>,
+      "stress": <1-10>,
+      "category": "work-critical|work-routine|personal|admin",
+      "cognitive_type": "analytical|creative|social|passive|administrative",
+      "reasoning": "1-2 sentences: specific cognitive/emotional demand AND how it interacts with adjacent events"
+    }
   ],
   "cognitive_factors": {
     "context_switching": "low|medium|high",
     "fragmentation": "low|medium|high",
     "emotional_load": "low|medium|high",
-    "deep_work_ratio": <0.0-1.0>
-  }
+    "deep_work_ratio": <0.0-1.0>,
+    "decision_fatigue_risk": "low|medium|high",
+    "recovery_adequacy": "sufficient|marginal|insufficient"
+  },
+  "patterns": [
+    "Specific invisible pattern with evidence, e.g.: 3 creative tasks consecutive 14:00-17:30 with no break — decision quality degrades after 2nd"
+  ],
+  "clinical_note": "1-3 sentences: what a psychologist would flag about this schedule — the one thing the person does not see but should know"
 }`;
 }
+
+const VALID_CATEGORIES = new Set(['work-critical', 'work-routine', 'personal', 'admin']);
+const VALID_COGNITIVE_TYPES = new Set([
+  'analytical',
+  'creative',
+  'social',
+  'passive',
+  'administrative',
+]);
+const VALID_LEVELS = new Set(['low', 'medium', 'high']);
+const VALID_ADEQUACY = new Set(['sufficient', 'marginal', 'insufficient']);
 
 function parseAiResponse(text) {
   const cleaned = text
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
     .trim();
-  return JSON.parse(cleaned);
+
+  const parsed = JSON.parse(cleaned);
+
+  if (typeof parsed.global_stress !== 'number') {
+    throw new Error('Missing or invalid global_stress');
+  }
+
+  parsed.global_stress = Math.max(1, Math.min(10, Math.round(parsed.global_stress)));
+
+  if (Array.isArray(parsed.per_event)) {
+    for (const event of parsed.per_event) {
+      if (typeof event.stress === 'number') {
+        event.stress = Math.max(1, Math.min(10, Math.round(event.stress)));
+      }
+      if (event.category && !VALID_CATEGORIES.has(event.category)) {
+        event.category = 'work-routine';
+      }
+      if (event.cognitive_type && !VALID_COGNITIVE_TYPES.has(event.cognitive_type)) {
+        event.cognitive_type = 'passive';
+      }
+    }
+  }
+
+  if (Array.isArray(parsed.daily_breakdown)) {
+    for (const day of parsed.daily_breakdown) {
+      if (typeof day.stress === 'number') {
+        day.stress = Math.max(1, Math.min(10, Math.round(day.stress)));
+      }
+    }
+  }
+
+  if (parsed.cognitive_factors) {
+    const cf = parsed.cognitive_factors;
+    for (const key of ['context_switching', 'fragmentation', 'emotional_load']) {
+      if (cf[key] && !VALID_LEVELS.has(cf[key])) {
+        cf[key] = 'medium';
+      }
+    }
+    if (cf.decision_fatigue_risk && !VALID_LEVELS.has(cf.decision_fatigue_risk)) {
+      cf.decision_fatigue_risk = 'medium';
+    }
+    if (cf.recovery_adequacy && !VALID_ADEQUACY.has(cf.recovery_adequacy)) {
+      cf.recovery_adequacy = 'marginal';
+    }
+    if (typeof cf.deep_work_ratio === 'number') {
+      cf.deep_work_ratio = Math.max(0, Math.min(1, cf.deep_work_ratio));
+    }
+  }
+
+  if (!Array.isArray(parsed.patterns)) {
+    parsed.patterns = [];
+  }
+  if (typeof parsed.clinical_note !== 'string') {
+    parsed.clinical_note = '';
+  }
+
+  return parsed;
 }
 
-module.exports = { buildScoringPrompt, parseAiResponse };
+module.exports = {
+  buildScoringPrompt,
+  parseAiResponse,
+  VALID_CATEGORIES,
+  VALID_COGNITIVE_TYPES,
+  VALID_LEVELS,
+  VALID_ADEQUACY,
+};

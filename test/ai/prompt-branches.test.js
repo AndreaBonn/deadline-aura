@@ -103,7 +103,7 @@ describe('prompt branch coverage', () => {
         },
       ];
       const prompt = buildScoringPrompt(events);
-      expect(prompt).toContain('a'.repeat(200));
+      expect(prompt).toContain('desc: ' + 'a'.repeat(200));
       expect(prompt).not.toContain('a'.repeat(201));
     });
 
@@ -121,18 +121,14 @@ describe('prompt branch coverage', () => {
     });
 
     it('includes event without due_at', () => {
-      const events = [
-        { id: 'ev1', title: 'No Due', source: 'gcal' },
-      ];
+      const events = [{ id: 'ev1', title: 'No Due', source: 'gcal' }];
       const prompt = buildScoringPrompt(events);
       expect(prompt).toContain('No Due');
       expect(prompt).not.toContain('due:');
     });
 
     it('includes event without source', () => {
-      const events = [
-        { id: 'ev1', title: 'No Source', due_at: Date.now() },
-      ];
+      const events = [{ id: 'ev1', title: 'No Source', due_at: Date.now() }];
       const prompt = buildScoringPrompt(events);
       expect(prompt).toContain('No Source');
       expect(prompt).not.toContain('source:');

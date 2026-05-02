@@ -105,7 +105,12 @@ function applyAiScores(aiResult) {
       stress: event.stress,
       category: event.category,
       reasoning: event.reasoning,
+      cognitive_type: event.cognitive_type,
     });
+  }
+
+  if (typeof aiResult.global_stress === 'number') {
+    db.saveGlobalScore(aiResult.global_stress / 10);
   }
 }
 
