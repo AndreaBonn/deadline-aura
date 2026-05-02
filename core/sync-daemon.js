@@ -15,7 +15,10 @@ function computeEventsHash(tasks) {
 }
 
 function shouldRecalcAi(config) {
-  const cache = db.getDb().prepare('SELECT computed_at FROM ai_cache ORDER BY computed_at DESC LIMIT 1').get();
+  const cache = db
+    .getDb()
+    .prepare('SELECT computed_at FROM ai_cache ORDER BY computed_at DESC LIMIT 1')
+    .get();
   if (!cache) {
     return true;
   }
@@ -35,11 +38,7 @@ async function sync(config) {
     errors,
   );
 
-  const jiraIssues = await fetchWithErrorCapture(
-    () => jira.fetchIssues(config),
-    'jira',
-    errors,
-  );
+  const jiraIssues = await fetchWithErrorCapture(() => jira.fetchIssues(config), 'jira', errors);
 
   const database = db.getDb();
   const upsertMany = database.transaction((tasks, source) => {

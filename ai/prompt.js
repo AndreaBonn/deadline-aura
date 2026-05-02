@@ -73,7 +73,10 @@ Respond with ONLY valid JSON, no markdown:
 }
 
 function parseAiResponse(text) {
-  const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+  const cleaned = text
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
+    .trim();
   return JSON.parse(cleaned);
 }
 

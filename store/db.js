@@ -28,7 +28,10 @@ function getDb() {
 
 function runMigrations(database) {
   const migrationsDir = path.join(__dirname, 'migrations');
-  const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort();
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
 
   for (const file of files) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
@@ -67,9 +70,7 @@ function upsertTask(task) {
 
 function markStale(source, activeIds) {
   if (activeIds.length === 0) {
-    getDb()
-      .prepare('UPDATE tasks SET is_stale = 1 WHERE source = ? AND is_stale = 0')
-      .run(source);
+    getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE source = ? AND is_stale = 0').run(source);
     return;
   }
 
@@ -122,9 +123,7 @@ function cleanupOldRecords() {
   const fortyEightHoursAgo = Date.now() - 48 * 3600000;
 
   getDb().prepare('DELETE FROM scores WHERE computed_at < ?').run(sevenDaysAgo);
-  getDb()
-    .prepare('DELETE FROM tasks WHERE is_stale = 1 AND synced_at < ?')
-    .run(fortyEightHoursAgo);
+  getDb().prepare('DELETE FROM tasks WHERE is_stale = 1 AND synced_at < ?').run(fortyEightHoursAgo);
   getDb().prepare('DELETE FROM ai_cache WHERE computed_at < ?').run(sevenDaysAgo);
 }
 

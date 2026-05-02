@@ -58,7 +58,9 @@ body {
   height: 100%;
   border-radius: 2px;
   width: 0%;
-  transition: width 2s ease, background-color 2s ease;
+  transition:
+    width 2s ease,
+    background-color 2s ease;
 }
 
 .urgency-meta {
@@ -101,7 +103,9 @@ body {
   border-radius: 8px;
   border-left: 3px solid transparent;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .task-card:hover {
@@ -183,7 +187,9 @@ body {
   border-radius: 6px;
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .footer-btn:hover {
@@ -197,6 +203,11 @@ body {
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }

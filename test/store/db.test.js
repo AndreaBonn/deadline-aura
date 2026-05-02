@@ -54,10 +54,12 @@ function insertTask(overrides = {}) {
     ...overrides,
   };
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO tasks (id, source, title, due_at, priority, is_done, is_stale, raw_json, synced_at)
     VALUES (@id, @source, @title, @due_at, @priority, @is_done, 0, @raw_json, @synced_at)
-  `).run(task);
+  `,
+  ).run(task);
 
   return task;
 }
@@ -102,19 +104,23 @@ describe('database schema', () => {
 
   it('enforces source CHECK constraint', () => {
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO tasks (id, source, title, priority, is_done, is_stale, synced_at)
         VALUES ('x', 'invalid', 'Test', 3, 0, 0, ${Date.now()})
-      `).run();
+      `,
+      ).run();
     }).toThrow();
   });
 
   it('enforces priority CHECK constraint', () => {
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO tasks (id, source, title, priority, is_done, is_stale, synced_at)
         VALUES ('x', 'gcal', 'Test', 5, 0, 0, ${Date.now()})
-      `).run();
+      `,
+      ).run();
     }).toThrow();
   });
 });
@@ -133,11 +139,13 @@ describe('task operations', () => {
 
   it('upserts task on conflict', () => {
     insertTask({ id: 'upsert_1', title: 'Original' });
-    db.prepare(`
+    db.prepare(
+      `
       INSERT INTO tasks (id, source, title, due_at, priority, is_done, is_stale, raw_json, synced_at)
       VALUES ('upsert_1', 'gcal', 'Updated', ${Date.now() + 3600000}, 2, 0, 0, '{}', ${Date.now()})
       ON CONFLICT(id) DO UPDATE SET title = excluded.title, priority = excluded.priority
-    `).run();
+    `,
+    ).run();
 
     const row = db.prepare('SELECT * FROM tasks WHERE id = ?').get('upsert_1');
     expect(row.title).toBe('Updated');

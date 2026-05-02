@@ -32,7 +32,10 @@ function loadProviders(config) {
       continue;
     }
 
-    const keys = keysStr.split(',').map((k) => k.trim()).filter(Boolean);
+    const keys = keysStr
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
     if (keys.length === 0) {
       continue;
     }

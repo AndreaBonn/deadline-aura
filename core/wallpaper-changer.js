@@ -4,7 +4,7 @@ const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync } = require('child_process');
+const { execSync, spawnSync } = require('child_process');
 
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const WALLPAPER_PATH = path.join(DATA_DIR, 'wallpaper.png');
@@ -38,8 +38,12 @@ function generateWallpaper(palette, resolution) {
   const centerColor = `hsl(${h}, ${s}%, ${Math.min(l + 3, 20)}%)`;
 
   const gradient = ctx.createRadialGradient(
-    width * 0.4, height * 0.5, 0,
-    width * 0.4, height * 0.5, Math.max(width, height) * 0.7,
+    width * 0.4,
+    height * 0.5,
+    0,
+    width * 0.4,
+    height * 0.5,
+    Math.max(width, height) * 0.7,
   );
   gradient.addColorStop(0, centerColor);
   gradient.addColorStop(1, baseColor);
@@ -88,23 +92,30 @@ function renderTextOverlay(ctx, engineResult, palette, width, height) {
 function setWallpaper(filePath) {
   const uri = `file://${filePath}`;
 
+  const gsettingsOk = (args) => spawnSync('gsettings', args, { timeout: 5000 }).status === 0;
+
   try {
-    execSync(`gsettings set org.gnome.desktop.background picture-uri "${uri}"`, { timeout: 5000 });
-    execSync(`gsettings set org.gnome.desktop.background picture-uri-dark "${uri}"`, {
-      timeout: 5000,
-    });
-    execSync('gsettings set org.gnome.desktop.background picture-options "zoom"', {
-      timeout: 5000,
-    });
-    return 'gsettings';
-  } catch {
-    try {
-      execSync(`feh --bg-scale "${filePath}"`, { timeout: 5000 });
-      return 'feh';
-    } catch {
-      return null;
+    const r1 = gsettingsOk(['set', 'org.gnome.desktop.background', 'picture-uri', uri]);
+    const r2 = gsettingsOk(['set', 'org.gnome.desktop.background', 'picture-uri-dark', uri]);
+    const r3 = gsettingsOk(['set', 'org.gnome.desktop.background', 'picture-options', 'zoom']);
+
+    if (r1 && r2 && r3) {
+      return 'gsettings';
     }
+  } catch {
+    // gsettings not available
   }
+
+  try {
+    const result = spawnSync('feh', ['--bg-scale', filePath], { timeout: 5000 });
+    if (result.status === 0) {
+      return 'feh';
+    }
+  } catch {
+    // feh not available
+  }
+
+  return null;
 }
 
 function update(palette, { engineResult = null, force = false, resolution = null } = {}) {

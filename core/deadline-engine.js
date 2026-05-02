@@ -6,7 +6,10 @@ const DEFAULT_PRIORITY_WEIGHTS = [2.0, 1.5, 1.0, 0.5];
 const DEFAULT_K = 0.05;
 const MS_PER_HOUR = 3600000;
 
-function computeTaskUrgency(task, { k = DEFAULT_K, priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = {}) {
+function computeTaskUrgency(
+  task,
+  { k = DEFAULT_K, priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = {},
+) {
   if (task.is_done) {
     return null;
   }
@@ -39,9 +42,7 @@ function computeTaskUrgency(task, { k = DEFAULT_K, priorityWeights = DEFAULT_PRI
     };
   }
 
-  const weight = task.ai_stress
-    ? task.ai_stress / 5
-    : priorityWeights[task.priority - 1] || 1.0;
+  const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
 
   const urgencyRaw = weight / Math.max(hoursRemaining, 0.5);
   const urgencyScore = 1 - Math.exp(-k * urgencyRaw);
@@ -77,9 +78,7 @@ function computeGlobalScore(tasks, options = {}) {
   let totalWeight = 0;
 
   for (const task of scored) {
-    const weight = task.ai_stress
-      ? task.ai_stress / 5
-      : priorityWeights[task.priority - 1] || 1.0;
+    const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
 
     weightedSum += task.urgency_score * weight;
     totalWeight += weight;

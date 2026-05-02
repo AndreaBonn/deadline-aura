@@ -1,6 +1,6 @@
 'use strict';
 
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 let lastNotifiedAt = 0;
 
@@ -64,10 +64,14 @@ function send(engineResult, config) {
   const body = `${task.title} ${countdown}`.trim();
 
   try {
-    execSync(
-      `notify-send --urgency=normal --app-name="DeadlineAura" "Scadenza imminente" "${body.replace(/"/g, '\\"')}"`,
-      { timeout: 5000 },
+    const result = spawnSync(
+      'notify-send',
+      ['--urgency=normal', '--app-name=DeadlineAura', 'Scadenza imminente', body],
+      { timeout: 5000, encoding: 'utf-8' },
     );
+    if (result.error || result.status !== 0) {
+      return { sent: false, error: 'notify-send failed' };
+    }
     lastNotifiedAt = Date.now();
     return { sent: true, task: task.id };
   } catch {

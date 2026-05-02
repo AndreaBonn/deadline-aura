@@ -13,7 +13,9 @@ describe('google-calendar normalization', () => {
     });
 
     it('returns 2 for events with priority keywords in description', () => {
-      expect(assignPriority({ summary: 'Meeting', description: 'Discuss deadline for Q3' })).toBe(2);
+      expect(assignPriority({ summary: 'Meeting', description: 'Discuss deadline for Q3' })).toBe(
+        2,
+      );
     });
 
     it('returns 3 for normal events', () => {

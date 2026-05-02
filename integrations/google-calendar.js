@@ -28,7 +28,19 @@ function loadSavedToken(oAuth2Client) {
     return false;
   }
 
-  const token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
+  let token;
+  try {
+    token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
+  } catch {
+    console.error('Google Calendar: token file corrupted, re-authenticating');
+    return false;
+  }
+
+  if (!token || typeof token !== 'object' || (!token.access_token && !token.refresh_token)) {
+    console.error('Google Calendar: token file invalid, re-authenticating');
+    return false;
+  }
+
   oAuth2Client.setCredentials(token);
 
   oAuth2Client.on('tokens', (newTokens) => {
@@ -67,7 +79,7 @@ function startAuthFlow(oAuth2Client) {
         const { tokens } = await oAuth2Client.getToken(code);
         oAuth2Client.setCredentials(tokens);
 
-        fs.mkdirSync(CONFIG_DIR, { recursive: true });
+        fs.mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
         fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
         fs.chmodSync(TOKEN_PATH, 0o600);
 
@@ -85,8 +97,8 @@ function startAuthFlow(oAuth2Client) {
     });
 
     server.listen(OAUTH_PORT, () => {
-      const { exec } = require('child_process');
-      exec(`xdg-open "${authUrl}"`);
+      const { spawn } = require('child_process');
+      spawn('xdg-open', [authUrl], { detached: true, stdio: 'ignore' }).unref();
     });
 
     server.on('error', reject);

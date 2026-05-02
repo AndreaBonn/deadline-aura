@@ -1,42 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
-  <link rel="stylesheet" href="styles.css">
-  <title>DeadlineAura</title>
-</head>
-<body>
-  <div class="sidebar">
-    <div class="clock-section">
-      <div class="clock-time" id="clock">--:--</div>
-      <div class="clock-date" id="clockDate"></div>
-    </div>
-
-    <div class="urgency-section">
-      <div class="urgency-bar-container">
-        <div class="urgency-bar-fill" id="urgencyBar"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <title>DeadlineAura</title>
+  </head>
+  <body>
+    <div class="sidebar">
+      <div class="clock-section">
+        <div class="clock-time" id="clock">--:--</div>
+        <div class="clock-date" id="clockDate"></div>
       </div>
-      <div class="urgency-meta">
-        <span id="urgencyLabel">--</span>
-        <span id="urgencyScore">0.00</span>
+
+      <div class="urgency-section">
+        <div class="urgency-bar-container">
+          <div class="urgency-bar-fill" id="urgencyBar"></div>
+        </div>
+        <div class="urgency-meta">
+          <span id="urgencyLabel">--</span>
+          <span id="urgencyScore">0.00</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="tasks-container" id="tasksContainer">
+        <div class="empty-state">Nessun task in arrivo</div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="footer-btn" id="btnConfig">&#9881; Config</button>
+        <span class="sync-status" id="syncStatus">--</span>
+        <button class="footer-btn" id="btnSync">&#8635; Sync</button>
       </div>
     </div>
 
-    <div class="divider"></div>
-
-    <div class="tasks-container" id="tasksContainer">
-      <div class="empty-state">Nessun task in arrivo</div>
-    </div>
-
-    <div class="sidebar-footer">
-      <button class="footer-btn" id="btnConfig">&#9881; Config</button>
-      <span class="sync-status" id="syncStatus">--</span>
-      <button class="footer-btn" id="btnSync">&#8635; Sync</button>
-    </div>
-  </div>
-
-  <script src="sidebar.js"></script>
-</body>
+    <script src="sidebar.js"></script>
+  </body>
 </html>

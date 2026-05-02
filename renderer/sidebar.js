@@ -49,8 +49,12 @@ function renderTaskList(tasks, palette) {
     return;
   }
 
-  const gcalTasks = tasks.filter(function(t) { return t.source === 'gcal'; });
-  const jiraTasks = tasks.filter(function(t) { return t.source === 'jira'; });
+  const gcalTasks = tasks.filter(function (t) {
+    return t.source === 'gcal';
+  });
+  const jiraTasks = tasks.filter(function (t) {
+    return t.source === 'jira';
+  });
 
   if (gcalTasks.length > 0) {
     renderSection(container, 'Google Calendar', gcalTasks, palette);
@@ -83,47 +87,57 @@ function renderSection(container, title, tasks, _palette) {
     const isCritical = task.urgency_score > 0.8;
     const countdown = formatCountdown(task.hours_remaining);
 
-    const categoryBadge = task.ai_category
-      ? `<span class="task-category">${task.ai_category}</span>`
-      : '';
+    const header = document.createElement('div');
+    header.className = 'task-header';
 
-    card.innerHTML =
-      '<div class="task-header">' +
-        '<div class="task-title">' + escapeHtml(task.title) + '</div>' +
-        '<div class="task-countdown" style="color: ' + color + '">' +
-          countdown +
-          ' <span class="task-dot' + (isCritical ? ' critical' : '') +
-          '" style="background: ' + color + '"></span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="task-meta">' +
-        task.source + (task.priority ? ' · P' + task.priority : '') +
-        categoryBadge +
-      '</div>';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'task-title';
+    titleEl.textContent = task.title;
+
+    const dot = document.createElement('span');
+    dot.className = 'task-dot' + (isCritical ? ' critical' : '');
+    dot.style.background = color;
+
+    const countdownEl = document.createElement('div');
+    countdownEl.className = 'task-countdown';
+    countdownEl.style.color = color;
+    countdownEl.textContent = countdown + ' ';
+    countdownEl.appendChild(dot);
+
+    header.appendChild(titleEl);
+    header.appendChild(countdownEl);
+
+    const meta = document.createElement('div');
+    meta.className = 'task-meta';
+    meta.textContent = String(task.source) + (task.priority ? ' · P' + Number(task.priority) : '');
+
+    if (task.ai_category) {
+      const badge = document.createElement('span');
+      badge.className = 'task-category';
+      badge.textContent = task.ai_category;
+      meta.appendChild(badge);
+    }
+
+    card.appendChild(header);
+    card.appendChild(meta);
 
     container.appendChild(card);
   }
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
 updateClock();
 setInterval(updateClock, 1000);
 
-document.getElementById('btnSync').addEventListener('click', function() {
+document.getElementById('btnSync').addEventListener('click', function () {
   window.deadlineAura.syncNow();
   document.getElementById('syncStatus').textContent = 'sync...';
 });
 
-document.getElementById('btnConfig').addEventListener('click', function() {
+document.getElementById('btnConfig').addEventListener('click', function () {
   window.deadlineAura.openConfig();
 });
 
-window.deadlineAura.onUpdate(function(data) {
+window.deadlineAura.onUpdate(function (data) {
   renderUrgencyBar(data.engineResult.global_score, data.palette);
   renderTaskList(data.engineResult.tasks, data.palette);
   document.getElementById('syncStatus').textContent = 'aggiornato';
