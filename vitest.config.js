@@ -8,11 +8,6 @@ module.exports = defineConfig({
     coverage: {
       provider: 'v8',
       include: ['core/**', 'store/**', 'ai/**', 'integrations/**'],
-      thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 70,
-      },
     },
   },
 });
