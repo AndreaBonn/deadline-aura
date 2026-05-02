@@ -13,9 +13,7 @@ const DEFAULTS = {
     },
     jira: {
       enabled: true,
-      domain: '',
-      email: '',
-      api_token: '',
+      instances: [],
       jql: 'assignee = currentUser() AND statusCategory != Done',
     },
   },

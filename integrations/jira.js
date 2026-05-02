@@ -70,25 +70,12 @@ function normalizeIssue(issue) {
   };
 }
 
-async function fetchIssues(config) {
-  const { jira: jiraConfig } = config.sources;
-
-  if (!jiraConfig.enabled) {
-    return [];
-  }
-
-  const { domain, email, api_token: apiToken, jql } = jiraConfig;
-
-  if (!domain || !email || !apiToken) {
-    console.error('Jira: domain, email, and api_token required');
-    return [];
-  }
-
+async function fetchFromInstance({ domain, email, apiToken, jql }) {
   const authHeader = buildAuthHeader(email, apiToken);
   const baseUrl = `https://${domain}/rest/api/3/search`;
   const fields = 'summary,priority,duedate,status,assignee';
 
-  const allIssues = [];
+  const issues = [];
   let startAt = 0;
   let total = Infinity;
 
@@ -110,16 +97,69 @@ async function fetchIssues(config) {
       });
 
       total = data.total || 0;
-      const issues = (data.issues || []).map(normalizeIssue);
-      allIssues.push(...issues);
+      issues.push(...(data.issues || []).map(normalizeIssue));
       startAt += MAX_RESULTS_PER_PAGE;
     } catch (err) {
-      console.error('Jira: fetch error:', err.message);
+      console.error(`Jira [${domain}]: fetch error:`, err.message);
       break;
     }
   }
 
-  return allIssues;
+  return issues;
+}
+
+function resolveInstances(config) {
+  const { jira: jiraConfig } = config.sources;
+
+  if (jiraConfig.instances && jiraConfig.instances.length > 0) {
+    return jiraConfig.instances;
+  }
+
+  // Fallback: env vars JIRA_DOMAINS=domain1,domain2
+  const domains = (process.env.JIRA_DOMAINS || process.env.JIRA_DOMAIN || '')
+    .split(',')
+    .filter(Boolean);
+  const email = process.env.JIRA_EMAIL || '';
+  const apiToken = process.env.JIRA_API_TOKEN || '';
+
+  if (domains.length === 0 || !email || !apiToken) {
+    return [];
+  }
+
+  return domains.map((domain) => ({
+    domain: domain.trim(),
+    email,
+    apiToken,
+    jql: jiraConfig.jql,
+  }));
+}
+
+async function fetchIssues(config) {
+  const { jira: jiraConfig } = config.sources;
+
+  if (!jiraConfig.enabled) {
+    return [];
+  }
+
+  const instances = resolveInstances(config);
+
+  if (instances.length === 0) {
+    console.error('Jira: no instances configured (set JIRA_DOMAINS, JIRA_EMAIL, JIRA_API_TOKEN)');
+    return [];
+  }
+
+  const results = await Promise.all(
+    instances.map((inst) =>
+      fetchFromInstance({
+        domain: inst.domain,
+        email: inst.email,
+        apiToken: inst.apiToken || inst.api_token,
+        jql: inst.jql || jiraConfig.jql,
+      }),
+    ),
+  );
+
+  return results.flat();
 }
 
 module.exports = {
