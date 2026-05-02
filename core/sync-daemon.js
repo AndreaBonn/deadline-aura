@@ -119,9 +119,9 @@ async function fetchWithErrorCapture(fetchFn, source, errors) {
 }
 
 if (require.main === module) {
-  const { DEFAULTS } = require('../config/defaults');
+  const { loadConfig } = require('../config/loader');
 
-  sync(DEFAULTS)
+  sync(loadConfig())
     .then((result) => {
       console.log(`Sync complete: gcal=${result.gcal}, jira=${result.jira}`);
       if (result.errors.length > 0) {

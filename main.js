@@ -9,7 +9,8 @@ const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
-const { DEFAULTS } = require('./config/defaults');
+const { loadConfig } = require('./config/loader');
+const config = loadConfig();
 
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = 24 * 3600000;
@@ -93,7 +94,7 @@ function buildStripHTML(accentColor) {
 function createDockForDisplay(display) {
   const { width, height } = display.workAreaSize;
   const { x: wx, y: wy } = display.workArea;
-  const sidebarWidth = DEFAULTS.sidebar.width;
+  const sidebarWidth = config.sidebar.width;
   const accentColor = currentPalette ? currentPalette.accent : '#1a1c2e';
 
   // Colored strip — always visible at right edge
@@ -255,15 +256,15 @@ function createAllDocks() {
 function runUpdateCycle() {
   try {
     const engineResult = deadlineEngine.run({
-      lookaheadHours: DEFAULTS.sync.lookahead_hours,
-      k: DEFAULTS.engine.k_constant,
-      priorityWeights: DEFAULTS.engine.priority_weights,
+      lookaheadHours: config.sync.lookahead_hours,
+      k: config.engine.k_constant,
+      priorityWeights: config.engine.priority_weights,
     });
 
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
     currentPalette = palette;
 
-    if (DEFAULTS.wallpaper.enabled) {
+    if (config.wallpaper.enabled) {
       wallpaperChanger.update(palette, { engineResult });
     }
 
@@ -295,7 +296,7 @@ app.whenReady().then(() => {
   ipcMain.on('sync-now', async () => {
     try {
       const syncDaemon = require('./core/sync-daemon');
-      await syncDaemon.sync(DEFAULTS);
+      await syncDaemon.sync(config);
       runUpdateCycle();
     } catch (err) {
       console.error('Manual sync error:', err.message);
