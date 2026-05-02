@@ -61,7 +61,8 @@ describe('google-calendar normalization', () => {
       };
 
       const result = normalizeEvent(event);
-      expect(result.due_at).toBeGreaterThan(Date.now());
+      expect(result.due_at).toBe(new Date(tomorrow + 'T00:00:00').getTime());
+      expect(result.all_day).toBe(true);
     });
 
     it('returns null for past events', () => {

@@ -73,9 +73,13 @@ function renderTaskList(tasks, palette) {
     return;
   }
 
-  const gcalTasks = tasks.filter(function (t) {
-    return t.source === 'gcal';
-  });
+  const gcalTasks = tasks
+    .filter(function (t) {
+      return t.source === 'gcal';
+    })
+    .sort(function (a, b) {
+      return (a.due_at || 0) - (b.due_at || 0);
+    });
   const jiraTasks = filterJiraTasks(
     tasks.filter(function (t) {
       return t.source === 'jira';

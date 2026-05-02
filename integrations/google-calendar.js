@@ -150,17 +150,18 @@ function normalizeEvent(event, priorityKeywords) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
     : event.end?.date
-      ? new Date(event.end.date).getTime()
+      ? new Date(event.end.date + 'T23:59:59').getTime()
       : null;
 
   if (endTime && endTime < Date.now()) {
     return null;
   }
 
+  const allDay = !event.end?.dateTime && !!event.end?.date;
   const dueAt = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
     : event.end?.date
-      ? new Date(event.end.date + 'T23:59:59').getTime()
+      ? new Date(event.end.date + 'T00:00:00').getTime()
       : null;
 
   return {
@@ -168,6 +169,7 @@ function normalizeEvent(event, priorityKeywords) {
     source: 'gcal',
     title: event.summary || '(no title)',
     due_at: dueAt,
+    all_day: allDay,
     priority: assignPriority(event, priorityKeywords),
     is_done: 0,
     web_url: event.htmlLink || null,
