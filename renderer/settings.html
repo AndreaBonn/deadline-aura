@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="settings.css" />
+    <title>DeadlineAura — Impostazioni</title>
+  </head>
+  <body>
+    <div class="titlebar">
+      <span class="titlebar-title">Impostazioni</span>
+      <button class="titlebar-close" id="btnClose">&#10005;</button>
+    </div>
+
+    <div class="settings-layout">
+      <nav class="settings-nav" id="settingsNav">
+        <button class="nav-item active" data-tab="generale">Generale</button>
+        <button class="nav-item" data-tab="sorgenti">Sorgenti</button>
+        <button class="nav-item" data-tab="ai">AI</button>
+        <button class="nav-item" data-tab="wallpaper">Wallpaper</button>
+        <button class="nav-item" data-tab="sidebar">Sidebar</button>
+        <button class="nav-item" data-tab="notifiche">Notifiche</button>
+        <button class="nav-item" data-tab="ui">Interfaccia</button>
+        <button class="nav-item" data-tab="avanzate">Avanzate</button>
+      </nav>
+
+      <main class="settings-content" id="settingsContent"></main>
+    </div>
+
+    <div class="settings-actions">
+      <button class="btn btn--secondary" id="btnReset">Reset sezione</button>
+      <div class="actions-spacer"></div>
+      <span class="save-feedback" id="saveFeedback"></span>
+      <button class="btn btn--primary" id="btnSave">Salva</button>
+    </div>
+
+    <script src="settings-fields.js"></script>
+    <script src="settings.js"></script>
+  </body>
+</html>

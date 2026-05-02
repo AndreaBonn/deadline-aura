@@ -10,8 +10,12 @@ const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
-const { loadConfig } = require('./config/loader');
-const config = loadConfig();
+const { loadConfig, saveConfig } = require('./config/loader');
+const { DEFAULTS } = require('./config/defaults');
+const { configSchema } = require('./config/schema');
+let config = loadConfig();
+
+let settingsWindow = null;
 
 let overlayWindow = null;
 
@@ -26,6 +30,29 @@ let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette, desktop
 let currentPalette = null;
 let isDesktopActive = false;
 let desktopCheckInterval = null;
+
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  settingsWindow = new BrowserWindow({
+    width: 720,
+    height: 560,
+    frame: false,
+    resizable: false,
+    backgroundColor: '#0a0c14',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-settings.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
 
 function getOwnWindowIds() {
   const ids = new Set();
@@ -376,7 +403,30 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('open-config', () => {
-    console.log('Config window not yet implemented');
+    openSettingsWindow();
+  });
+
+  ipcMain.handle('settings:get-config', () => config);
+  ipcMain.handle('settings:get-defaults', () => DEFAULTS);
+  ipcMain.handle('settings:save-config', (_event, newConfig) => {
+    const result = configSchema.safeParse(newConfig);
+    if (!result.success) {
+      return { ok: false, errors: result.error.flatten().fieldErrors };
+    }
+    saveConfig(result.data);
+    config = loadConfig();
+    for (const dock of docks) {
+      if (!dock.sidebar.isDestroyed()) {
+        dock.sidebar.webContents.send('config-changed', config);
+      }
+    }
+    return { ok: true };
+  });
+
+  ipcMain.on('settings:close', () => {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close();
+    }
   });
 
   ipcMain.on('pin-task', (_event, { taskId, displayId }) => {
