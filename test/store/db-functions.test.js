@@ -3,11 +3,11 @@ const fs = require('fs');
 const os = require('os');
 
 // Override DB path before requiring db module
-const TEST_DB_DIR = path.join(os.tmpdir(), 'deadlineaura-fn-test-' + process.pid);
-const TEST_DB_PATH = path.join(TEST_DB_DIR, 'db.sqlite');
 
 // Must mock before requiring db.js which reads DATA_DIR at module level
-vi.spyOn(os, 'homedir').mockReturnValue(path.join(os.tmpdir(), 'deadlineaura-fn-test-home-' + process.pid));
+vi.spyOn(os, 'homedir').mockReturnValue(
+  path.join(os.tmpdir(), 'deadlineaura-fn-test-home-' + process.pid),
+);
 
 // Now require db module — it will use the mocked homedir
 const db = require('../../store/db');
@@ -15,7 +15,13 @@ const db = require('../../store/db');
 afterAll(() => {
   db.close();
   // Clean up the temp directory
-  const dataDir = path.join(os.tmpdir(), 'deadlineaura-fn-test-home-' + process.pid, '.local', 'share', 'deadlineaura');
+  const dataDir = path.join(
+    os.tmpdir(),
+    'deadlineaura-fn-test-home-' + process.pid,
+    '.local',
+    'share',
+    'deadlineaura',
+  );
   if (fs.existsSync(dataDir)) {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
@@ -28,6 +34,7 @@ const SAMPLE_TASK = {
   due_at: Date.now() + 24 * 3600000,
   priority: 3,
   is_done: 0,
+  web_url: null,
   raw_json: '{"summary":"Test"}',
   synced_at: Date.now(),
 };
@@ -192,7 +199,9 @@ describe('db module exported functions', () => {
 
     it('removes old scores (older than 7 days)', () => {
       const oldTime = Date.now() - 8 * 24 * 3600000;
-      db.getDb().prepare('INSERT INTO scores (global_score, computed_at) VALUES (?, ?)').run(0.5, oldTime);
+      db.getDb()
+        .prepare('INSERT INTO scores (global_score, computed_at) VALUES (?, ?)')
+        .run(0.5, oldTime);
       db.saveGlobalScore(0.8);
 
       db.cleanupOldRecords();
@@ -215,7 +224,9 @@ describe('db module exported functions', () => {
 
     it('removes old AI cache entries', () => {
       const oldTime = Date.now() - 8 * 24 * 3600000;
-      db.getDb().prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)').run('old_hash', '{}', oldTime);
+      db.getDb()
+        .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
+        .run('old_hash', '{}', oldTime);
 
       db.cleanupOldRecords();
 

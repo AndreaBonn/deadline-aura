@@ -1,15 +1,20 @@
 const { fetchIssues } = require('../../integrations/jira');
 
 function makeConfig(overrides = {}) {
+  const { enabled = true, instances, ...rest } = overrides;
   return {
     sources: {
       jira: {
-        enabled: true,
-        domain: 'test.atlassian.net',
-        email: 'user@test.com',
-        api_token: 'test-token',
+        enabled,
         jql: 'assignee = currentUser()',
-        ...overrides,
+        instances: instances || [
+          {
+            domain: 'test.atlassian.net',
+            email: 'user@test.com',
+            api_token: 'test-token',
+            ...rest,
+          },
+        ],
       },
     },
   };
@@ -37,9 +42,9 @@ describe('jira fetchIssues', () => {
     expect(result).toEqual([]);
   });
 
-  it('returns empty array when credentials missing', async () => {
+  it('returns empty array when no instances configured', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const config = makeConfig({ domain: '', email: '', api_token: '' });
+    const config = makeConfig({ instances: [] });
     const result = await fetchIssues(config);
     expect(result).toEqual([]);
     consoleSpy.mockRestore();
@@ -110,7 +115,8 @@ describe('jira fetchIssues', () => {
   it('constructs correct JQL query URL', async () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockJiraResponse([]));
 
-    const config = makeConfig({ jql: 'project = TEST' });
+    const config = makeConfig();
+    config.sources.jira.jql = 'project = TEST';
     await fetchIssues(config);
 
     const url = global.fetch.mock.calls[0][0];

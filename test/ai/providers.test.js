@@ -134,7 +134,6 @@ describe('AnthropicProvider', () => {
 
     expect(result).toBe('{"global_stress": 7}');
     const fetchCall = global.fetch.mock.calls[0];
-    const headers = JSON.parse(fetchCall[1].body);
     expect(fetchCall[0]).toBe('https://api.anthropic.com/v1/messages');
 
     vi.restoreAllMocks();
