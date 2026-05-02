@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=DeadlineAura
-Exec=/usr/bin/deadlineaura --no-sandbox
+Exec=/home/bonn/.nvm/versions/node/v20.20.0/bin/npx electron /home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura --no-sandbox
 Icon=deadlineaura
 Comment=Deadline-aware desktop widget
 Categories=Utility;

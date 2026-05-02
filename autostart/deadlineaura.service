@@ -1,0 +1,16 @@
+[Unit]
+Description=DeadlineAura - Deadline-aware desktop widget
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=NODE_ENV=production
+PassEnvironment=DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR
+ExecStart=/home/bonn/.nvm/versions/node/v20.20.0/bin/npx electron /home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura --no-sandbox
+WorkingDirectory=/home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
