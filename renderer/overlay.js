@@ -1,6 +1,7 @@
 'use strict';
 
 let pinnedTasks = [];
+let currentDisplayId = 'default';
 let dragState = null;
 
 function formatCountdown(dueAt) {
@@ -37,14 +38,24 @@ function createPostitGhost(task) {
   const countdown = formatCountdown(task.due_at);
 
   el.innerHTML =
-    '<div class="postit-header ' + pClass + '">' +
-    '  <span class="postit-code">' + escapeHtml(code) + '</span>' +
-    '  <span class="postit-countdown">' + escapeHtml(countdown) + '</span>' +
+    '<div class="postit-header ' +
+    pClass +
+    '">' +
+    '  <span class="postit-code">' +
+    escapeHtml(code) +
+    '</span>' +
+    '  <span class="postit-countdown">' +
+    escapeHtml(countdown) +
+    '</span>' +
     '</div>' +
     '<div class="postit-body">' +
-    '  <div class="postit-title">' + escapeHtml(task.title) + '</div>' +
+    '  <div class="postit-title">' +
+    escapeHtml(task.title) +
     '</div>' +
-    '<div class="postit-accent ' + pClass + '"></div>';
+    '</div>' +
+    '<div class="postit-accent ' +
+    pClass +
+    '"></div>';
 
   el.addEventListener('mousedown', onDragStart);
 
@@ -110,6 +121,7 @@ function collectPositions() {
     const ghost = ghosts[i];
     positions.push({
       taskId: ghost.dataset.taskId,
+      displayId: currentDisplayId,
       xPct: parseFloat(ghost.style.left),
       yPct: parseFloat(ghost.style.top),
     });
@@ -119,6 +131,7 @@ function collectPositions() {
 
 function init(data) {
   pinnedTasks = data.pinnedTasks || [];
+  currentDisplayId = data.displayId || 'default';
   const canvas = document.getElementById('overlayCanvas');
   canvas.innerHTML = '';
 

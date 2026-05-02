@@ -256,7 +256,7 @@ function createAllDocks() {
   docks = displays.map((d) => createDockForDisplay(d));
 }
 
-async function runUpdateCycle() {
+async function runUpdateCycle({ force = false } = {}) {
   try {
     const engineResult = deadlineEngine.run({
       lookaheadHours: config.sync.lookahead_hours,
@@ -270,6 +270,7 @@ async function runUpdateCycle() {
     if (config.wallpaper.enabled) {
       await wallpaperChanger.update(palette, {
         engineResult,
+        force,
         electronScreen: screen,
       });
     }
@@ -380,7 +381,7 @@ app.whenReady().then(() => {
 
   ipcMain.on('pin-task', (_event, { taskId, displayId }) => {
     pinnedQueries.pinTask({ taskId, displayId: displayId || 'default' });
-    runUpdateCycle();
+    runUpdateCycle({ force: true });
   });
 
   ipcMain.on('unpin-task', (_event, { taskId, displayId }) => {
@@ -389,7 +390,7 @@ app.whenReady().then(() => {
     } else {
       pinnedQueries.unpinTaskFromAll(taskId);
     }
-    runUpdateCycle();
+    runUpdateCycle({ force: true });
   });
 
   ipcMain.on('open-overlay', (_event, { displayId }) => {
@@ -398,10 +399,11 @@ app.whenReady().then(() => {
 
   ipcMain.on('save-positions', (_event, positions) => {
     pinnedQueries.updatePositions(positions);
+    wallpaperChanger.setOverlayOpen(false);
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.close();
     }
-    runUpdateCycle();
+    runUpdateCycle({ force: true });
   });
 
   ipcMain.on('overlay-cancel', () => {

@@ -33,14 +33,17 @@ function detectDisplaysFromXrandr() {
 }
 
 function detectDisplaysFromElectron(screen) {
-  return screen.getAllDisplays().map((d) => ({
-    id: String(d.id),
-    width: d.size.width,
-    height: d.size.height,
-    x: d.bounds.x,
-    y: d.bounds.y,
-    primary: d.bounds.x === 0 && d.bounds.y === 0,
-  }));
+  return screen.getAllDisplays().map((d) => {
+    const scale = d.scaleFactor || 1;
+    return {
+      id: String(d.id),
+      width: Math.round(d.size.width * scale),
+      height: Math.round(d.size.height * scale),
+      x: Math.round(d.bounds.x * scale),
+      y: Math.round(d.bounds.y * scale),
+      primary: d.bounds.x === 0 && d.bounds.y === 0,
+    };
+  });
 }
 
 function computeCanvasGeometry(displays) {
@@ -81,7 +84,11 @@ function detectDisplays(electronScreen) {
   if (electronScreen) {
     return detectDisplaysFromElectron(electronScreen);
   }
-  return detectDisplaysFromXrandr() || [{ id: 'default', width: 1920, height: 1080, x: 0, y: 0, primary: true }];
+  return (
+    detectDisplaysFromXrandr() || [
+      { id: 'default', width: 1920, height: 1080, x: 0, y: 0, primary: true },
+    ]
+  );
 }
 
 module.exports = {
