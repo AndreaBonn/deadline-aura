@@ -3,6 +3,7 @@
 require('dotenv').config();
 
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { execFile } = require('child_process');
 const path = require('path');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
@@ -15,9 +16,75 @@ const CLEANUP_INTERVAL_MS = 24 * 3600000;
 const STRIP_WIDTH = 6;
 const AUTOHIDE_DELAY_MS = 500;
 const MOUSE_POLL_MS = 100;
+const DESKTOP_CHECK_MS = 1000;
 
-let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette }
+let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette, desktopPinned }
 let currentPalette = null;
+let isDesktopActive = false;
+let desktopCheckInterval = null;
+
+function getOwnWindowIds() {
+  const ids = new Set();
+  for (const dock of docks) {
+    if (!dock.sidebar.isDestroyed()) {
+      const buf = dock.sidebar.getNativeWindowHandle();
+      ids.add(buf.readUInt32LE(0));
+    }
+    if (!dock.strip.isDestroyed()) {
+      const buf = dock.strip.getNativeWindowHandle();
+      ids.add(buf.readUInt32LE(0));
+    }
+  }
+  return ids;
+}
+
+function checkDesktopState() {
+  execFile('xprop', ['-root', '_NET_ACTIVE_WINDOW'], (err, stdout) => {
+    if (err) {
+      return;
+    }
+    const match = stdout.match(/#\s*(0x[\da-f]+)/i);
+    if (!match || match[1] === '0x0') {
+      setDesktopActive(true);
+      return;
+    }
+
+    const activeHex = match[1];
+    const activeId = parseInt(activeHex, 16);
+    const ownIds = getOwnWindowIds();
+    if (ownIds.has(activeId)) {
+      return;
+    }
+
+    execFile('xprop', ['-id', activeHex, '_NET_WM_WINDOW_TYPE'], (err2, stdout2) => {
+      if (err2) {
+        return;
+      }
+      if (stdout2.includes('_NET_WM_WINDOW_TYPE_DESKTOP')) {
+        setDesktopActive(true);
+      } else {
+        setDesktopActive(false);
+      }
+    });
+  });
+}
+
+function setDesktopActive(active) {
+  if (isDesktopActive === active) {
+    return;
+  }
+  isDesktopActive = active;
+
+  for (const dock of docks) {
+    if (active) {
+      dock.desktopPinned = true;
+      openDock(dock);
+    } else {
+      dock.desktopPinned = false;
+      closeDock(dock);
+    }
+  }
+}
 
 function buildStripHTML(accentColor) {
   return `<html><body style="margin:0;background:${accentColor};cursor:default;"></body></html>`;
@@ -74,11 +141,23 @@ function createDockForDisplay(display) {
   sidebar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
   sidebar.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  const dock = { sidebar, strip, hideTimeout: null, pollInterval: null, palette: null };
+  const dock = {
+    sidebar,
+    strip,
+    hideTimeout: null,
+    pollInterval: null,
+    palette: null,
+    desktopPinned: false,
+  };
 
   // Poll mouse position — detect hover over strip or sidebar
   dock.pollInterval = setInterval(() => {
     const cursor = screen.getCursorScreenPoint();
+
+    // Desktop pinned — sidebar stays open, skip autohide logic
+    if (dock.desktopPinned) {
+      return;
+    }
 
     if (!sidebar.isVisible()) {
       // Check if mouse is over the strip
@@ -120,13 +199,17 @@ function createDockForDisplay(display) {
 
   sidebar.on('closed', () => {
     clearInterval(dock.pollInterval);
-    if (!strip.isDestroyed()) strip.close();
+    if (!strip.isDestroyed()) {
+      strip.close();
+    }
     docks = docks.filter((d) => d !== dock);
   });
 
   strip.on('closed', () => {
     clearInterval(dock.pollInterval);
-    if (!sidebar.isDestroyed()) sidebar.close();
+    if (!sidebar.isDestroyed()) {
+      sidebar.close();
+    }
   });
 
   return dock;
@@ -137,15 +220,21 @@ function openDock(dock) {
     clearTimeout(dock.hideTimeout);
     dock.hideTimeout = null;
   }
-  if (!dock.strip.isDestroyed()) dock.strip.hide();
+  if (!dock.strip.isDestroyed()) {
+    dock.strip.hide();
+  }
   if (!dock.sidebar.isDestroyed() && !dock.sidebar.isVisible()) {
     dock.sidebar.show();
   }
 }
 
 function closeDock(dock) {
-  if (!dock.sidebar.isDestroyed()) dock.sidebar.hide();
-  if (!dock.strip.isDestroyed()) dock.strip.show();
+  if (!dock.sidebar.isDestroyed()) {
+    dock.sidebar.hide();
+  }
+  if (!dock.strip.isDestroyed()) {
+    dock.strip.show();
+  }
 }
 
 function updateStripColor(palette) {
@@ -200,6 +289,9 @@ app.whenReady().then(() => {
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
 
+  checkDesktopState();
+  desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
+
   ipcMain.on('sync-now', async () => {
     try {
       const syncDaemon = require('./core/sync-daemon');
@@ -216,6 +308,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  clearInterval(desktopCheckInterval);
   db.close();
   app.quit();
 });
