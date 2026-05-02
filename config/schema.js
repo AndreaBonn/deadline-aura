@@ -55,7 +55,6 @@ const configSchema = z.object({
   sidebar: z.object({
     width: z.number().int().min(200).max(400),
     position: z.enum(['left', 'right']),
-    monitor: z.string(),
     opacity: z.number().min(0.1).max(1),
   }),
   notifications: z.object({

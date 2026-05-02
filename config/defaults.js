@@ -42,7 +42,6 @@ const DEFAULTS = {
   sidebar: {
     width: 260,
     position: 'right',
-    monitor: 'primary',
     opacity: 0.75,
   },
   notifications: {
