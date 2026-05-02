@@ -34,21 +34,46 @@ function generateWallpaper(palette, resolution) {
   const ctx = canvas.getContext('2d');
 
   const { h, s, l } = palette.hsl;
-  const baseColor = `hsl(${h}, ${s}%, ${l}%)`;
-  const centerColor = `hsl(${h}, ${s}%, ${Math.min(l + 3, 20)}%)`;
 
-  const gradient = ctx.createRadialGradient(
-    width * 0.4,
-    height * 0.5,
+  // Base fill — dark, slightly desaturated
+  const baseColor = `hsl(${h}, ${Math.max(s - 10, 5)}%, ${Math.max(l - 2, 4)}%)`;
+  ctx.fillStyle = baseColor;
+  ctx.fillRect(0, 0, width, height);
+
+  // Radial glow, offset left-center (sidebar occupies right side)
+  const glowColor = `hsl(${h}, ${s}%, ${Math.min(l + 6, 22)}%)`;
+  const glow = ctx.createRadialGradient(
+    width * 0.35,
+    height * 0.45,
     0,
-    width * 0.4,
-    height * 0.5,
-    Math.max(width, height) * 0.7,
+    width * 0.35,
+    height * 0.45,
+    Math.max(width, height) * 0.65,
   );
-  gradient.addColorStop(0, centerColor);
-  gradient.addColorStop(1, baseColor);
+  glow.addColorStop(0, glowColor);
+  glow.addColorStop(0.55, `hsl(${h}, ${s}%, ${Math.min(l + 1, 14)}%)`);
+  glow.addColorStop(1, baseColor);
 
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+
+  // Subtle secondary glow, upper-right quadrant
+  const accentH = (h + 25) % 360;
+  const accentGlow = ctx.createRadialGradient(
+    width * 0.75,
+    height * 0.2,
+    0,
+    width * 0.75,
+    height * 0.2,
+    Math.max(width, height) * 0.35,
+  );
+  accentGlow.addColorStop(
+    0,
+    `hsla(${accentH}, ${Math.min(s + 5, 70)}%, ${Math.min(l + 4, 18)}%, 0.4)`,
+  );
+  accentGlow.addColorStop(1, 'hsla(0, 0%, 0%, 0)');
+
+  ctx.fillStyle = accentGlow;
   ctx.fillRect(0, 0, width, height);
 
   return canvas;
@@ -59,33 +84,34 @@ function renderTextOverlay(ctx, engineResult, palette, width, height) {
     return;
   }
 
-  const textColor = 'rgba(255, 255, 255, 0.12)';
-  const subtleColor = 'rgba(255, 255, 255, 0.06)';
+  const titleColor = 'rgba(255, 255, 255, 0.25)';
+  const metaColor = 'rgba(255, 255, 255, 0.14)';
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   const marginLeft = 60;
   const marginBottom = 80;
-  let y = height - marginBottom - engineResult.tasks.slice(0, 3).length * 32;
+  const rowHeight = 34;
+  let y = height - marginBottom - engineResult.tasks.slice(0, 3).length * rowHeight;
 
-  ctx.font = '600 13px sans-serif';
-  ctx.fillStyle = subtleColor;
-  ctx.fillText(`urgency ${(engineResult.global_score * 100).toFixed(0)}%`, marginLeft, y - 24);
+  ctx.font = '600 18px sans-serif';
+  ctx.fillStyle = metaColor;
+  ctx.fillText(`urgency ${(engineResult.global_score * 100).toFixed(0)}%`, marginLeft, y - 30);
 
-  ctx.font = '400 14px sans-serif';
+  ctx.font = '400 15px sans-serif';
   for (const task of engineResult.tasks.slice(0, 3)) {
-    ctx.fillStyle = textColor;
+    ctx.fillStyle = titleColor;
     ctx.fillText(task.title, marginLeft, y);
 
     if (task.hours_remaining !== null) {
       const hrs = Math.abs(task.hours_remaining);
       const label = task.hours_remaining < 0 ? 'scaduto' : `${hrs.toFixed(0)}h`;
-      ctx.fillStyle = subtleColor;
-      ctx.fillText(label, marginLeft + 300, y);
+      ctx.fillStyle = metaColor;
+      ctx.fillText(label, marginLeft + 320, y);
     }
 
-    y += 32;
+    y += rowHeight;
   }
 }
 
@@ -134,9 +160,25 @@ function update(palette, { engineResult = null, force = false, resolution = null
   }
 
   const buffer = canvas.toBuffer('image/png');
-  fs.writeFileSync(WALLPAPER_PATH, buffer);
 
-  const method = setWallpaper(WALLPAPER_PATH);
+  // GNOME caches wallpaper by URI — use timestamped path to force reload
+  const timestampedPath = path.join(DATA_DIR, `wallpaper-${Date.now()}.png`);
+  fs.writeFileSync(timestampedPath, buffer);
+
+  const method = setWallpaper(timestampedPath);
+
+  // Cleanup old wallpapers
+  try {
+    const files = fs
+      .readdirSync(DATA_DIR)
+      .filter((f) => f.startsWith('wallpaper-') && f !== path.basename(timestampedPath));
+    for (const old of files) {
+      fs.unlinkSync(path.join(DATA_DIR, old));
+    }
+  } catch {
+    // cleanup is best-effort
+  }
+
   lastScore = palette.hsl.h;
 
   return { changed: true, method, path: WALLPAPER_PATH };

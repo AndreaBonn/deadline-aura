@@ -6,7 +6,7 @@
 
 body {
   font-family: 'Segoe UI', 'Ubuntu', system-ui, sans-serif;
-  background: transparent;
+  background: #0a0c14;
   overflow: hidden;
   -webkit-app-region: no-drag;
 }
@@ -14,12 +14,11 @@ body {
 .sidebar {
   width: 100%;
   height: 100vh;
-  background: rgba(10, 12, 20, 0.82);
-  backdrop-filter: blur(16px);
+  background: #0a0c14;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .clock-section {
