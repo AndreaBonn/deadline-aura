@@ -160,6 +160,7 @@ function normalizeEvent(event, priorityKeywords) {
     due_at: dueAt,
     priority: assignPriority(event, priorityKeywords),
     is_done: 0,
+    web_url: event.htmlLink || null,
     raw_json: JSON.stringify(event),
     synced_at: Date.now(),
   };

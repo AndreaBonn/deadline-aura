@@ -22,6 +22,7 @@ function computeTaskUrgency(
       hours_remaining: null,
       priority: task.priority,
       source: task.source,
+      web_url: task.web_url || null,
       ai_stress: task.ai_stress || null,
       ai_category: task.ai_category || null,
     };
@@ -37,6 +38,7 @@ function computeTaskUrgency(
       hours_remaining: hoursRemaining,
       priority: task.priority,
       source: task.source,
+      web_url: task.web_url || null,
       ai_stress: task.ai_stress || null,
       ai_category: task.ai_category || null,
     };
@@ -54,6 +56,7 @@ function computeTaskUrgency(
     hours_remaining: Math.round(hoursRemaining * 10) / 10,
     priority: task.priority,
     source: task.source,
+    web_url: task.web_url || null,
     ai_stress: task.ai_stress || null,
     ai_category: task.ai_category || null,
   };

@@ -1,0 +1,1 @@
+-- web_url column added via code in db.js (SQLite lacks ALTER TABLE ADD COLUMN IF NOT EXISTS)

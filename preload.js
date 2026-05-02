@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   openConfig: () => ipcRenderer.send('open-config'),
   syncNow: () => ipcRenderer.send('sync-now'),
   markDone: (taskId) => ipcRenderer.send('mark-done', taskId),
+  openLink: (url) => ipcRenderer.send('open-link', url),
 });

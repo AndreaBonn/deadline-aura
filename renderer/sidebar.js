@@ -80,6 +80,12 @@ function renderSection(container, title, tasks, _palette) {
   for (const task of tasks) {
     const card = document.createElement('div');
     card.className = 'task-card';
+    if (task.web_url) {
+      card.classList.add('clickable');
+      card.addEventListener('click', function () {
+        window.deadlineAura.openLink(task.web_url);
+      });
+    }
 
     const color = urgencyToColor(task.urgency_score);
     card.style.borderLeftColor = color;

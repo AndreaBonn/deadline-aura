@@ -54,9 +54,10 @@ async function fetchWithRetry(url, options) {
   throw lastError;
 }
 
-function normalizeIssue(issue) {
+function normalizeIssue(issue, domain) {
   const dueDate = issue.fields?.duedate;
   const dueAt = dueDate ? new Date(dueDate + 'T23:59:59').getTime() : null;
+  const webUrl = domain && issue.key ? `https://${domain}/browse/${issue.key}` : null;
 
   return {
     id: `jira_${issue.id}`,
@@ -65,6 +66,7 @@ function normalizeIssue(issue) {
     due_at: dueAt,
     priority: mapJiraPriority(issue.fields?.priority?.name),
     is_done: 0,
+    web_url: webUrl,
     raw_json: JSON.stringify(issue),
     synced_at: Date.now(),
   };
@@ -97,7 +99,7 @@ async function fetchFromInstance({ domain, email, apiToken, jql }) {
       });
 
       total = data.total || 0;
-      issues.push(...(data.issues || []).map(normalizeIssue));
+      issues.push(...(data.issues || []).map((issue) => normalizeIssue(issue, domain)));
       startAt += MAX_RESULTS_PER_PAGE;
     } catch (err) {
       console.error(`Jira [${domain}]: fetch error:`, err.message);

@@ -37,6 +37,13 @@ function runMigrations(database) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
     database.exec(sql);
   }
+
+  // 002: add web_url column (idempotent)
+  const columns = database.pragma('table_info(tasks)');
+  const hasWebUrl = columns.some((col) => col.name === 'web_url');
+  if (!hasWebUrl) {
+    database.exec('ALTER TABLE tasks ADD COLUMN web_url TEXT');
+  }
 }
 
 function getActiveTasks(lookaheadMs) {
@@ -54,14 +61,15 @@ function getActiveTasks(lookaheadMs) {
 
 function upsertTask(task) {
   const stmt = getDb().prepare(`
-    INSERT INTO tasks (id, source, title, due_at, priority, is_done, is_stale, raw_json, synced_at)
-    VALUES (@id, @source, @title, @due_at, @priority, @is_done, 0, @raw_json, @synced_at)
+    INSERT INTO tasks (id, source, title, due_at, priority, is_done, is_stale, web_url, raw_json, synced_at)
+    VALUES (@id, @source, @title, @due_at, @priority, @is_done, 0, @web_url, @raw_json, @synced_at)
     ON CONFLICT(id) DO UPDATE SET
       title = @title,
       due_at = @due_at,
       priority = @priority,
       is_done = @is_done,
       is_stale = 0,
+      web_url = @web_url,
       raw_json = @raw_json,
       synced_at = @synced_at
   `);

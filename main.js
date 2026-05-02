@@ -2,7 +2,7 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
 const deadlineEngine = require('./core/deadline-engine');
@@ -299,6 +299,12 @@ app.whenReady().then(() => {
       runUpdateCycle();
     } catch (err) {
       console.error('Manual sync error:', err.message);
+    }
+  });
+
+  ipcMain.on('open-link', (_event, url) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+      shell.openExternal(url);
     }
   });
 

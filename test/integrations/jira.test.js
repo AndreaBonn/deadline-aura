@@ -100,6 +100,36 @@ describe('jira normalization', () => {
       expect(raw.key).toBe('API-1');
     });
 
+    it('builds web_url from domain and issue key', () => {
+      const issue = {
+        id: '10047',
+        key: 'PROJ-42',
+        fields: {
+          summary: 'Some task',
+          priority: { name: 'Medium' },
+          duedate: '2026-05-10',
+        },
+      };
+
+      const result = normalizeIssue(issue, 'mycompany.atlassian.net');
+      expect(result.web_url).toBe('https://mycompany.atlassian.net/browse/PROJ-42');
+    });
+
+    it('returns null web_url when domain is not provided', () => {
+      const issue = {
+        id: '10048',
+        key: 'PROJ-43',
+        fields: {
+          summary: 'Another task',
+          priority: { name: 'Low' },
+          duedate: null,
+        },
+      };
+
+      const result = normalizeIssue(issue);
+      expect(result.web_url).toBeNull();
+    });
+
     it('sets due_at to end of day for duedate', () => {
       const issue = {
         id: '10046',
