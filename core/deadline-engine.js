@@ -96,9 +96,22 @@ function computeGlobalScore(tasks, options = {}) {
   };
 }
 
+function getEndOfWeekMs() {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+  const nextSunday = new Date(now);
+  nextSunday.setDate(now.getDate() + daysUntilSunday);
+  nextSunday.setHours(23, 59, 59, 999);
+  return nextSunday.getTime() - Date.now();
+}
+
 function run(options = {}) {
-  const { lookaheadHours = 72 } = options;
-  const tasks = db.getActiveTasks(lookaheadHours * MS_PER_HOUR);
+  const { lookaheadHours } = options;
+  const endOfWeekMs = getEndOfWeekMs();
+  const configMs = lookaheadHours ? lookaheadHours * MS_PER_HOUR : 0;
+  const effectiveMs = Math.max(endOfWeekMs, configMs);
+  const tasks = db.getActiveTasks(effectiveMs);
   const result = computeGlobalScore(tasks, options);
 
   db.saveGlobalScore(result.global_score);

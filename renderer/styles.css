@@ -173,6 +173,57 @@ body {
   padding: 40px 20px;
 }
 
+.section-count {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+.expand-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 4px 12px 8px;
+  padding: 6px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.expand-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.jira-search-wrap {
+  padding: 0 12px 6px;
+}
+
+.jira-search {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.jira-search::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.jira-search:focus {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 .sidebar-footer {
   padding: 12px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);

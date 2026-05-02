@@ -1,5 +1,10 @@
 'use strict';
 
+const COLLAPSED_LIMIT = 5;
+let jiraFilter = '';
+let lastTasks = null;
+let lastPalette = null;
+
 function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
@@ -40,9 +45,27 @@ function renderUrgencyBar(globalScore, palette) {
   document.getElementById('urgencyScore').textContent = globalScore.toFixed(2);
 }
 
+function filterJiraTasks(tasks) {
+  if (!jiraFilter) {
+    return tasks;
+  }
+  const query = jiraFilter.toLowerCase();
+  return tasks.filter(function (t) {
+    return t.title.toLowerCase().includes(query);
+  });
+}
+
 function renderTaskList(tasks, palette) {
   const container = document.getElementById('tasksContainer');
+
+  const searchFocused =
+    document.activeElement && document.activeElement.classList.contains('jira-search');
+  const cursorPos = searchFocused ? document.activeElement.selectionStart : 0;
+
   container.innerHTML = '';
+
+  lastTasks = tasks;
+  lastPalette = palette;
 
   if (!tasks || tasks.length === 0) {
     container.innerHTML = '<div class="empty-state">Nessun task in arrivo</div>';
@@ -52,15 +75,25 @@ function renderTaskList(tasks, palette) {
   const gcalTasks = tasks.filter(function (t) {
     return t.source === 'gcal';
   });
-  const jiraTasks = tasks.filter(function (t) {
-    return t.source === 'jira';
-  });
+  const jiraTasks = filterJiraTasks(
+    tasks.filter(function (t) {
+      return t.source === 'jira';
+    }),
+  );
 
   if (gcalTasks.length > 0) {
-    renderSection(container, 'Google Calendar', gcalTasks, palette);
+    renderSection(container, 'Google Calendar', gcalTasks, palette, 'gcal');
   }
-  if (jiraTasks.length > 0) {
-    renderSection(container, 'Jira', jiraTasks, palette);
+  if (jiraTasks.length > 0 || jiraFilter) {
+    renderJiraSection(container, jiraTasks, palette);
+  }
+
+  if (searchFocused) {
+    const newInput = container.querySelector('.jira-search');
+    if (newInput) {
+      newInput.focus();
+      newInput.setSelectionRange(cursorPos, cursorPos);
+    }
   }
 }
 
@@ -71,63 +104,144 @@ function urgencyToColor(score) {
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
-function renderSection(container, title, tasks, _palette) {
+function createTaskCard(task) {
+  const card = document.createElement('div');
+  card.className = 'task-card';
+  if (task.web_url) {
+    card.classList.add('clickable');
+    card.addEventListener('click', function () {
+      window.deadlineAura.openLink(task.web_url);
+    });
+  }
+
+  const color = urgencyToColor(task.urgency_score);
+  card.style.borderLeftColor = color;
+
+  const isCritical = task.urgency_score > 0.8;
+  const countdown = formatCountdown(task.hours_remaining);
+
+  const header = document.createElement('div');
+  header.className = 'task-header';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'task-title';
+  titleEl.textContent = task.title;
+
+  const dot = document.createElement('span');
+  dot.className = 'task-dot' + (isCritical ? ' critical' : '');
+  dot.style.background = color;
+
+  const countdownEl = document.createElement('div');
+  countdownEl.className = 'task-countdown';
+  countdownEl.style.color = color;
+  countdownEl.textContent = countdown + ' ';
+  countdownEl.appendChild(dot);
+
+  header.appendChild(titleEl);
+  header.appendChild(countdownEl);
+
+  const meta = document.createElement('div');
+  meta.className = 'task-meta';
+  meta.textContent = String(task.source) + (task.priority ? ' · P' + Number(task.priority) : '');
+
+  if (task.ai_category) {
+    const badge = document.createElement('span');
+    badge.className = 'task-category';
+    badge.textContent = task.ai_category;
+    meta.appendChild(badge);
+  }
+
+  card.appendChild(header);
+  card.appendChild(meta);
+
+  return card;
+}
+
+function renderSection(container, title, tasks, _palette, sectionId) {
   const label = document.createElement('div');
   label.className = 'section-label';
   label.textContent = title;
+  if (tasks.length > COLLAPSED_LIMIT) {
+    const count = document.createElement('span');
+    count.className = 'section-count';
+    count.textContent = ` (${tasks.length})`;
+    label.appendChild(count);
+  }
   container.appendChild(label);
 
-  for (const task of tasks) {
-    const card = document.createElement('div');
-    card.className = 'task-card';
-    if (task.web_url) {
-      card.classList.add('clickable');
-      card.addEventListener('click', function () {
-        window.deadlineAura.openLink(task.web_url);
-      });
-    }
+  const isExpanded = container.dataset['expanded_' + sectionId] === '1';
+  const visibleTasks = isExpanded ? tasks : tasks.slice(0, COLLAPSED_LIMIT);
 
-    const color = urgencyToColor(task.urgency_score);
-    card.style.borderLeftColor = color;
+  for (const task of visibleTasks) {
+    container.appendChild(createTaskCard(task));
+  }
 
-    const isCritical = task.urgency_score > 0.8;
-    const countdown = formatCountdown(task.hours_remaining);
+  if (tasks.length > COLLAPSED_LIMIT) {
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'expand-btn';
+    expandBtn.textContent = isExpanded
+      ? 'Mostra meno'
+      : `Mostra tutti (${tasks.length - COLLAPSED_LIMIT} altri)`;
+    expandBtn.addEventListener('click', function () {
+      container.dataset['expanded_' + sectionId] = isExpanded ? '0' : '1';
+      renderTaskList(lastTasks, lastPalette);
+    });
+    container.appendChild(expandBtn);
+  }
+}
 
-    const header = document.createElement('div');
-    header.className = 'task-header';
+function renderJiraSection(container, tasks, _palette) {
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = 'Jira';
+  if (tasks.length > 0) {
+    const count = document.createElement('span');
+    count.className = 'section-count';
+    count.textContent = ` (${tasks.length})`;
+    label.appendChild(count);
+  }
+  container.appendChild(label);
 
-    const titleEl = document.createElement('div');
-    titleEl.className = 'task-title';
-    titleEl.textContent = task.title;
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'jira-search-wrap';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'jira-search';
+  searchInput.placeholder = 'Filtra per codice o titolo...';
+  searchInput.value = jiraFilter;
+  searchInput.addEventListener('input', function () {
+    jiraFilter = searchInput.value;
+    renderTaskList(lastTasks, lastPalette);
+  });
+  searchWrap.appendChild(searchInput);
+  container.appendChild(searchWrap);
 
-    const dot = document.createElement('span');
-    dot.className = 'task-dot' + (isCritical ? ' critical' : '');
-    dot.style.background = color;
+  if (tasks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = jiraFilter ? 'Nessun risultato' : 'Nessun task Jira';
+    container.appendChild(empty);
+    return;
+  }
 
-    const countdownEl = document.createElement('div');
-    countdownEl.className = 'task-countdown';
-    countdownEl.style.color = color;
-    countdownEl.textContent = countdown + ' ';
-    countdownEl.appendChild(dot);
+  const isExpanded = container.dataset.expanded_jira === '1';
+  const visibleTasks = isExpanded ? tasks : tasks.slice(0, COLLAPSED_LIMIT);
 
-    header.appendChild(titleEl);
-    header.appendChild(countdownEl);
+  for (const task of visibleTasks) {
+    container.appendChild(createTaskCard(task));
+  }
 
-    const meta = document.createElement('div');
-    meta.className = 'task-meta';
-    meta.textContent = String(task.source) + (task.priority ? ' · P' + Number(task.priority) : '');
-
-    if (task.ai_category) {
-      const badge = document.createElement('span');
-      badge.className = 'task-category';
-      badge.textContent = task.ai_category;
-      meta.appendChild(badge);
-    }
-
-    card.appendChild(header);
-    card.appendChild(meta);
-
-    container.appendChild(card);
+  if (tasks.length > COLLAPSED_LIMIT) {
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'expand-btn';
+    expandBtn.textContent = isExpanded
+      ? 'Mostra meno'
+      : `Mostra tutti (${tasks.length - COLLAPSED_LIMIT} altri)`;
+    expandBtn.addEventListener('click', function () {
+      container.dataset.expanded_jira = isExpanded ? '0' : '1';
+      renderTaskList(lastTasks, lastPalette);
+    });
+    container.appendChild(expandBtn);
   }
 }
 
