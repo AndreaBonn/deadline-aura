@@ -15,9 +15,18 @@ const configSchema = z.object({
     }),
     jira: z.object({
       enabled: z.boolean(),
-      domain: z.string(),
-      email: z.string(),
-      api_token: z.string(),
+      instances: z
+        .array(
+          z.object({
+            domain: z.string(),
+            email: z.string(),
+            api_token: z.string(),
+          }),
+        )
+        .optional(),
+      domain: z.string().optional(),
+      email: z.string().optional(),
+      api_token: z.string().optional(),
       jql: z.string(),
     }),
   }),
@@ -37,6 +46,11 @@ const configSchema = z.object({
     min_score_delta: z.number().min(0).max(0.5),
     resolution: z.union([z.literal('auto'), z.string().regex(/^\d+x\d+$/)]),
     show_text: z.boolean(),
+    use_backgrounds: z.boolean(),
+    postit: z.object({
+      enabled: z.boolean(),
+      max_per_display: z.number().int().min(1).max(20),
+    }),
   }),
   sidebar: z.object({
     width: z.number().int().min(200).max(400),

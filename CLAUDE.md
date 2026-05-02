@@ -28,14 +28,20 @@ node core/sync-daemon.js  # Sync manuale
 ## Struttura
 
 ```
-core/           — Business logic (engine, color-mapper, wallpaper, notifier, sync)
-ai/             — AI scoring (multi-provider con failover e key rotation)
-ai/providers/   — Provider implementations (groq, gemini, openai, anthropic)
-integrations/   — Client API esterne (Google Calendar, Jira)
-store/          — SQLite init, migrations, query helpers
-config/         — Defaults e schema Zod
-renderer/       — Sidebar UI (HTML/CSS/JS)
-test/           — Mirror struttura src/
+core/               — Business logic (engine, color-mapper, wallpaper, notifier, sync)
+core/wallpaper-renderer.js  — Rendering wallpaper: sfondo immagine + tint + post-it + calendar
+core/postit-renderer.js     — Disegno singolo post-it su canvas
+core/display-manager.js     — Detect multi-monitor, geometria canvas composito
+ai/                 — AI scoring (multi-provider con failover e key rotation)
+ai/providers/       — Provider implementations (groq, gemini, openai, anthropic)
+integrations/       — Client API esterne (Google Calendar, Jira)
+store/              — SQLite init, migrations, query helpers
+store/pinned-queries.js — CRUD pinned tasks (pin/unpin, posizioni, query per display)
+config/             — Defaults e schema Zod
+renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
+renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
+assets/backgrounds/ — 5 immagini sfondo mappate su bande urgenza
+test/               — Mirror struttura src/
 ```
 
 ## Decisioni architetturali
@@ -46,6 +52,11 @@ test/           — Mirror struttura src/
 - Provider con failover in ordine di priorità configurabile
 - `canvas` (non sharp) per supporto testo su wallpaper
 - CJS per compatibilità better-sqlite3 + Electron
+- Wallpaper composito spanned per multi-monitor (singolo PNG, picture-options=spanned)
+- Post-it task renderizzati nel wallpaper PNG (non finestre sopra desktop)
+- Overlay Electron trasparente effimero per drag & drop posizionamento
+- Posizioni post-it in percentuale (x%, y%) per adattarsi a qualsiasi risoluzione
+- Preload separato per overlay (principio minimo privilegio)
 
 ## Configurazione
 

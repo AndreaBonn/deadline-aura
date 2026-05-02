@@ -8,4 +8,7 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   syncNow: () => ipcRenderer.send('sync-now'),
   markDone: (taskId) => ipcRenderer.send('mark-done', taskId),
   openLink: (url) => ipcRenderer.send('open-link', url),
+  pinTask: (taskId, displayId) => ipcRenderer.send('pin-task', { taskId, displayId }),
+  unpinTask: (taskId, displayId) => ipcRenderer.send('unpin-task', { taskId, displayId }),
+  openOverlay: (displayId) => ipcRenderer.send('open-overlay', { displayId }),
 });

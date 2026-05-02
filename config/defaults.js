@@ -33,6 +33,11 @@ const DEFAULTS = {
     min_score_delta: 0.02,
     resolution: 'auto',
     show_text: true,
+    use_backgrounds: true,
+    postit: {
+      enabled: true,
+      max_per_display: 12,
+    },
   },
   sidebar: {
     width: 260,

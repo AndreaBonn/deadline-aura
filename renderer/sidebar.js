@@ -4,6 +4,7 @@ const COLLAPSED_LIMIT = 5;
 let jiraFilter = '';
 let lastTasks = null;
 let lastPalette = null;
+let pinnedTaskIds = new Set();
 
 function updateClock() {
   const now = new Date();
@@ -109,7 +110,10 @@ function createTaskCard(task) {
   card.className = 'task-card';
   if (task.web_url) {
     card.classList.add('clickable');
-    card.addEventListener('click', function () {
+    card.addEventListener('click', function (e) {
+      if (e.target.closest('.pin-btn')) {
+        return;
+      }
       window.deadlineAura.openLink(task.web_url);
     });
   }
@@ -150,6 +154,22 @@ function createTaskCard(task) {
     badge.textContent = task.ai_category;
     meta.appendChild(badge);
   }
+
+  // Pin/unpin button
+  const pinBtn = document.createElement('button');
+  const isPinned = pinnedTaskIds.has(task.id);
+  pinBtn.className = 'pin-btn' + (isPinned ? ' pinned' : '');
+  pinBtn.textContent = isPinned ? '✕' : '📌';
+  pinBtn.title = isPinned ? 'Rimuovi dal desktop' : 'Appunta sul desktop';
+  pinBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isPinned) {
+      window.deadlineAura.unpinTask(task.id);
+    } else {
+      window.deadlineAura.pinTask(task.id);
+    }
+  });
+  meta.appendChild(pinBtn);
 
   card.appendChild(header);
   card.appendChild(meta);
@@ -257,7 +277,12 @@ document.getElementById('btnConfig').addEventListener('click', function () {
   window.deadlineAura.openConfig();
 });
 
+document.getElementById('btnLayout').addEventListener('click', function () {
+  window.deadlineAura.openOverlay();
+});
+
 window.deadlineAura.onUpdate(function (data) {
+  pinnedTaskIds = new Set(data.pinnedTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
   renderTaskList(data.engineResult.tasks, data.palette);
   document.getElementById('syncStatus').textContent = 'aggiornato';

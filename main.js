@@ -2,15 +2,18 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const { execFile, spawn } = require('child_process');
 const path = require('path');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
+const pinnedQueries = require('./store/pinned-queries');
 const { loadConfig } = require('./config/loader');
 const config = loadConfig();
+
+let overlayWindow = null;
 
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = 24 * 3600000;
@@ -253,7 +256,7 @@ function createAllDocks() {
   docks = displays.map((d) => createDockForDisplay(d));
 }
 
-function runUpdateCycle() {
+async function runUpdateCycle() {
   try {
     const engineResult = deadlineEngine.run({
       lookaheadHours: config.sync.lookahead_hours,
@@ -265,14 +268,24 @@ function runUpdateCycle() {
     currentPalette = palette;
 
     if (config.wallpaper.enabled) {
-      wallpaperChanger.update(palette, { engineResult });
+      await wallpaperChanger.update(palette, {
+        engineResult,
+        electronScreen: screen,
+      });
     }
 
     updateStripColor(palette);
 
+    const allPinned = pinnedQueries.getAllPinned();
+    const pinnedIds = new Set(allPinned.map((p) => p.task_id));
+
     for (const dock of docks) {
       if (dock.sidebar && !dock.sidebar.isDestroyed()) {
-        dock.sidebar.webContents.send('update', { engineResult, palette });
+        dock.sidebar.webContents.send('update', {
+          engineResult,
+          palette,
+          pinnedTaskIds: Array.from(pinnedIds),
+        });
       }
     }
 
@@ -281,6 +294,54 @@ function runUpdateCycle() {
     console.error('Update cycle error:', err.message);
     return null;
   }
+}
+
+function openOverlay(displayId) {
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.focus();
+    return;
+  }
+
+  wallpaperChanger.setOverlayOpen(true);
+
+  const displays = screen.getAllDisplays();
+  const targetDisplay =
+    displays.find((d) => String(d.id) === displayId) || screen.getPrimaryDisplay();
+
+  overlayWindow = new BrowserWindow({
+    x: targetDisplay.bounds.x,
+    y: targetDisplay.bounds.y,
+    width: targetDisplay.size.width,
+    height: targetDisplay.size.height,
+    fullscreen: true,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload-overlay.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+
+  overlayWindow.webContents.once('did-finish-load', () => {
+    const pinned = pinnedQueries.getByDisplay(displayId);
+    overlayWindow.webContents.send('overlay-init', {
+      pinnedTasks: pinned,
+      displayId,
+      width: targetDisplay.size.width,
+      height: targetDisplay.size.height,
+    });
+  });
+
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+    wallpaperChanger.setOverlayOpen(false);
+  });
 }
 
 app.whenReady().then(() => {
@@ -315,6 +376,38 @@ app.whenReady().then(() => {
 
   ipcMain.on('open-config', () => {
     console.log('Config window not yet implemented');
+  });
+
+  ipcMain.on('pin-task', (_event, { taskId, displayId }) => {
+    pinnedQueries.pinTask({ taskId, displayId: displayId || 'default' });
+    runUpdateCycle();
+  });
+
+  ipcMain.on('unpin-task', (_event, { taskId, displayId }) => {
+    if (displayId) {
+      pinnedQueries.unpinTask({ taskId, displayId });
+    } else {
+      pinnedQueries.unpinTaskFromAll(taskId);
+    }
+    runUpdateCycle();
+  });
+
+  ipcMain.on('open-overlay', (_event, { displayId }) => {
+    openOverlay(displayId || 'default');
+  });
+
+  ipcMain.on('save-positions', (_event, positions) => {
+    pinnedQueries.updatePositions(positions);
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
+    runUpdateCycle();
+  });
+
+  ipcMain.on('overlay-cancel', () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
   });
 });
 

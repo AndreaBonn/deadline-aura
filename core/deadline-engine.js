@@ -18,6 +18,7 @@ function computeTaskUrgency(
     return {
       id: task.id,
       title: task.title,
+      due_at: null,
       urgency_score: 0.1,
       hours_remaining: null,
       priority: task.priority,
@@ -34,6 +35,7 @@ function computeTaskUrgency(
     return {
       id: task.id,
       title: task.title,
+      due_at: task.due_at,
       urgency_score: 1.0,
       hours_remaining: hoursRemaining,
       priority: task.priority,
@@ -52,6 +54,7 @@ function computeTaskUrgency(
   return {
     id: task.id,
     title: task.title,
+    due_at: task.due_at,
     urgency_score: Math.round(urgencyScore * 1000) / 1000,
     hours_remaining: Math.round(hoursRemaining * 10) / 10,
     priority: task.priority,

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <link rel="stylesheet" href="overlay.css" />
+    <title>DeadlineAura — Layout</title>
+  </head>
+  <body>
+    <div class="overlay-toolbar">
+      <span class="toolbar-label">Sposta i post-it dove vuoi, poi salva</span>
+      <button class="toolbar-btn save-btn" id="btnSave">Salva</button>
+      <button class="toolbar-btn cancel-btn" id="btnCancel">Annulla</button>
+    </div>
+    <div class="overlay-canvas" id="overlayCanvas"></div>
+    <script src="overlay.js"></script>
+  </body>
+</html>
