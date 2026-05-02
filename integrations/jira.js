@@ -72,7 +72,7 @@ function normalizeIssue(issue) {
 
 async function fetchFromInstance({ domain, email, apiToken, jql }) {
   const authHeader = buildAuthHeader(email, apiToken);
-  const baseUrl = `https://${domain}/rest/api/3/search`;
+  const baseUrl = `https://${domain}/rest/api/3/search/jql`;
   const fields = 'summary,priority,duedate,status,assignee';
 
   const issues = [];
