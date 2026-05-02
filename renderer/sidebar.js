@@ -155,21 +155,23 @@ function createTaskCard(task) {
     meta.appendChild(badge);
   }
 
-  // Pin/unpin button
-  const pinBtn = document.createElement('button');
-  const isPinned = pinnedTaskIds.has(task.id);
-  pinBtn.className = 'pin-btn' + (isPinned ? ' pinned' : '');
-  pinBtn.textContent = isPinned ? '✕' : '📌';
-  pinBtn.title = isPinned ? 'Rimuovi dal desktop' : 'Appunta sul desktop';
-  pinBtn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (isPinned) {
-      window.deadlineAura.unpinTask(task.id);
-    } else {
-      window.deadlineAura.pinTask(task.id);
-    }
-  });
-  meta.appendChild(pinBtn);
+  // Pin/unpin button — solo per task Jira
+  if (task.source === 'jira') {
+    const pinBtn = document.createElement('button');
+    const isPinned = pinnedTaskIds.has(task.id);
+    pinBtn.className = 'pin-btn' + (isPinned ? ' pinned' : '');
+    pinBtn.textContent = isPinned ? '✕' : '📌';
+    pinBtn.title = isPinned ? 'Rimuovi dal desktop' : 'Appunta sul desktop';
+    pinBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isPinned) {
+        window.deadlineAura.unpinTask(task.id);
+      } else {
+        window.deadlineAura.pinTask(task.id);
+      }
+    });
+    meta.appendChild(pinBtn);
+  }
 
   card.appendChild(header);
   card.appendChild(meta);

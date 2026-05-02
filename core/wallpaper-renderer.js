@@ -112,24 +112,22 @@ function drawTintOverlay(ctx, palette, score, region) {
   ctx.fillRect(x, y, width, height);
 }
 
-function filterTodayFutureEvents(allTasks) {
+function filterUpcomingEvents(allTasks) {
   const now = Date.now();
-  const endOfDay = new Date();
-  endOfDay.setHours(23, 59, 59, 999);
-  const endOfDayMs = endOfDay.getTime();
+  const horizon = now + 24 * 3600 * 1000;
 
   return allTasks
     .filter((t) => {
       if (!t.due_at) {
         return false;
       }
-      return t.due_at >= now && t.due_at <= endOfDayMs;
+      return t.due_at >= now && t.due_at <= horizon;
     })
     .sort((a, b) => a.due_at - b.due_at);
 }
 
 function drawDailyAgenda(ctx, allTasks, region) {
-  const todayEvents = filterTodayFutureEvents(allTasks);
+  const todayEvents = filterUpcomingEvents(allTasks);
   if (todayEvents.length === 0) {
     return;
   }
@@ -146,7 +144,7 @@ function drawDailyAgenda(ctx, allTasks, region) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.letterSpacing = '2px';
-  ctx.fillText('OGGI', startX, startY);
+  ctx.fillText('PROSSIME 24H', startX, startY);
 
   // Separator line
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
@@ -173,8 +171,7 @@ function drawDailyAgenda(ctx, allTasks, region) {
     // Source badge
     const badgeX = startX + 52;
     const badgeLabel = ev.source === 'gcal' ? 'CAL' : 'JIRA';
-    const badgeColor =
-      ev.source === 'gcal' ? 'rgba(66, 133, 244, 0.5)' : 'rgba(255, 152, 0, 0.5)';
+    const badgeColor = ev.source === 'gcal' ? 'rgba(66, 133, 244, 0.5)' : 'rgba(255, 152, 0, 0.5)';
 
     ctx.fillStyle = badgeColor;
     ctx.font = '700 8px "Ubuntu", system-ui, sans-serif';

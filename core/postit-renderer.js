@@ -41,8 +41,11 @@ function formatCountdown(dueAt) {
   return `${Math.round(hoursRemaining / 24)}g`;
 }
 
-function extractCode(taskId) {
-  const match = taskId.match(/^(?:jira-|gcal-)?(.+)/);
+function extractCode(taskId, title) {
+  if (taskId.startsWith('gcal_') || taskId.startsWith('gcal-')) {
+    return title || 'Calendar';
+  }
+  const match = taskId.match(/^jira-(.+)/);
   return match ? match[1] : taskId;
 }
 
@@ -74,7 +77,7 @@ function renderPostit(ctx, { task, x, y, scale }) {
   const headerH = HEADER_HEIGHT * s;
   const accentColor = getPostitColor(task.priority);
   const countdown = formatCountdown(task.due_at);
-  const code = extractCode(task.task_id);
+  const code = extractCode(task.task_id, task.title);
 
   // Shadow
   ctx.save();
