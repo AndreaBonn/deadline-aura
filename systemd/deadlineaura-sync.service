@@ -1,0 +1,10 @@
+[Unit]
+Description=DeadlineAura sync daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/node /opt/deadlineaura/core/sync-daemon.js
+StandardOutput=journal
+StandardError=journal

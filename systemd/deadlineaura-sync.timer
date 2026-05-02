@@ -1,0 +1,11 @@
+[Unit]
+Description=DeadlineAura sync ogni 5 minuti
+Requires=deadlineaura-sync.service
+
+[Timer]
+OnBootSec=30sec
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

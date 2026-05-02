@@ -1,0 +1,63 @@
+'use strict';
+
+const { z } = require('zod');
+
+const configSchema = z.object({
+  sync: z.object({
+    interval_minutes: z.number().int().min(1).max(60),
+    lookahead_hours: z.number().int().min(1).max(720),
+  }),
+  sources: z.object({
+    google_calendar: z.object({
+      enabled: z.boolean(),
+      calendars: z.array(z.string()).min(1),
+      priority_keywords: z.array(z.string()),
+    }),
+    jira: z.object({
+      enabled: z.boolean(),
+      domain: z.string(),
+      email: z.string(),
+      api_token: z.string(),
+      jql: z.string(),
+    }),
+  }),
+  engine: z.object({
+    k_constant: z.number().positive().max(1),
+    priority_weights: z.array(z.number()).length(4),
+  }),
+  ai: z.object({
+    enabled: z.boolean(),
+    provider_priority: z.array(z.enum(['groq', 'gemini', 'openai', 'anthropic'])),
+    recalc_hours: z.number().int().min(1).max(24),
+    timeout_ms: z.number().int().min(1000).max(30000),
+    temperature: z.number().min(0).max(1),
+  }),
+  wallpaper: z.object({
+    enabled: z.boolean(),
+    min_score_delta: z.number().min(0).max(0.5),
+    resolution: z.union([z.literal('auto'), z.string().regex(/^\d+x\d+$/)]),
+    show_text: z.boolean(),
+  }),
+  sidebar: z.object({
+    width: z.number().int().min(200).max(400),
+    position: z.enum(['left', 'right']),
+    monitor: z.string(),
+    opacity: z.number().min(0.1).max(1),
+  }),
+  notifications: z.object({
+    enabled: z.boolean(),
+    threshold_score: z.number().min(0).max(1),
+    cooldown_minutes: z.number().int().min(1).max(1440),
+  }),
+  ui: z.object({
+    max_tasks_shown: z.number().int().min(1).max(20),
+    show_source_badge: z.boolean(),
+    countdown_format: z.enum(['relative', 'absolute', 'both']),
+  }),
+});
+
+function validateConfig(config) {
+  return configSchema.parse(config);
+}
+
+module.exports = { configSchema, validateConfig };
