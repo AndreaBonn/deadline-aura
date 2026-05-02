@@ -1,5 +1,7 @@
 'use strict';
 
+require('dotenv').config();
+
 const db = require('../store/db');
 const gcal = require('../integrations/google-calendar');
 const jira = require('../integrations/jira');

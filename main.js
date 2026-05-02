@@ -1,5 +1,7 @@
 'use strict';
 
+require('dotenv').config();
+
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('path');
 const deadlineEngine = require('./core/deadline-engine');
@@ -10,28 +12,58 @@ const { DEFAULTS } = require('./config/defaults');
 
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = 24 * 3600000;
+const STRIP_WIDTH = 6;
+const AUTOHIDE_DELAY_MS = 500;
+const MOUSE_POLL_MS = 100;
 
-let mainWindow = null;
+let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette }
+let currentPalette = null;
 
-function createSidebarWindow() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-  const { x: wx, y: wy } = primaryDisplay.workArea;
+function buildStripHTML(accentColor) {
+  return `<html><body style="margin:0;background:${accentColor};cursor:default;"></body></html>`;
+}
 
+function createDockForDisplay(display) {
+  const { width, height } = display.workAreaSize;
+  const { x: wx, y: wy } = display.workArea;
   const sidebarWidth = DEFAULTS.sidebar.width;
+  const accentColor = currentPalette ? currentPalette.accent : '#1a1c2e';
 
-  mainWindow = new BrowserWindow({
+  // Colored strip — always visible at right edge
+  const strip = new BrowserWindow({
+    width: STRIP_WIDTH,
+    height: height,
+    x: wx + width - STRIP_WIDTH,
+    y: wy,
+    frame: false,
+    transparent: false,
+    backgroundColor: accentColor,
+    alwaysOnTop: false,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+
+  strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+  strip.setIgnoreMouseEvents(false);
+  strip.loadURL('data:text/html,' + encodeURIComponent(buildStripHTML(accentColor)));
+
+  // Full sidebar — shown on hover, hidden otherwise
+  const sidebar = new BrowserWindow({
     width: sidebarWidth,
     height: height,
     x: wx + width - sidebarWidth,
     y: wy,
+    show: false,
     frame: false,
     transparent: false,
     backgroundColor: '#0a0c14',
-    alwaysOnTop: false,
+    alwaysOnTop: true,
     skipTaskbar: true,
-    focusable: false,
-    type: 'normal',
+    focusable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -39,15 +71,96 @@ function createSidebarWindow() {
     },
   });
 
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-  mainWindow.setIgnoreMouseEvents(false);
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  sidebar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+  sidebar.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  const dock = { sidebar, strip, hideTimeout: null, pollInterval: null, palette: null };
+
+  // Poll mouse position — detect hover over strip or sidebar
+  dock.pollInterval = setInterval(() => {
+    const cursor = screen.getCursorScreenPoint();
+
+    if (!sidebar.isVisible()) {
+      // Check if mouse is over the strip
+      if (!strip.isDestroyed() && strip.isVisible()) {
+        const sb = strip.getBounds();
+        if (
+          cursor.x >= sb.x &&
+          cursor.x <= sb.x + sb.width &&
+          cursor.y >= sb.y &&
+          cursor.y <= sb.y + sb.height
+        ) {
+          openDock(dock);
+        }
+      }
+    } else {
+      // Sidebar is visible — check if mouse left sidebar area
+      const bounds = sidebar.getBounds();
+      const isInside =
+        cursor.x >= bounds.x &&
+        cursor.x <= bounds.x + bounds.width &&
+        cursor.y >= bounds.y &&
+        cursor.y <= bounds.y + bounds.height;
+
+      if (isInside) {
+        // Mouse still inside — cancel any pending hide
+        if (dock.hideTimeout) {
+          clearTimeout(dock.hideTimeout);
+          dock.hideTimeout = null;
+        }
+      } else if (!dock.hideTimeout) {
+        // Mouse left — schedule hide
+        dock.hideTimeout = setTimeout(() => {
+          closeDock(dock);
+          dock.hideTimeout = null;
+        }, AUTOHIDE_DELAY_MS);
+      }
+    }
+  }, MOUSE_POLL_MS);
+
+  sidebar.on('closed', () => {
+    clearInterval(dock.pollInterval);
+    if (!strip.isDestroyed()) strip.close();
+    docks = docks.filter((d) => d !== dock);
   });
 
-  return mainWindow;
+  strip.on('closed', () => {
+    clearInterval(dock.pollInterval);
+    if (!sidebar.isDestroyed()) sidebar.close();
+  });
+
+  return dock;
+}
+
+function openDock(dock) {
+  if (dock.hideTimeout) {
+    clearTimeout(dock.hideTimeout);
+    dock.hideTimeout = null;
+  }
+  if (!dock.strip.isDestroyed()) dock.strip.hide();
+  if (!dock.sidebar.isDestroyed() && !dock.sidebar.isVisible()) {
+    dock.sidebar.show();
+  }
+}
+
+function closeDock(dock) {
+  if (!dock.sidebar.isDestroyed()) dock.sidebar.hide();
+  if (!dock.strip.isDestroyed()) dock.strip.show();
+}
+
+function updateStripColor(palette) {
+  const color = palette ? palette.accent_hex : '#1a1c2e';
+  for (const dock of docks) {
+    if (!dock.strip.isDestroyed()) {
+      dock.strip.setBackgroundColor(color);
+      dock.strip.loadURL('data:text/html,' + encodeURIComponent(buildStripHTML(color)));
+    }
+  }
+}
+
+function createAllDocks() {
+  const displays = screen.getAllDisplays();
+  docks = displays.map((d) => createDockForDisplay(d));
 }
 
 function runUpdateCycle() {
@@ -59,13 +172,18 @@ function runUpdateCycle() {
     });
 
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
+    currentPalette = palette;
 
     if (DEFAULTS.wallpaper.enabled) {
       wallpaperChanger.update(palette, { engineResult });
     }
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update', { engineResult, palette });
+    updateStripColor(palette);
+
+    for (const dock of docks) {
+      if (dock.sidebar && !dock.sidebar.isDestroyed()) {
+        dock.sidebar.webContents.send('update', { engineResult, palette });
+      }
     }
 
     return { engineResult, palette };
@@ -76,7 +194,7 @@ function runUpdateCycle() {
 }
 
 app.whenReady().then(() => {
-  createSidebarWindow();
+  createAllDocks();
 
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
