@@ -1,6 +1,95 @@
-const { computeEventsHash } = require('../../core/sync-daemon');
+const { computeEventsHash, applyAiScores } = require('../../core/sync-daemon');
+const db = require('../../store/db');
 
 describe('sync-daemon', () => {
+  describe('applyAiScores', () => {
+    let updateAiScoresSpy;
+    let saveGlobalScoreSpy;
+    let warnSpy;
+
+    beforeEach(() => {
+      updateAiScoresSpy = vi.spyOn(db, 'updateAiScores').mockImplementation(() => {});
+      saveGlobalScoreSpy = vi.spyOn(db, 'saveGlobalScore').mockImplementation(() => {});
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('maps 1-based AI index to correct taskId', () => {
+      const activeTasks = [{ id: 'task-abc' }, { id: 'task-def' }];
+      const aiResult = {
+        per_event: [
+          {
+            id: 1,
+            stress: 7,
+            category: 'work-critical',
+            reasoning: 'urgent',
+            cognitive_type: 'analytical',
+          },
+          { id: 2, stress: 3, category: 'personal', reasoning: 'low', cognitive_type: 'passive' },
+        ],
+        global_stress: 6,
+      };
+
+      applyAiScores(aiResult, activeTasks);
+
+      expect(updateAiScoresSpy).toHaveBeenCalledWith('task-abc', {
+        stress: 7,
+        category: 'work-critical',
+        reasoning: 'urgent',
+        cognitive_type: 'analytical',
+      });
+      expect(updateAiScoresSpy).toHaveBeenCalledWith('task-def', {
+        stress: 3,
+        category: 'personal',
+        reasoning: 'low',
+        cognitive_type: 'passive',
+      });
+      expect(saveGlobalScoreSpy).toHaveBeenCalledWith(0.6);
+    });
+
+    it('warns and skips when AI index is out of bounds', () => {
+      const activeTasks = [{ id: 'task-only' }];
+      const aiResult = {
+        per_event: [
+          {
+            id: 1,
+            stress: 5,
+            category: 'admin',
+            reasoning: 'ok',
+            cognitive_type: 'administrative',
+          },
+          {
+            id: 99,
+            stress: 8,
+            category: 'work-critical',
+            reasoning: 'ghost',
+            cognitive_type: 'analytical',
+          },
+        ],
+      };
+
+      applyAiScores(aiResult, activeTasks);
+
+      expect(updateAiScoresSpy).toHaveBeenCalledTimes(1);
+      expect(updateAiScoresSpy).toHaveBeenCalledWith('task-only', expect.any(Object));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('id=99'));
+    });
+
+    it('does nothing when aiResult is null', () => {
+      applyAiScores(null, []);
+      expect(updateAiScoresSpy).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when per_event is missing', () => {
+      applyAiScores({ global_stress: 5 }, []);
+      expect(updateAiScoresSpy).not.toHaveBeenCalled();
+      expect(saveGlobalScoreSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('computeEventsHash', () => {
     it('returns consistent hash for same tasks', () => {
       const tasks = [

@@ -147,5 +147,20 @@ describe('prompt branch coverage', () => {
       const result = parseAiResponse(raw);
       expect(result.global_stress).toBe(2);
     });
+
+    it('defaults missing per_event stress to 5', () => {
+      const raw = JSON.stringify({
+        global_stress: 4,
+        per_event: [
+          { id: 1, category: 'work-routine', reasoning: 'test', cognitive_type: 'passive' },
+        ],
+      });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = parseAiResponse(raw);
+
+      expect(result.per_event[0].stress).toBe(5);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('missing stress'));
+      warnSpy.mockRestore();
+    });
   });
 });

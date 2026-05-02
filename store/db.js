@@ -47,6 +47,7 @@ function runMigrations(database) {
   }
 
   // 004: add ai_cognitive_type column (idempotent)
+  // Valid values must stay in sync with VALID_COGNITIVE_TYPES in ai/prompt.js
   if (!columnNames.has('ai_cognitive_type')) {
     database.exec(
       "ALTER TABLE tasks ADD COLUMN ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative'))",

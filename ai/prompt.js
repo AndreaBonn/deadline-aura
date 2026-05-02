@@ -127,6 +127,9 @@ function parseAiResponse(text) {
     for (const event of parsed.per_event) {
       if (typeof event.stress === 'number') {
         event.stress = Math.max(1, Math.min(10, Math.round(event.stress)));
+      } else {
+        console.warn(`[ai] per_event id=${event.id} missing stress, defaulting to 5`);
+        event.stress = 5;
       }
       if (event.category && !VALID_CATEGORIES.has(event.category)) {
         event.category = 'work-routine';

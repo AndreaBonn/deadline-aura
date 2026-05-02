@@ -78,30 +78,37 @@ async function runAiScoring(tasks, config, errors) {
 
     const needsRecalc = shouldRecalcAi(config);
 
+    const activeTasks = db.getActiveTasks(config.sync.lookahead_hours * 3600000);
+
     if (cached && !needsRecalc) {
-      applyAiScores(JSON.parse(cached.response_json));
+      applyAiScores(JSON.parse(cached.response_json), activeTasks);
       return;
     }
 
-    const activeTasks = db.getActiveTasks(config.sync.lookahead_hours * 3600000);
     const result = await aiScorer.scoreTasks(activeTasks, config);
 
     if (result) {
       db.setAiCache(currentHash, JSON.stringify(result));
-      applyAiScores(result);
+      applyAiScores(result, activeTasks);
     }
   } catch (err) {
     errors.push({ source: 'ai', message: err.message });
   }
 }
 
-function applyAiScores(aiResult) {
+function applyAiScores(aiResult, activeTasks) {
   if (!aiResult || !aiResult.per_event) {
     return;
   }
 
   for (const event of aiResult.per_event) {
-    db.updateAiScores(event.id, {
+    const idx = event.id - 1; // AI uses 1-based index from prompt
+    const task = activeTasks[idx];
+    if (!task) {
+      console.warn(`[ai] per_event id=${event.id} has no matching task (index out of bounds)`);
+      continue;
+    }
+    db.updateAiScores(task.id, {
       stress: event.stress,
       category: event.category,
       reasoning: event.reasoning,
@@ -142,4 +149,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { sync, computeEventsHash };
+module.exports = { sync, computeEventsHash, applyAiScores };
