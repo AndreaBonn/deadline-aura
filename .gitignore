@@ -45,5 +45,8 @@ Thumbs.db
 # Claude
 .claude/
 
+# Test coverage
+coverage/
+
 # Electron specific
 app/node_modules/
