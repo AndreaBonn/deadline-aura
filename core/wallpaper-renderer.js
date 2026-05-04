@@ -164,7 +164,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   const maxItems = Math.max(1, Math.floor(availableHeight / lineHeight));
 
   // Header
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
   ctx.font = '700 13px "Ubuntu", system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -172,7 +172,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   ctx.fillText('PROSSIME 24H', startX, startY);
 
   // Separator line
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.40)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(startX, startY + 20);
@@ -190,7 +190,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
     const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
     ctx.font = '600 12px "Ubuntu Mono", "Consolas", monospace';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.90)';
     ctx.fillText(time, startX, y);
 
     // Source badge
@@ -209,7 +209,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
 
     // Title
     ctx.font = '400 12px "Ubuntu", system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     const titleX = badgeX + badgeWidth + 10;
     const maxTitleWidth = 370;
     ctx.fillText(truncateText(ctx, ev.title, maxTitleWidth), titleX, y);
@@ -217,7 +217,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
 
   if (todayEvents.length > maxItems) {
     const y = startY + 28 + maxItems * lineHeight;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
     ctx.font = '400 11px "Ubuntu", system-ui, sans-serif';
     ctx.fillText(`+ ${todayEvents.length - maxItems} altri`, startX, y);
   }
@@ -237,13 +237,13 @@ function drawMentalLoad(ctx, engineResult, region) {
 
   // Percentage — large and prominent
   ctx.font = '700 32px "Ubuntu", system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
   ctx.fillText(`${pct}%`, region.x + margin, y);
 
   // Label
   const pctWidth = ctx.measureText(`${pct}%`).width;
   ctx.font = '400 16px "Ubuntu", system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
   ctx.fillText('carico mentale', region.x + margin + pctWidth + 12, y - 5);
 }
 
