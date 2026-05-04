@@ -252,6 +252,11 @@ body {
   color: rgba(255, 255, 255, 0.6);
 }
 
+.footer-btn--close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: rgba(239, 68, 68, 0.9);
+}
+
 .footer-btn--text {
   font-size: 10px;
   text-transform: uppercase;

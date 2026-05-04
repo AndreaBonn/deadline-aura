@@ -16,21 +16,19 @@ const { configSchema } = require('./config/schema');
 let config = loadConfig();
 
 let settingsWindow = null;
-
 let overlayWindow = null;
 
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = 24 * 3600000;
-const EDGE_TRIGGER_PX = 6;
-const AUTOHIDE_DELAY_MS = 500;
-const MOUSE_POLL_MS = 100;
+const STRIP_WIDTH = 20;
 const DESKTOP_CHECK_MS = 1000;
 
 let sidebarWindow = null;
 let sidebarReady = false;
-let sidebarHideTimeout = null;
-let mousePollInterval = null;
+let sidebarManualOpen = false;
+let stripWindows = new Map(); // displayId → BrowserWindow
 let desktopCheckInterval = null;
+let currentPaletteHex = '#334155';
 
 function openSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -55,70 +53,7 @@ function openSettingsWindow() {
   });
 }
 
-function getDisplaysWithWindows(callback) {
-  // wmctrl -l -G -x: id desktop x y w h wm_class hostname title
-  execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
-    if (err) {
-      callback(null);
-      return;
-    }
-
-    const occupiedDisplayIds = new Set();
-
-    for (const line of stdout.trim().split('\n')) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length < 9) {
-        continue;
-      }
-
-      const desktop = parseInt(parts[1], 10);
-      if (desktop === -1) {
-        continue;
-      }
-
-      // Skip our own windows (sidebar, strip, overlay, settings)
-      const wmClass = parts[6].toLowerCase();
-      if (wmClass.includes('deadlineaura') || wmClass === 'electron.electron') {
-        continue;
-      }
-
-      const x = parseInt(parts[2], 10);
-      const y = parseInt(parts[3], 10);
-      const display = screen.getDisplayNearestPoint({ x, y });
-      occupiedDisplayIds.add(String(display.id));
-    }
-
-    callback(occupiedDisplayIds);
-  });
-}
-
-function checkDesktopState() {
-  // No-op when sidebar not ready
-  if (!sidebarWindow || sidebarWindow.isDestroyed() || !sidebarReady) {
-    return;
-  }
-
-  getDisplaysWithWindows((occupiedDisplayIds) => {
-    if (!occupiedDisplayIds) {
-      // wmctrl failed — show sidebar on primary as fallback
-      if (!sidebarWindow.isVisible()) {
-        showSidebarOnDisplay(screen.getPrimaryDisplay());
-      }
-      return;
-    }
-
-    // Find first unoccupied display to pin sidebar
-    const displays = screen.getAllDisplays();
-    const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
-
-    if (freeDisplay && !sidebarWindow.isVisible()) {
-      showSidebarOnDisplay(freeDisplay);
-    } else if (!freeDisplay && sidebarWindow.isVisible() && !sidebarHideTimeout) {
-      // All displays occupied — hide sidebar
-      hideSidebar();
-    }
-  });
-}
+// --- Sidebar (full panel, hidden by default) ---
 
 function createSidebar() {
   if (sidebarWindow && !sidebarWindow.isDestroyed()) {
@@ -159,20 +94,15 @@ function createSidebar() {
   sidebarWindow.on('closed', () => {
     sidebarWindow = null;
     sidebarReady = false;
-    clearInterval(mousePollInterval);
-    mousePollInterval = null;
   });
 }
+
+let activeStripDisplayId = null;
 
 function showSidebarOnDisplay(display) {
   if (!sidebarWindow || sidebarWindow.isDestroyed()) {
     return;
   }
-  if (sidebarHideTimeout) {
-    clearTimeout(sidebarHideTimeout);
-    sidebarHideTimeout = null;
-  }
-
   const { width, height } = display.workAreaSize;
   const { x: wx, y: wy } = display.workArea;
   const sidebarWidth = config.sidebar.width;
@@ -182,75 +112,175 @@ function showSidebarOnDisplay(display) {
     width: sidebarWidth,
     height: height,
   });
-  if (!sidebarWindow.isVisible()) {
-    sidebarWindow.show();
+
+  const displayId = String(display.id);
+  const strip = stripWindows.get(displayId);
+  if (strip && !strip.isDestroyed()) {
+    strip.hide();
   }
+  activeStripDisplayId = displayId;
+
+  sidebarWindow.show();
 }
 
 function hideSidebar() {
   if (sidebarWindow && !sidebarWindow.isDestroyed()) {
     sidebarWindow.hide();
   }
+  if (activeStripDisplayId) {
+    const strip = stripWindows.get(activeStripDisplayId);
+    if (strip && !strip.isDestroyed()) {
+      strip.show();
+    }
+    activeStripDisplayId = null;
+  }
 }
 
-function startMousePoll() {
-  if (mousePollInterval) {
+function toggleSidebar() {
+  if (!sidebarWindow || sidebarWindow.isDestroyed()) {
     return;
   }
+  if (sidebarWindow.isVisible()) {
+    sidebarManualOpen = false;
+    hideSidebar();
+  } else {
+    sidebarManualOpen = true;
+    const cursor = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursor);
+    showSidebarOnDisplay(display);
+  }
+}
 
-  mousePollInterval = setInterval(() => {
-    if (!sidebarWindow || sidebarWindow.isDestroyed()) {
+// --- Strips (one per display, always visible, same renderer as sidebar) ---
+
+function createStrips() {
+  destroyStrips();
+  const displays = screen.getAllDisplays();
+
+  for (const display of displays) {
+    const { x: wx, y: wy } = display.workArea;
+    const { width, height } = display.workAreaSize;
+    const displayId = String(display.id);
+
+    const stripWin = new BrowserWindow({
+      width: STRIP_WIDTH,
+      height: height,
+      x: wx + width - STRIP_WIDTH,
+      y: wy,
+      show: false,
+      frame: false,
+      transparent: false,
+      backgroundColor: currentPaletteHex,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: true,
+      resizable: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    stripWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+    stripWin.loadFile(path.join(__dirname, 'renderer', 'strip.html'));
+
+    stripWin.webContents.once('did-finish-load', () => {
+      stripWin.webContents.send('strip-color', currentPaletteHex);
+      stripWin.show();
+    });
+
+    stripWindows.set(displayId, stripWin);
+  }
+}
+
+function destroyStrips() {
+  for (const win of stripWindows.values()) {
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+  }
+  stripWindows = new Map();
+}
+
+function updateStripColor(hex) {
+  currentPaletteHex = hex;
+  for (const win of stripWindows.values()) {
+    if (win && !win.isDestroyed() && win.webContents) {
+      win.webContents.send('strip-color', hex);
+    }
+  }
+}
+
+// --- Desktop state check ---
+
+function getDisplaysWithWindows(callback) {
+  execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
+    if (err) {
+      callback(null);
       return;
     }
 
-    const cursor = screen.getCursorScreenPoint();
-    const sidebarVisible = sidebarWindow.isVisible();
+    const occupiedDisplayIds = new Set();
 
-    if (!sidebarVisible) {
-      // Check if cursor is at the right edge of any display
-      const displays = screen.getAllDisplays();
-      for (const display of displays) {
-        const { x: wx, y: wy } = display.workArea;
-        const { width, height } = display.workAreaSize;
-        const rightEdge = wx + width;
-
-        if (
-          cursor.x >= rightEdge - EDGE_TRIGGER_PX &&
-          cursor.x <= rightEdge &&
-          cursor.y >= wy &&
-          cursor.y <= wy + height
-        ) {
-          showSidebarOnDisplay(display);
-          break;
-        }
+    for (const line of stdout.trim().split('\n')) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 9) {
+        continue;
       }
-    } else {
-      // Sidebar visible — check if mouse left sidebar bounds
-      const bounds = sidebarWindow.getBounds();
-      const isInside =
-        cursor.x >= bounds.x &&
-        cursor.x <= bounds.x + bounds.width &&
-        cursor.y >= bounds.y &&
-        cursor.y <= bounds.y + bounds.height;
 
-      if (isInside) {
-        if (sidebarHideTimeout) {
-          clearTimeout(sidebarHideTimeout);
-          sidebarHideTimeout = null;
-        }
-      } else if (!sidebarHideTimeout) {
-        sidebarHideTimeout = setTimeout(() => {
-          hideSidebar();
-          sidebarHideTimeout = null;
-        }, AUTOHIDE_DELAY_MS);
+      const desktop = parseInt(parts[1], 10);
+      if (desktop === -1) {
+        continue;
       }
+
+      const wmClass = parts[6].toLowerCase();
+      if (wmClass.includes('deadlineaura') || wmClass === 'electron.electron') {
+        continue;
+      }
+
+      const x = parseInt(parts[2], 10);
+      const y = parseInt(parts[3], 10);
+      const display = screen.getDisplayNearestPoint({ x, y });
+      occupiedDisplayIds.add(String(display.id));
     }
-  }, MOUSE_POLL_MS);
+
+    callback(occupiedDisplayIds);
+  });
 }
+
+function checkDesktopState() {
+  if (!sidebarWindow || sidebarWindow.isDestroyed() || !sidebarReady) {
+    return;
+  }
+
+  getDisplaysWithWindows((occupiedDisplayIds) => {
+    if (!occupiedDisplayIds) {
+      return;
+    }
+
+    const displays = screen.getAllDisplays();
+    const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
+
+    if (freeDisplay && !sidebarWindow.isVisible()) {
+      showSidebarOnDisplay(freeDisplay);
+    } else if (!freeDisplay && sidebarWindow.isVisible() && !sidebarManualOpen) {
+      hideSidebar();
+    }
+  });
+}
+
+// --- Init ---
 
 function initSidebar() {
   createSidebar();
-  startMousePoll();
+  createStrips();
+
+  checkDesktopState();
+  desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
+
+  screen.on('display-added', () => createStrips());
+  screen.on('display-removed', () => createStrips());
 }
 
 async function runUpdateCycle({ force = false } = {}) {
@@ -272,6 +302,8 @@ async function runUpdateCycle({ force = false } = {}) {
         calendarEvents,
       });
     }
+
+    updateStripColor(palette.accent_hex);
 
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
@@ -350,8 +382,9 @@ app.whenReady().then(() => {
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
 
-  checkDesktopState();
-  desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
+  ipcMain.on('toggle-sidebar', () => {
+    toggleSidebar();
+  });
 
   ipcMain.on('sync-now', async () => {
     try {
@@ -434,6 +467,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
+  destroyStrips();
   db.close();
   app.quit();
 });

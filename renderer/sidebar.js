@@ -287,6 +287,10 @@ document.getElementById('btnLayout').addEventListener('click', function () {
   window.deadlineAura.openOverlay();
 });
 
+document.getElementById('btnClose').addEventListener('click', function () {
+  window.deadlineAura.toggleSidebar();
+});
+
 window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
