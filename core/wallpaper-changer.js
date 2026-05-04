@@ -15,6 +15,37 @@ const MIN_SCORE_DELTA = 0.02;
 let lastScore = null;
 let overlayOpen = false;
 
+function buildPinnedByDisplay(allPinned, displays) {
+  const pinnedByDisplay = {};
+  for (const p of allPinned) {
+    if (!pinnedByDisplay[p.display_id]) {
+      pinnedByDisplay[p.display_id] = [];
+    }
+    pinnedByDisplay[p.display_id].push(p);
+  }
+
+  const primaryDisplay = displays.find((d) => d.primary) || displays[0];
+  if (!primaryDisplay) {
+    return pinnedByDisplay;
+  }
+
+  const targetId = primaryDisplay.id;
+  const knownDisplayIds = new Set(displays.map((d) => d.id));
+
+  // Map 'default' and orphaned display IDs to primary display
+  for (const storedId of Object.keys(pinnedByDisplay)) {
+    if (storedId === 'default' || !knownDisplayIds.has(storedId)) {
+      if (!pinnedByDisplay[targetId]) {
+        pinnedByDisplay[targetId] = [];
+      }
+      pinnedByDisplay[targetId].push(...pinnedByDisplay[storedId]);
+      delete pinnedByDisplay[storedId];
+    }
+  }
+
+  return pinnedByDisplay;
+}
+
 function setOverlayOpen(open) {
   overlayOpen = open;
 }
@@ -77,23 +108,9 @@ async function update(
   const displays = detectDisplays(electronScreen);
   const score = engineResult ? engineResult.global_score : 0;
 
-  // Group pinned tasks by display
+  // Group pinned tasks by display, remapping stale IDs to primary
   const allPinned = pinnedQueries.getAllPinned();
-  const pinnedByDisplay = {};
-  for (const p of allPinned) {
-    if (!pinnedByDisplay[p.display_id]) {
-      pinnedByDisplay[p.display_id] = [];
-    }
-    pinnedByDisplay[p.display_id].push(p);
-  }
-
-  // If single display, also map 'default' pinned to actual display id
-  if (displays.length === 1) {
-    const displayId = displays[0].id;
-    if (!pinnedByDisplay[displayId] && pinnedByDisplay['default']) {
-      pinnedByDisplay[displayId] = pinnedByDisplay['default'];
-    }
-  }
+  const pinnedByDisplay = buildPinnedByDisplay(allPinned, displays);
 
   const allTasks = engineResult ? engineResult.tasks : [];
 
@@ -136,5 +153,6 @@ module.exports = {
   setWallpaper,
   setOverlayOpen,
   isOverlayOpen,
+  buildPinnedByDisplay,
   WALLPAPER_PATH,
 };
