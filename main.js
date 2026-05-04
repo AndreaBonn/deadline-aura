@@ -21,13 +21,15 @@ let overlayWindow = null;
 
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = 24 * 3600000;
-const STRIP_WIDTH = 6;
+const EDGE_TRIGGER_PX = 6;
 const AUTOHIDE_DELAY_MS = 500;
 const MOUSE_POLL_MS = 100;
 const DESKTOP_CHECK_MS = 1000;
 
-let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette, desktopPinned, displayId }
-let currentPalette = null;
+let sidebarWindow = null;
+let sidebarReady = false;
+let sidebarHideTimeout = null;
+let mousePollInterval = null;
 let desktopCheckInterval = null;
 
 function openSettingsWindow() {
@@ -91,67 +93,43 @@ function getDisplaysWithWindows(callback) {
 }
 
 function checkDesktopState() {
+  // No-op when sidebar not ready
+  if (!sidebarWindow || sidebarWindow.isDestroyed() || !sidebarReady) {
+    return;
+  }
+
   getDisplaysWithWindows((occupiedDisplayIds) => {
     if (!occupiedDisplayIds) {
-      for (const dock of docks) {
-        if (!dock.desktopPinned) {
-          dock.desktopPinned = true;
-          openDock(dock);
-        }
+      // wmctrl failed — show sidebar on primary as fallback
+      if (!sidebarWindow.isVisible()) {
+        showSidebarOnDisplay(screen.getPrimaryDisplay());
       }
       return;
     }
 
-    for (const dock of docks) {
-      if (occupiedDisplayIds.has(dock.displayId)) {
-        if (dock.desktopPinned) {
-          dock.desktopPinned = false;
-          closeDock(dock);
-        }
-      } else {
-        if (!dock.desktopPinned) {
-          dock.desktopPinned = true;
-          openDock(dock);
-        }
-      }
+    // Find first unoccupied display to pin sidebar
+    const displays = screen.getAllDisplays();
+    const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
+
+    if (freeDisplay && !sidebarWindow.isVisible()) {
+      showSidebarOnDisplay(freeDisplay);
+    } else if (!freeDisplay && sidebarWindow.isVisible() && !sidebarHideTimeout) {
+      // All displays occupied — hide sidebar
+      hideSidebar();
     }
   });
 }
 
-function buildStripHTML(accentColor) {
-  return `<html><body style="margin:0;background:${accentColor};cursor:default;"></body></html>`;
-}
-
-function createDockForDisplay(display) {
-  const { width, height } = display.workAreaSize;
-  const { x: wx, y: wy } = display.workArea;
+function createSidebar() {
+  if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+    return;
+  }
+  const primary = screen.getPrimaryDisplay();
+  const { width, height } = primary.workAreaSize;
+  const { x: wx, y: wy } = primary.workArea;
   const sidebarWidth = config.sidebar.width;
-  const accentColor = currentPalette ? currentPalette.accent : '#1a1c2e';
 
-  // Colored strip — always visible at right edge
-  const strip = new BrowserWindow({
-    width: STRIP_WIDTH,
-    height: height,
-    x: wx + width - STRIP_WIDTH,
-    y: wy,
-    frame: false,
-    transparent: false,
-    backgroundColor: accentColor,
-    alwaysOnTop: false,
-    skipTaskbar: true,
-    focusable: false,
-    resizable: false,
-    movable: false,
-    hasShadow: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
-  });
-
-  strip.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-  strip.setIgnoreMouseEvents(false);
-  strip.loadURL('data:text/html,' + encodeURIComponent(buildStripHTML(accentColor)));
-
-  // Full sidebar — shown on hover, hidden otherwise
-  const sidebar = new BrowserWindow({
+  sidebarWindow = new BrowserWindow({
     width: sidebarWidth,
     height: height,
     x: wx + width - sidebarWidth,
@@ -170,50 +148,85 @@ function createDockForDisplay(display) {
     },
   });
 
-  sidebar.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-  sidebar.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  sidebarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+  sidebarWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  const dock = {
-    sidebar,
-    strip,
-    hideTimeout: null,
-    pollInterval: null,
-    palette: null,
-    desktopPinned: false,
-    displayId: String(display.id),
-    sidebarReady: false,
-  };
-
-  sidebar.webContents.once('did-finish-load', () => {
-    dock.sidebarReady = true;
+  sidebarWindow.webContents.once('did-finish-load', () => {
+    sidebarReady = true;
     runUpdateCycle({ force: true });
   });
 
-  // Poll mouse position — detect hover over strip or sidebar
-  dock.pollInterval = setInterval(() => {
-    const cursor = screen.getCursorScreenPoint();
+  sidebarWindow.on('closed', () => {
+    sidebarWindow = null;
+    sidebarReady = false;
+    clearInterval(mousePollInterval);
+    mousePollInterval = null;
+  });
+}
 
-    // Desktop pinned — sidebar stays open, skip autohide logic
-    if (dock.desktopPinned) {
+function showSidebarOnDisplay(display) {
+  if (!sidebarWindow || sidebarWindow.isDestroyed()) {
+    return;
+  }
+  if (sidebarHideTimeout) {
+    clearTimeout(sidebarHideTimeout);
+    sidebarHideTimeout = null;
+  }
+
+  const { width, height } = display.workAreaSize;
+  const { x: wx, y: wy } = display.workArea;
+  const sidebarWidth = config.sidebar.width;
+  sidebarWindow.setBounds({
+    x: wx + width - sidebarWidth,
+    y: wy,
+    width: sidebarWidth,
+    height: height,
+  });
+  if (!sidebarWindow.isVisible()) {
+    sidebarWindow.show();
+  }
+}
+
+function hideSidebar() {
+  if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+    sidebarWindow.hide();
+  }
+}
+
+function startMousePoll() {
+  if (mousePollInterval) {
+    return;
+  }
+
+  mousePollInterval = setInterval(() => {
+    if (!sidebarWindow || sidebarWindow.isDestroyed()) {
       return;
     }
 
-    if (!sidebar.isVisible()) {
-      // Check if mouse is over the strip
-      if (!strip.isDestroyed() && strip.isVisible()) {
-        const sb = strip.getBounds();
+    const cursor = screen.getCursorScreenPoint();
+    const sidebarVisible = sidebarWindow.isVisible();
+
+    if (!sidebarVisible) {
+      // Check if cursor is at the right edge of any display
+      const displays = screen.getAllDisplays();
+      for (const display of displays) {
+        const { x: wx, y: wy } = display.workArea;
+        const { width, height } = display.workAreaSize;
+        const rightEdge = wx + width;
+
         if (
-          cursor.x >= sb.x &&
-          cursor.x <= sb.x + sb.width &&
-          cursor.y >= sb.y &&
-          cursor.y <= sb.y + sb.height
+          cursor.x >= rightEdge - EDGE_TRIGGER_PX &&
+          cursor.x <= rightEdge &&
+          cursor.y >= wy &&
+          cursor.y <= wy + height
         ) {
-          openDock(dock);
+          showSidebarOnDisplay(display);
+          break;
         }
       }
     } else {
-      // Sidebar is visible — check if mouse left sidebar area
-      const bounds = sidebar.getBounds();
+      // Sidebar visible — check if mouse left sidebar bounds
+      const bounds = sidebarWindow.getBounds();
       const isInside =
         cursor.x >= bounds.x &&
         cursor.x <= bounds.x + bounds.width &&
@@ -221,72 +234,23 @@ function createDockForDisplay(display) {
         cursor.y <= bounds.y + bounds.height;
 
       if (isInside) {
-        if (dock.hideTimeout) {
-          clearTimeout(dock.hideTimeout);
-          dock.hideTimeout = null;
+        if (sidebarHideTimeout) {
+          clearTimeout(sidebarHideTimeout);
+          sidebarHideTimeout = null;
         }
-      } else if (!dock.hideTimeout) {
-        dock.hideTimeout = setTimeout(() => {
-          closeDock(dock);
-          dock.hideTimeout = null;
+      } else if (!sidebarHideTimeout) {
+        sidebarHideTimeout = setTimeout(() => {
+          hideSidebar();
+          sidebarHideTimeout = null;
         }, AUTOHIDE_DELAY_MS);
       }
     }
   }, MOUSE_POLL_MS);
-
-  sidebar.on('closed', () => {
-    clearInterval(dock.pollInterval);
-    if (!strip.isDestroyed()) {
-      strip.close();
-    }
-    docks = docks.filter((d) => d !== dock);
-  });
-
-  strip.on('closed', () => {
-    clearInterval(dock.pollInterval);
-    if (!sidebar.isDestroyed()) {
-      sidebar.close();
-    }
-  });
-
-  return dock;
 }
 
-function openDock(dock) {
-  if (dock.hideTimeout) {
-    clearTimeout(dock.hideTimeout);
-    dock.hideTimeout = null;
-  }
-  if (!dock.strip.isDestroyed()) {
-    dock.strip.hide();
-  }
-  if (!dock.sidebar.isDestroyed() && !dock.sidebar.isVisible()) {
-    dock.sidebar.show();
-  }
-}
-
-function closeDock(dock) {
-  if (!dock.sidebar.isDestroyed()) {
-    dock.sidebar.hide();
-  }
-  if (!dock.strip.isDestroyed()) {
-    dock.strip.show();
-  }
-}
-
-function updateStripColor(palette) {
-  const color = palette ? palette.accent_hex : '#1a1c2e';
-  for (const dock of docks) {
-    if (!dock.strip.isDestroyed()) {
-      dock.strip.setBackgroundColor(color);
-      dock.strip.loadURL('data:text/html,' + encodeURIComponent(buildStripHTML(color)));
-    }
-  }
-}
-
-function createAllDocks() {
-  const displays = screen.getAllDisplays();
-  docks = displays.map((d) => createDockForDisplay(d));
+function initSidebar() {
+  createSidebar();
+  startMousePoll();
 }
 
 async function runUpdateCycle({ force = false } = {}) {
@@ -298,7 +262,6 @@ async function runUpdateCycle({ force = false } = {}) {
     });
 
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
-    currentPalette = palette;
 
     if (config.wallpaper.enabled) {
       const calendarEvents = db.getUpcomingCalendarEvents(24 * 3600000);
@@ -310,19 +273,15 @@ async function runUpdateCycle({ force = false } = {}) {
       });
     }
 
-    updateStripColor(palette);
-
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
 
-    for (const dock of docks) {
-      if (dock.sidebar && !dock.sidebar.isDestroyed() && dock.sidebarReady) {
-        dock.sidebar.webContents.send('update', {
-          engineResult,
-          palette,
-          pinnedTaskIds: Array.from(pinnedIds),
-        });
-      }
+    if (sidebarWindow && !sidebarWindow.isDestroyed() && sidebarReady) {
+      sidebarWindow.webContents.send('update', {
+        engineResult,
+        palette,
+        pinnedTaskIds: Array.from(pinnedIds),
+      });
     }
 
     return { engineResult, palette };
@@ -385,7 +344,7 @@ function openOverlay(displayId) {
 }
 
 app.whenReady().then(() => {
-  createAllDocks();
+  initSidebar();
 
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
@@ -427,10 +386,8 @@ app.whenReady().then(() => {
     }
     saveConfig(result.data);
     config = loadConfig();
-    for (const dock of docks) {
-      if (!dock.sidebar.isDestroyed()) {
-        dock.sidebar.webContents.send('config-changed', config);
-      }
+    if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+      sidebarWindow.webContents.send('config-changed', config);
     }
     return { ok: true };
   });
