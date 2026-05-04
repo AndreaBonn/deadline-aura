@@ -20,13 +20,14 @@ function makeConfig(overrides = {}) {
   };
 }
 
-function mockJiraResponse(issues, total) {
+function mockJiraResponse(issues, { isLast = true, nextPageToken = null } = {}) {
   return {
     ok: true,
     status: 200,
     json: async () => ({
-      total: total !== undefined ? total : issues.length,
       issues,
+      isLast,
+      nextPageToken,
     }),
   };
 }
@@ -90,8 +91,8 @@ describe('jira fetchIssues', () => {
     ];
 
     vi.spyOn(global, 'fetch')
-      .mockResolvedValueOnce(mockJiraResponse(page1Issues, 51))
-      .mockResolvedValueOnce(mockJiraResponse(page2Issues, 51));
+      .mockResolvedValueOnce(mockJiraResponse(page1Issues, { isLast: false, nextPageToken: 'abc' }))
+      .mockResolvedValueOnce(mockJiraResponse(page2Issues));
 
     const config = makeConfig();
     const result = await fetchIssues(config);

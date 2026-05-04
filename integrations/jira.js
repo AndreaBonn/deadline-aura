@@ -78,16 +78,17 @@ async function fetchFromInstance({ domain, email, apiToken, jql }) {
   const fields = 'summary,priority,duedate,status,assignee';
 
   const issues = [];
-  let startAt = 0;
-  let total = Infinity;
+  let nextPageToken = null;
 
-  while (startAt < total) {
+  do {
     const params = new URLSearchParams({
       jql,
       fields,
       maxResults: String(MAX_RESULTS_PER_PAGE),
-      startAt: String(startAt),
     });
+    if (nextPageToken) {
+      params.set('nextPageToken', nextPageToken);
+    }
 
     try {
       const data = await fetchWithRetry(`${baseUrl}?${params}`, {
@@ -98,14 +99,14 @@ async function fetchFromInstance({ domain, email, apiToken, jql }) {
         },
       });
 
-      total = data.total || 0;
-      issues.push(...(data.issues || []).map((issue) => normalizeIssue(issue, domain)));
-      startAt += MAX_RESULTS_PER_PAGE;
+      const pageIssues = data.issues || [];
+      issues.push(...pageIssues.map((issue) => normalizeIssue(issue, domain)));
+      nextPageToken = data.isLast === false ? data.nextPageToken : null;
     } catch (err) {
       console.error(`Jira [${domain}]: fetch error:`, err.message);
       break;
     }
-  }
+  } while (nextPageToken);
 
   return issues;
 }

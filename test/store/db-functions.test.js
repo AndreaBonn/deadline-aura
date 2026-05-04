@@ -103,6 +103,38 @@ describe('db module exported functions', () => {
       const tasks = db.getActiveTasks(72 * 3600000);
       expect(tasks.find((t) => t.id === 'stale_task')).toBeUndefined();
     });
+
+    it('returns all jira tasks regardless of due_at', () => {
+      const farFutureJira = {
+        ...SAMPLE_TASK,
+        id: 'jira_far',
+        source: 'jira',
+        due_at: Date.now() + 999 * 3600000,
+      };
+      db.upsertTask(farFutureJira);
+      const tasks = db.getActiveTasks(72 * 3600000);
+      expect(tasks.find((t) => t.id === 'jira_far')).toBeDefined();
+    });
+
+    it('still filters gcal tasks by lookahead window', () => {
+      db.upsertTask({
+        ...SAMPLE_TASK,
+        id: 'gcal_far',
+        source: 'gcal',
+        due_at: Date.now() + 999 * 3600000,
+      });
+      db.upsertTask({
+        ...SAMPLE_TASK,
+        id: 'jira_far',
+        source: 'jira',
+        due_at: Date.now() + 999 * 3600000,
+      });
+
+      const tasks = db.getActiveTasks(72 * 3600000);
+      const ids = tasks.map((t) => t.id);
+      expect(ids).not.toContain('gcal_far');
+      expect(ids).toContain('jira_far');
+    });
   });
 
   describe('markStale', () => {

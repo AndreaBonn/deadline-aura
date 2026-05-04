@@ -57,15 +57,26 @@ function runMigrations(database) {
 
 function getActiveTasks(lookaheadMs) {
   const deadline = Date.now() + lookaheadMs;
-  return getDb()
+  const jiraTasks = getDb()
     .prepare(
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
+       AND source = 'jira'
+     ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
+    )
+    .all();
+  const otherTasks = getDb()
+    .prepare(
+      `SELECT * FROM tasks
+     WHERE is_done = 0
+       AND is_stale = 0
+       AND source != 'jira'
        AND (due_at IS NULL OR due_at <= ?)
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
     .all(deadline);
+  return [...jiraTasks, ...otherTasks];
 }
 
 function upsertTask(task) {
