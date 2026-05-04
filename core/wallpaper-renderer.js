@@ -139,15 +139,12 @@ function filterUpcomingEvents(allTasks) {
     .sort((a, b) => (a.start_at || a.due_at) - (b.start_at || b.due_at));
 }
 
-function urgencyBlockTop(engineResult, region) {
-  if (!engineResult || !engineResult.tasks || engineResult.tasks.length === 0) {
+function mentalLoadBlockTop(engineResult, region) {
+  if (!engineResult) {
     return region.y + region.height;
   }
   const margin = 60;
-  const rowHeight = 34;
-  const taskCount = Math.min(engineResult.tasks.length, 3);
-  const firstRowY = region.y + region.height - margin - taskCount * rowHeight;
-  return firstRowY - 30;
+  return region.y + region.height - margin - 10;
 }
 
 function drawDailyAgenda(ctx, allTasks, region, engineResult) {
@@ -163,7 +160,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   const headerHeight = 28;
   const gapToUrgency = 20;
   const availableHeight =
-    urgencyBlockTop(engineResult, region) - startY - headerHeight - gapToUrgency;
+    mentalLoadBlockTop(engineResult, region) - startY - headerHeight - gapToUrgency;
   const maxItems = Math.max(1, Math.floor(availableHeight / lineHeight));
 
   // Header
@@ -226,42 +223,28 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   }
 }
 
-function drawUrgencyInfo(ctx, engineResult, region) {
-  if (!engineResult || !engineResult.tasks || engineResult.tasks.length === 0) {
+function drawMentalLoad(ctx, engineResult, region) {
+  if (!engineResult) {
     return;
   }
 
   const margin = 60;
-  const rowHeight = 34;
-  const tasks = engineResult.tasks.slice(0, 3);
-  let y = region.y + region.height - margin - tasks.length * rowHeight;
+  const pct = (engineResult.global_score * 100).toFixed(0);
+  const y = region.y + region.height - margin;
 
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+  ctx.textBaseline = 'bottom';
 
-  ctx.font = '600 18px sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-  ctx.fillText(
-    `urgency ${(engineResult.global_score * 100).toFixed(0)}%`,
-    region.x + margin,
-    y - 30,
-  );
+  // Percentage — large and prominent
+  ctx.font = '700 32px "Ubuntu", system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+  ctx.fillText(`${pct}%`, region.x + margin, y);
 
-  ctx.font = '400 15px sans-serif';
-  for (const task of tasks) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    const maxTitleWidth = 380;
-    ctx.fillText(truncateText(ctx, task.title, maxTitleWidth), region.x + margin, y);
-
-    if (task.hours_remaining !== null) {
-      const hrs = Math.abs(task.hours_remaining);
-      const label = task.hours_remaining < 0 ? 'scaduto' : `${hrs.toFixed(0)}h`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-      ctx.fillText(label, region.x + margin + 390, y);
-    }
-
-    y += rowHeight;
-  }
+  // Label
+  const pctWidth = ctx.measureText(`${pct}%`).width;
+  ctx.font = '300 14px "Ubuntu", system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.20)';
+  ctx.fillText('carico mentale', region.x + margin + pctWidth + 12, y - 4);
 }
 
 async function render({ displays, palette, score, engineResult, pinnedByDisplay, calendarEvents }) {
@@ -291,8 +274,8 @@ async function render({ displays, palette, score, engineResult, pinnedByDisplay,
     const allTasks = calendarEvents || [];
     drawDailyAgenda(ctx, allTasks, region, engineResult);
 
-    // Urgency info (bottom-left)
-    drawUrgencyInfo(ctx, engineResult, region);
+    // Mental load indicator (bottom-left)
+    drawMentalLoad(ctx, engineResult, region);
 
     // Pinned post-it tasks
     const pinned = pinnedByDisplay ? pinnedByDisplay[region.displayId] || [] : [];
