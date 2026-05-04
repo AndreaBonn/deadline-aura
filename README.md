@@ -1,158 +1,205 @@
+**English** | [Italiano](./README.it.md)
+
 # DeadlineAura
 
-Desktop widget per Linux/GNOME che cambia il colore del wallpaper in base all'urgenza delle scadenze. Sincronizza eventi da Google Calendar e issue da Jira, calcola un punteggio di urgenza globale e lo traduce in una transizione cromatica continua (verde → rosso). Un LLM analizza il carico cognitivo complessivo (context switching, frammentazione, carico emotivo) per un punteggio più accurato della semplice distanza temporale.
+Desktop widget for Linux that maps your workload into an ambient visual signal — a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
 
-## Requisiti
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/AndreaBonn/deadline-aura?style=social)](https://github.com/AndreaBonn/deadline-aura)
 
-- Node.js 20 LTS (`nvm use 20`)
-- Linux con GNOME 44+ (Ubuntu 22.04+, Fedora 38+)
-- Cairo e Pango (per il package `canvas`)
-- `gsettings` (GNOME) o `feh` (fallback) per il wallpaper
-- `notify-send` (libnotify) per le notifiche desktop
+## What it does
 
-### Dipendenze di sistema (Ubuntu/Debian)
+DeadlineAura pulls tasks from Google Calendar and Jira, computes an urgency score for each one, and reflects the aggregate load as color: calm green at low pressure, through yellow, to deep red at critical. The color appears on a persistent sidebar strip on each display, as a wallpaper tint, and optionally as post-it notes rendered directly into the desktop background.
 
-```bash
-sudo apt install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
-```
+An optional AI scoring layer (Groq, Gemini, OpenAI, or Anthropic) evaluates cognitive and emotional load across the full event window and blends that assessment (70%) with the time-based mechanical score (30%). If no AI provider is configured, the mechanical formula runs alone.
 
-### Dipendenze di sistema (Fedora)
+This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 
-```bash
-sudo dnf install gcc-c++ cairo-devel pango-devel libjpeg-turbo-devel giflib-devel librsvg2-devel
-```
+## Features
+
+- Persistent 20px strip on every connected display; color interpolates across five urgency bands (calm → normal → attention → urgent → critical)
+- Sidebar panel with tasks sorted by urgency score, toggled by clicking the strip
+- Wallpaper generated as a composite PNG spanning all displays, with per-task post-it notes at drag-and-drop positions stored as percentages
+- Urgency engine: exponential decay formula with priority weights and volume amplification above 5 concurrent events
+- AI scoring with provider failover (Groq → Gemini → OpenAI → Anthropic), hash-based cache, configurable refresh interval (default: 6 hours)
+- Google Calendar sync via OAuth2 (read-only scope: `calendar.readonly`)
+- Jira sync via API token with configurable JQL
+- Multi-monitor support: one strip per display, single spanned wallpaper PNG
+- Config validated with Zod on startup and on every settings save
+- X11 strut reservation so the strip does not overlap the GNOME work area
 
 ## Setup
 
+### Step 1 — Install system dependencies
+
+**Ubuntu/Debian:**
+
 ```bash
-git clone <repo-url> deadlineaura
-cd deadlineaura
-nvm use 20
-npm install
-cp .env.example .env
-# Configura le variabili in .env (vedi sezione Configurazione)
+sudo apt install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+sudo apt install x11-utils wmctrl libnotify-bin
 ```
 
-## Avvio
+**Fedora:**
 
 ```bash
+sudo dnf install gcc-c++ cairo-devel pango-devel libjpeg-turbo-devel giflib-devel librsvg2-devel
+sudo dnf install xprop wmctrl libnotify
+```
+
+`xprop` and `wmctrl` are required at runtime. The wallpaper is set via `gsettings` (GNOME); `feh` is used as a fallback. `notify-send` handles desktop notifications.
+
+### Step 2 — Install Node.js 20 via nvm
+
+The `canvas` package does not compile on Node 24. Node 20 LTS is required.
+
+If you don't have nvm: [https://github.com/nvm-sh/nvm#installing-and-updating](https://github.com/nvm-sh/nvm#installing-and-updating)
+
+```bash
+nvm install 20
+nvm use 20
+node --version   # should print v20.x.x
+```
+
+### Step 3 — Clone and build
+
+```bash
+git clone https://github.com/AndreaBonn/deadline-aura.git
+cd deadline-aura
+npm install
+npx electron-rebuild   # rebuilds better-sqlite3 and canvas against Electron's Node ABI
+```
+
+`npx electron-rebuild` is required after `npm install`. It recompiles the native addons (`better-sqlite3`, `canvas`) against the Node version embedded in Electron. Without this step, the app will fail to start.
+
+### Step 4 — Create Google Cloud credentials
+
+DeadlineAura needs OAuth 2.0 credentials to read your Google Calendar.
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) and create a new project (or use an existing one)
+2. In the left menu: **APIs & Services → Library** → search for "Google Calendar API" → Enable it
+3. Go to **APIs & Services → Credentials** → **Create Credentials → OAuth client ID**
+4. Choose application type: **Desktop app**
+5. Under **Authorized redirect URIs**, add exactly: `http://localhost:34567/oauth/callback`
+6. Click Create — note the **Client ID** and **Client Secret**
+
+### Step 5 — Create the .env file
+
+In the project root, create a file named `.env`:
+
+```dotenv
+# Google Calendar OAuth credentials (required for calendar sync)
+GOOGLE_CLIENT_ID=paste_your_client_id_here
+GOOGLE_CLIENT_SECRET=paste_your_client_secret_here
+
+# AI provider API keys — comma-separated to enable key rotation
+# All optional. If none are set, AI scoring is disabled.
+GROQ_API_KEYS=key1,key2
+GEMINI_API_KEYS=key1
+OPENAI_API_KEYS=key1
+ANTHROPIC_API_KEYS=key1
+```
+
+Fill in at minimum `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The AI keys are optional.
+
+### Step 6 — First run and Google authorization
+
+```bash
+nvm use 20
 npm start
 ```
 
-La sidebar Electron appare sul lato destro del desktop. Il wallpaper cambia colore in base allo score di urgenza globale.
+On first run, a browser window opens for Google Calendar authorization. Log in with the Google account whose calendar you want to sync and click Allow. The token is saved automatically to `~/.config/deadlineaura/google-token.json` with permissions `0600`. You will not be asked again unless the token is deleted or revoked.
 
-## Test
+After authorization, the colored strip appears on the right edge of each display. Click it to open the sidebar.
 
-```bash
-npm test              # Esegue tutti i test
-npm run test:watch    # Watch mode
-npm run test:coverage # Coverage report
-npm run lint          # ESLint
-```
+### Step 7 — Configure Jira (optional)
 
-## Configurazione
+Click the gear icon in the sidebar to open the settings panel. In the Jira section, enter:
 
-### Variabili d'ambiente (.env)
+- **Domain**: your Atlassian domain (e.g. `yourcompany.atlassian.net`)
+- **Email**: the email address of your Atlassian account
+- **API token**: generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+- **JQL**: filter for the issues you want to track (default: `assignee = currentUser() AND statusCategory != Done`)
 
-| Variabile | Descrizione |
-|---|---|
-| `GOOGLE_CLIENT_ID` | Client ID OAuth 2.0 da Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | Client Secret OAuth 2.0 |
-| `JIRA_DOMAIN` | Dominio Atlassian (es. `azienda.atlassian.net`) |
-| `JIRA_EMAIL` | Email account Jira |
-| `JIRA_API_TOKEN` | API token generato da id.atlassian.com |
-| `GROQ_API_KEYS` | Chiavi API Groq (comma-separated per rotazione) |
-| `GEMINI_API_KEYS` | Chiavi API Google Gemini |
-| `OPENAI_API_KEYS` | Chiavi API OpenAI |
-| `ANTHROPIC_API_KEYS` | Chiavi API Anthropic |
-| `AI_PROVIDER_PRIORITY` | Ordine provider (default: `groq,gemini,openai,anthropic`) |
-| `AI_RECALC_HOURS` | Ore tra ricalcoli AI forzati (default: 6) |
+Credentials are stored in `~/.config/deadlineaura/config.json`.
 
-### Google Calendar OAuth
+### Step 8 — Autostart (optional)
 
-1. Crea un progetto su [Google Cloud Console](https://console.cloud.google.com)
-2. Abilita Google Calendar API
-3. Crea credenziali OAuth 2.0 (tipo: Desktop app)
-4. Copia Client ID e Client Secret nel `.env`
-5. Al primo avvio, il browser si apre per l'autorizzazione
+**GNOME autostart — launch the widget on login:**
 
-### Jira
-
-1. Genera un API token da [Atlassian Account](https://id.atlassian.com/manage-profile/security/api-tokens)
-2. Configura dominio, email e token nel `.env`
-
-### AI Provider
-
-Configura almeno un provider AI per il calcolo del carico cognitivo. L'ordine in `AI_PROVIDER_PRIORITY` determina il failover: se il primo fallisce, si passa al secondo. Ogni provider supporta multiple chiavi API (comma-separated) con rotazione automatica.
-
-Senza provider AI configurato, il sistema usa la formula meccanica (distanza temporale + priorità numerica).
-
-### File di configurazione avanzata
-
-`~/.config/deadlineaura/config.json` — Sovrascrive i default per: intervallo sync, finestra temporale, soglie notifiche, larghezza sidebar, palette colori. Vedi `config/defaults.js` per lo schema completo.
-
-## Architettura
-
-```
-Google Calendar ──┐
-                   ├──► sync-daemon ──► SQLite ──► deadline-engine ──► color-mapper
-Jira            ──┘         │                           │                    │
-                        ai-scorer                       │                    ▼
-                     (multi-provider)                   │            wallpaper-changer
-                                                        │            Electron sidebar
-                                                        └──────────► notify-send
-```
-
-### Componenti
-
-| Modulo | Responsabilita |
-|---|---|
-| `core/sync-daemon.js` | Fetch periodico da GCal + Jira, salvataggio su SQLite |
-| `core/deadline-engine.js` | Calcolo urgency score per task e score globale |
-| `core/color-mapper.js` | Conversione score → palette HSL interpolata |
-| `core/wallpaper-changer.js` | Generazione PNG wallpaper + impostazione via gsettings |
-| `core/notifier.js` | Notifiche desktop via notify-send |
-| `ai/ai-scorer.js` | Orchestrazione AI scoring con cache hash-based |
-| `ai/provider-manager.js` | Failover multi-provider + rotazione chiavi |
-| `integrations/google-calendar.js` | Client Google Calendar API (OAuth 2.0) |
-| `integrations/jira.js` | Client Jira REST API (Basic Auth) |
-| `store/db.js` | SQLite init, migrations, query helpers |
-
-### AI Scoring
-
-L'AI non valuta singoli eventi, ma l'intera finestra temporale (72h default). Fattori analizzati:
-
-- Context switching (topic diversi, clienti diversi)
-- Complessita cognitiva (deep work vs meeting routine)
-- Frammentazione temporale (slot brevi sparsi vs blocchi concentrati)
-- Carico emotivo (performance review vs casual sync)
-- Pressione cumulativa (giorni intensi in sequenza)
-
-Il risultato viene cachato e ricalcolato solo quando cambia il set di eventi o ogni 6 ore.
-
-## Autostart
+Run these commands from inside the project directory:
 
 ```bash
-# Systemd timer per sync (ogni 5 minuti)
-cp systemd/deadlineaura-sync.{service,timer} ~/.config/systemd/user/
+mkdir -p ~/.config/autostart
+ELECTRON_BIN=$(node -e "console.log(require('electron'))")
+PROJECT_DIR=$(realpath .)
+
+sed "s|Exec=.*|Exec=$ELECTRON_BIN $PROJECT_DIR --no-sandbox|" \
+  autostart/deadlineaura.desktop > ~/.config/autostart/deadlineaura.desktop
+```
+
+**Systemd timer — background sync every 5 minutes:**
+
+```bash
+mkdir -p ~/.config/systemd/user
+NODE_BIN=$(which node)
+PROJECT_DIR=$(realpath .)
+
+sed "s|ExecStart=.*|ExecStart=$NODE_BIN $PROJECT_DIR/core/sync-daemon.js|" \
+  systemd/deadlineaura-sync.service > ~/.config/systemd/user/deadlineaura-sync.service
+
+cp systemd/deadlineaura-sync.timer ~/.config/systemd/user/
+
 systemctl --user daemon-reload
 systemctl --user enable --now deadlineaura-sync.timer
-
-# Autostart widget al login
-cp autostart/deadlineaura.desktop ~/.config/autostart/
 ```
 
-## Dati locali
+## Usage
 
-| Percorso | Contenuto |
+The sidebar updates automatically every 60 seconds. To force an immediate sync:
+
+```bash
+npm run sync
+```
+
+**File locations:**
+| Path | Content |
 |---|---|
-| `~/.config/deadlineaura/config.json` | Configurazione utente |
-| `~/.config/deadlineaura/google-token.json` | Token OAuth Google (600) |
-| `~/.local/share/deadlineaura/db.sqlite` | Database SQLite |
-| `~/.local/share/deadlineaura/wallpaper.png` | Wallpaper generato |
+| `~/.config/deadlineaura/config.json` | User configuration |
+| `~/.config/deadlineaura/google-token.json` | Google OAuth token (0600) |
+| `~/.local/share/deadlineaura/db.sqlite` | SQLite database |
+| `~/.local/share/deadlineaura/wallpaper.png` | Generated wallpaper |
 
-Nessun dato viene inviato a server terzi oltre alle API Google, Atlassian e provider AI configurati.
+Advanced configuration (sync interval, lookahead window, notification thresholds, sidebar width, etc.) is available through the in-app settings panel. The full schema with defaults is in `config/defaults.js`.
 
-## Licenza
+## Testing
 
-MIT
+```bash
+npm test                  # run all tests
+npm run test:coverage     # run with v8 coverage report
+npm run lint              # ESLint
+```
+
+Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, and `integrations/`.
+
+## Contributing
+
+Open an issue to discuss changes before submitting a pull request. Code must pass `npm run lint` and `npm test` before review. There is no formal contributing guide at this stage.
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](./SECURITY.md).
+
+## License
+
+Released under the [Apache License 2.0](./LICENSE).
+
+Commercial use is permitted. If you use DeadlineAura in a commercial product or service, attribution to the original author is required per the license terms.
+
+## Author
+
+Andrea Bonacci — [@AndreaBonn](https://github.com/AndreaBonn)
+
+---
+
+If this project is useful to you, a [star on GitHub](https://github.com/AndreaBonn/deadline-aura) helps others find it.
