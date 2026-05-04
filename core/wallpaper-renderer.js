@@ -242,9 +242,9 @@ function drawMentalLoad(ctx, engineResult, region) {
 
   // Label
   const pctWidth = ctx.measureText(`${pct}%`).width;
-  ctx.font = '300 14px "Ubuntu", system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.20)';
-  ctx.fillText('carico mentale', region.x + margin + pctWidth + 12, y - 4);
+  ctx.font = '400 16px "Ubuntu", system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.fillText('carico mentale', region.x + margin + pctWidth + 12, y - 5);
 }
 
 async function render({ displays, palette, score, engineResult, pinnedByDisplay, calendarEvents }) {
