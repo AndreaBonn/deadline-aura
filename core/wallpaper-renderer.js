@@ -138,7 +138,18 @@ function filterUpcomingEvents(allTasks) {
     .sort((a, b) => a.due_at - b.due_at);
 }
 
-function drawDailyAgenda(ctx, allTasks, region) {
+function urgencyBlockTop(engineResult, region) {
+  if (!engineResult || !engineResult.tasks || engineResult.tasks.length === 0) {
+    return region.y + region.height;
+  }
+  const margin = 60;
+  const rowHeight = 34;
+  const taskCount = Math.min(engineResult.tasks.length, 3);
+  const firstRowY = region.y + region.height - margin - taskCount * rowHeight;
+  return firstRowY - 30;
+}
+
+function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   const todayEvents = filterUpcomingEvents(allTasks);
   if (todayEvents.length === 0) {
     return;
@@ -148,7 +159,11 @@ function drawDailyAgenda(ctx, allTasks, region) {
   const startX = region.x + margin;
   const startY = region.y + margin;
   const lineHeight = 28;
-  const maxItems = 8;
+  const headerHeight = 28;
+  const gapToUrgency = 20;
+  const availableHeight =
+    urgencyBlockTop(engineResult, region) - startY - headerHeight - gapToUrgency;
+  const maxItems = Math.max(1, Math.floor(availableHeight / lineHeight));
 
   // Header
   ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
@@ -273,7 +288,7 @@ async function render({ displays, palette, score, engineResult, pinnedByDisplay,
 
     // Daily agenda (top-left) — all tasks with due_at today, only future
     const allTasks = calendarEvents || [];
-    drawDailyAgenda(ctx, allTasks, region);
+    drawDailyAgenda(ctx, allTasks, region, engineResult);
 
     // Urgency info (bottom-left)
     drawUrgencyInfo(ctx, engineResult, region);
