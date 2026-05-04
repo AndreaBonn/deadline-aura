@@ -16,33 +16,15 @@ let lastScore = null;
 let overlayOpen = false;
 
 function buildPinnedByDisplay(allPinned, displays) {
+  if (!displays.length || !allPinned.length) {
+    return {};
+  }
+
+  // Broadcast: every pinned task appears on every display
   const pinnedByDisplay = {};
-  for (const p of allPinned) {
-    if (!pinnedByDisplay[p.display_id]) {
-      pinnedByDisplay[p.display_id] = [];
-    }
-    pinnedByDisplay[p.display_id].push(p);
+  for (const display of displays) {
+    pinnedByDisplay[display.id] = [...allPinned];
   }
-
-  const primaryDisplay = displays.find((d) => d.primary) || displays[0];
-  if (!primaryDisplay) {
-    return pinnedByDisplay;
-  }
-
-  const targetId = primaryDisplay.id;
-  const knownDisplayIds = new Set(displays.map((d) => d.id));
-
-  // Map 'default' and orphaned display IDs to primary display
-  for (const storedId of Object.keys(pinnedByDisplay)) {
-    if (storedId === 'default' || !knownDisplayIds.has(storedId)) {
-      if (!pinnedByDisplay[targetId]) {
-        pinnedByDisplay[targetId] = [];
-      }
-      pinnedByDisplay[targetId].push(...pinnedByDisplay[storedId]);
-      delete pinnedByDisplay[storedId];
-    }
-  }
-
   return pinnedByDisplay;
 }
 

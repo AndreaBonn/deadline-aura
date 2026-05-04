@@ -62,44 +62,40 @@ describe('wallpaper system', () => {
       { id: 'HDMI-1', width: 1920, height: 1080, x: 1920, y: 0, primary: false },
     ];
 
-    it('maps default display_id to primary display on multi-monitor', () => {
+    it('broadcasts all pinned tasks to every display', () => {
+      const pinned = [
+        { display_id: 'eDP-1', task_id: 't1', x_pct: 10, y_pct: 10 },
+        { display_id: 'HDMI-1', task_id: 't2', x_pct: 20, y_pct: 20 },
+      ];
+      const result = buildPinnedByDisplay(pinned, dualDisplays);
+      expect(result['eDP-1']).toHaveLength(2);
+      expect(result['HDMI-1']).toHaveLength(2);
+      expect(result['eDP-1'].map((p) => p.task_id)).toEqual(['t1', 't2']);
+      expect(result['HDMI-1'].map((p) => p.task_id)).toEqual(['t1', 't2']);
+    });
+
+    it('broadcasts default display_id tasks to all displays', () => {
       const pinned = [
         { display_id: 'default', task_id: 't1', x_pct: 10, y_pct: 10 },
         { display_id: 'default', task_id: 't2', x_pct: 20, y_pct: 20 },
       ];
       const result = buildPinnedByDisplay(pinned, dualDisplays);
-      expect(result['default']).toBeUndefined();
       expect(result['eDP-1']).toHaveLength(2);
-      expect(result['eDP-1'].map((p) => p.task_id)).toEqual(['t1', 't2']);
+      expect(result['HDMI-1']).toHaveLength(2);
     });
 
-    it('maps orphaned Electron IDs to primary display after reboot', () => {
-      const pinned = [
-        { display_id: '73400320', task_id: 't1', x_pct: 10, y_pct: 10 },
-        { display_id: '73400320', task_id: 't2', x_pct: 20, y_pct: 20 },
-      ];
+    it('broadcasts orphaned Electron IDs to all displays', () => {
+      const pinned = [{ display_id: '73400320', task_id: 't1', x_pct: 10, y_pct: 10 }];
       const result = buildPinnedByDisplay(pinned, dualDisplays);
-      expect(result['73400320']).toBeUndefined();
-      expect(result['eDP-1']).toHaveLength(2);
-    });
-
-    it('preserves tasks already assigned to valid display IDs', () => {
-      const pinned = [{ display_id: 'HDMI-1', task_id: 't1', x_pct: 50, y_pct: 50 }];
-      const result = buildPinnedByDisplay(pinned, dualDisplays);
+      expect(result['eDP-1']).toHaveLength(1);
       expect(result['HDMI-1']).toHaveLength(1);
-      expect(result['eDP-1']).toBeUndefined();
     });
 
-    it('merges default and orphaned into existing primary tasks', () => {
-      const pinned = [
-        { display_id: 'eDP-1', task_id: 't1', x_pct: 10, y_pct: 10 },
-        { display_id: 'default', task_id: 't2', x_pct: 20, y_pct: 20 },
-        { display_id: '99999', task_id: 't3', x_pct: 30, y_pct: 30 },
-      ];
-      const result = buildPinnedByDisplay(pinned, dualDisplays);
-      expect(result['eDP-1']).toHaveLength(3);
-      expect(result['default']).toBeUndefined();
-      expect(result['99999']).toBeUndefined();
+    it('works with single display', () => {
+      const singleDisplay = [{ id: 'eDP-1', width: 1920, height: 1080, x: 0, y: 0, primary: true }];
+      const pinned = [{ display_id: 'eDP-1', task_id: 't1', x_pct: 50, y_pct: 50 }];
+      const result = buildPinnedByDisplay(pinned, singleDisplay);
+      expect(result['eDP-1']).toHaveLength(1);
     });
 
     it('returns empty object for empty pinned list', () => {

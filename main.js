@@ -26,9 +26,8 @@ const AUTOHIDE_DELAY_MS = 500;
 const MOUSE_POLL_MS = 100;
 const DESKTOP_CHECK_MS = 1000;
 
-let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette, desktopPinned }
+let docks = []; // { sidebar, strip, hideTimeout, pollInterval, palette, desktopPinned, displayId }
 let currentPalette = null;
-let isDesktopActive = false;
 let desktopCheckInterval = null;
 
 function openSettingsWindow() {
@@ -54,67 +53,69 @@ function openSettingsWindow() {
   });
 }
 
-function getOwnWindowIds() {
-  const ids = new Set();
-  for (const dock of docks) {
-    if (!dock.sidebar.isDestroyed()) {
-      const buf = dock.sidebar.getNativeWindowHandle();
-      ids.add(buf.readUInt32LE(0));
-    }
-    if (!dock.strip.isDestroyed()) {
-      const buf = dock.strip.getNativeWindowHandle();
-      ids.add(buf.readUInt32LE(0));
-    }
-  }
-  return ids;
-}
-
-function checkDesktopState() {
-  execFile('xprop', ['-root', '_NET_ACTIVE_WINDOW'], (err, stdout) => {
+function getDisplaysWithWindows(callback) {
+  // wmctrl -l -G -x: id desktop x y w h wm_class hostname title
+  execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
     if (err) {
-      return;
-    }
-    const match = stdout.match(/#\s*(0x[\da-f]+)/i);
-    if (!match || match[1] === '0x0') {
-      setDesktopActive(true);
+      callback(null);
       return;
     }
 
-    const activeHex = match[1];
-    const activeId = parseInt(activeHex, 16);
-    const ownIds = getOwnWindowIds();
-    if (ownIds.has(activeId)) {
-      return;
+    const occupiedDisplayIds = new Set();
+
+    for (const line of stdout.trim().split('\n')) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 9) {
+        continue;
+      }
+
+      const desktop = parseInt(parts[1], 10);
+      if (desktop === -1) {
+        continue;
+      }
+
+      // Skip our own windows (sidebar, strip, overlay, settings)
+      const wmClass = parts[6].toLowerCase();
+      if (wmClass.includes('deadlineaura') || wmClass === 'electron.electron') {
+        continue;
+      }
+
+      const x = parseInt(parts[2], 10);
+      const y = parseInt(parts[3], 10);
+      const display = screen.getDisplayNearestPoint({ x, y });
+      occupiedDisplayIds.add(String(display.id));
     }
 
-    execFile('xprop', ['-id', activeHex, '_NET_WM_WINDOW_TYPE'], (err2, stdout2) => {
-      if (err2) {
-        return;
-      }
-      if (stdout2.includes('_NET_WM_WINDOW_TYPE_DESKTOP')) {
-        setDesktopActive(true);
-      } else {
-        setDesktopActive(false);
-      }
-    });
+    callback(occupiedDisplayIds);
   });
 }
 
-function setDesktopActive(active) {
-  if (isDesktopActive === active) {
-    return;
-  }
-  isDesktopActive = active;
-
-  for (const dock of docks) {
-    if (active) {
-      dock.desktopPinned = true;
-      openDock(dock);
-    } else {
-      dock.desktopPinned = false;
-      closeDock(dock);
+function checkDesktopState() {
+  getDisplaysWithWindows((occupiedDisplayIds) => {
+    if (!occupiedDisplayIds) {
+      for (const dock of docks) {
+        if (!dock.desktopPinned) {
+          dock.desktopPinned = true;
+          openDock(dock);
+        }
+      }
+      return;
     }
-  }
+
+    for (const dock of docks) {
+      if (occupiedDisplayIds.has(dock.displayId)) {
+        if (dock.desktopPinned) {
+          dock.desktopPinned = false;
+          closeDock(dock);
+        }
+      } else {
+        if (!dock.desktopPinned) {
+          dock.desktopPinned = true;
+          openDock(dock);
+        }
+      }
+    }
+  });
 }
 
 function buildStripHTML(accentColor) {
@@ -179,6 +180,7 @@ function createDockForDisplay(display) {
     pollInterval: null,
     palette: null,
     desktopPinned: false,
+    displayId: String(display.id),
   };
 
   // Poll mouse position — detect hover over strip or sidebar
@@ -213,13 +215,11 @@ function createDockForDisplay(display) {
         cursor.y <= bounds.y + bounds.height;
 
       if (isInside) {
-        // Mouse still inside — cancel any pending hide
         if (dock.hideTimeout) {
           clearTimeout(dock.hideTimeout);
           dock.hideTimeout = null;
         }
       } else if (!dock.hideTimeout) {
-        // Mouse left — schedule hide
         dock.hideTimeout = setTimeout(() => {
           closeDock(dock);
           dock.hideTimeout = null;
