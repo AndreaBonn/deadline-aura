@@ -130,12 +130,13 @@ function filterUpcomingEvents(allTasks) {
 
   return allTasks
     .filter((t) => {
-      if (!t.due_at) {
+      const time = t.start_at || t.due_at;
+      if (!time) {
         return false;
       }
-      return t.due_at >= now && t.due_at <= horizon;
+      return time >= now && time <= horizon;
     })
-    .sort((a, b) => a.due_at - b.due_at);
+    .sort((a, b) => (a.start_at || a.due_at) - (b.start_at || b.due_at));
 }
 
 function urgencyBlockTop(engineResult, region) {
@@ -178,7 +179,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(startX, startY + 20);
-  ctx.lineTo(startX + 300, startY + 20);
+  ctx.lineTo(startX + 420, startY + 20);
   ctx.stroke();
 
   const visible = todayEvents.slice(0, maxItems);
@@ -187,8 +188,8 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
     const ev = visible[i];
     const y = startY + 28 + i * lineHeight;
 
-    // Time
-    const d = new Date(ev.due_at);
+    // Time — prefer start_at for display, fall back to due_at
+    const d = new Date(ev.start_at || ev.due_at);
     const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
     ctx.font = '600 12px "Ubuntu Mono", "Consolas", monospace';
@@ -213,7 +214,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
     ctx.font = '400 12px "Ubuntu", system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
     const titleX = badgeX + badgeWidth + 10;
-    const maxTitleWidth = 250;
+    const maxTitleWidth = 370;
     ctx.fillText(truncateText(ctx, ev.title, maxTitleWidth), titleX, y);
   }
 
@@ -249,14 +250,14 @@ function drawUrgencyInfo(ctx, engineResult, region) {
   ctx.font = '400 15px sans-serif';
   for (const task of tasks) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    const maxTitleWidth = 310;
+    const maxTitleWidth = 380;
     ctx.fillText(truncateText(ctx, task.title, maxTitleWidth), region.x + margin, y);
 
     if (task.hours_remaining !== null) {
       const hrs = Math.abs(task.hours_remaining);
       const label = task.hours_remaining < 0 ? 'scaduto' : `${hrs.toFixed(0)}h`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-      ctx.fillText(label, region.x + margin + 320, y);
+      ctx.fillText(label, region.x + margin + 390, y);
     }
 
     y += rowHeight;

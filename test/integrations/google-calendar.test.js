@@ -35,11 +35,13 @@ describe('google-calendar normalization', () => {
 
   describe('normalizeEvent', () => {
     it('normalizes a timed event', () => {
+      const startTime = new Date();
+      const endTime = new Date(Date.now() + 3600000);
       const event = {
         id: 'abc123',
         summary: 'Sprint Review',
-        end: { dateTime: new Date(Date.now() + 3600000).toISOString() },
-        start: { dateTime: new Date().toISOString() },
+        end: { dateTime: endTime.toISOString() },
+        start: { dateTime: startTime.toISOString() },
       };
 
       const result = normalizeEvent(event);
@@ -47,9 +49,35 @@ describe('google-calendar normalization', () => {
       expect(result.id).toBe('gcal_abc123');
       expect(result.source).toBe('gcal');
       expect(result.title).toBe('Sprint Review');
-      expect(result.due_at).toBeGreaterThan(Date.now());
+      expect(result.due_at).toBe(endTime.getTime());
+      expect(result.start_at).toBe(startTime.getTime());
       expect(result.priority).toBe(3);
       expect(result.is_done).toBe(0);
+    });
+
+    it('sets start_at for all-day events', () => {
+      const today = new Date().toISOString().split('T')[0];
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+      const event = {
+        id: 'allday_start',
+        summary: 'Conference',
+        start: { date: today },
+        end: { date: tomorrow },
+      };
+
+      const result = normalizeEvent(event);
+      expect(result.start_at).toBe(new Date(today + 'T00:00:00').getTime());
+    });
+
+    it('sets start_at to null when start is missing', () => {
+      const event = {
+        id: 'nostart1',
+        summary: 'Event',
+        end: { dateTime: new Date(Date.now() + 3600000).toISOString() },
+      };
+
+      const result = normalizeEvent(event);
+      expect(result.start_at).toBeNull();
     });
 
     it('normalizes all-day event with end.date', () => {

@@ -158,6 +158,11 @@ function normalizeEvent(event, priorityKeywords) {
   }
 
   const allDay = !event.end?.dateTime && !!event.end?.date;
+  const startAt = event.start?.dateTime
+    ? new Date(event.start.dateTime).getTime()
+    : event.start?.date
+      ? new Date(event.start.date + 'T00:00:00').getTime()
+      : null;
   const dueAt = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
     : event.end?.date
@@ -168,6 +173,7 @@ function normalizeEvent(event, priorityKeywords) {
     id: `gcal_${event.id}`,
     source: 'gcal',
     title: event.summary || '(no title)',
+    start_at: startAt,
     due_at: dueAt,
     all_day: allDay,
     priority: assignPriority(event, priorityKeywords),

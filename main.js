@@ -301,10 +301,12 @@ async function runUpdateCycle({ force = false } = {}) {
     currentPalette = palette;
 
     if (config.wallpaper.enabled) {
+      const calendarEvents = db.getUpcomingCalendarEvents(24 * 3600000);
       await wallpaperChanger.update(palette, {
         engineResult,
         force,
         electronScreen: screen,
+        calendarEvents,
       });
     }
 

@@ -53,6 +53,39 @@ function runMigrations(database) {
       "ALTER TABLE tasks ADD COLUMN ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative'))",
     );
   }
+
+  // 005: add start_at column for calendar event start times (idempotent)
+  if (!columnNames.has('start_at')) {
+    database.exec('ALTER TABLE tasks ADD COLUMN start_at INTEGER');
+  }
+
+  // 005b: backfill start_at from raw_json for existing gcal events
+  const needsBackfill = database
+    .prepare(
+      "SELECT id, raw_json FROM tasks WHERE source = 'gcal' AND start_at IS NULL AND raw_json IS NOT NULL",
+    )
+    .all();
+  if (needsBackfill.length > 0) {
+    const update = database.prepare('UPDATE tasks SET start_at = ? WHERE id = ?');
+    const backfill = database.transaction((rows) => {
+      for (const row of rows) {
+        try {
+          const event = JSON.parse(row.raw_json);
+          const startAt = event.start?.dateTime
+            ? new Date(event.start.dateTime).getTime()
+            : event.start?.date
+              ? new Date(event.start.date + 'T00:00:00').getTime()
+              : null;
+          if (startAt) {
+            update.run(startAt, row.id);
+          }
+        } catch {
+          // skip malformed raw_json
+        }
+      }
+    });
+    backfill(needsBackfill);
+  }
 }
 
 function getActiveTasks(lookaheadMs) {
@@ -79,13 +112,32 @@ function getActiveTasks(lookaheadMs) {
   return [...jiraTasks, ...otherTasks];
 }
 
+function getUpcomingCalendarEvents(horizonMs) {
+  const now = Date.now();
+  const horizon = now + horizonMs;
+  return getDb()
+    .prepare(
+      `SELECT * FROM tasks
+     WHERE is_done = 0
+       AND is_stale = 0
+       AND source = 'gcal'
+       AND (
+         (start_at IS NOT NULL AND start_at >= ? AND start_at <= ?)
+         OR (start_at IS NULL AND due_at IS NOT NULL AND due_at >= ? AND due_at <= ?)
+       )
+     ORDER BY COALESCE(start_at, due_at) ASC`,
+    )
+    .all(now, horizon, now, horizon);
+}
+
 function upsertTask(task) {
   const stmt = getDb().prepare(`
-    INSERT INTO tasks (id, source, title, due_at, priority, is_done, is_stale, web_url, raw_json, synced_at)
-    VALUES (@id, @source, @title, @due_at, @priority, @is_done, 0, @web_url, @raw_json, @synced_at)
+    INSERT INTO tasks (id, source, title, due_at, start_at, priority, is_done, is_stale, web_url, raw_json, synced_at)
+    VALUES (@id, @source, @title, @due_at, @start_at, @priority, @is_done, 0, @web_url, @raw_json, @synced_at)
     ON CONFLICT(id) DO UPDATE SET
       title = @title,
       due_at = @due_at,
+      start_at = @start_at,
       priority = @priority,
       is_done = @is_done,
       is_stale = 0,
@@ -93,7 +145,7 @@ function upsertTask(task) {
       raw_json = @raw_json,
       synced_at = @synced_at
   `);
-  return stmt.run(task);
+  return stmt.run({ start_at: null, ...task });
 }
 
 function markStale(source, activeIds) {
@@ -180,6 +232,7 @@ function close() {
 module.exports = {
   getDb,
   getActiveTasks,
+  getUpcomingCalendarEvents,
   upsertTask,
   markStale,
   updateAiScores,
