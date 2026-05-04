@@ -1,4 +1,10 @@
-const { computeTaskUrgency, computeGlobalScore, DEFAULT_K, DEFAULT_PRIORITY_WEIGHTS } = require('../../core/deadline-engine');
+const {
+  computeTaskUrgency,
+  computeGlobalScore,
+  DEFAULT_K,
+  DEFAULT_PRIORITY_WEIGHTS,
+  AI_SCORE_MAX_AGE_MS,
+} = require('../../core/deadline-engine');
 
 const MS_PER_HOUR = 3600000;
 
@@ -64,21 +70,58 @@ describe('deadline-engine branch coverage', () => {
     });
 
     it('uses ai_stress as weight in global calculation', () => {
-      const tasks = [
-        makeTask({ id: 'a', ai_stress: 9, due_at: Date.now() + 2 * MS_PER_HOUR }),
-      ];
+      const tasks = [makeTask({ id: 'a', ai_stress: 9, due_at: Date.now() + 2 * MS_PER_HOUR })];
       const result = computeGlobalScore(tasks);
       expect(result.global_score).toBeGreaterThan(0);
     });
 
     it('all done tasks yields global_score 0', () => {
-      const tasks = [
-        makeTask({ id: 'a', is_done: 1 }),
-        makeTask({ id: 'b', is_done: 1 }),
-      ];
+      const tasks = [makeTask({ id: 'a', is_done: 1 }), makeTask({ id: 'b', is_done: 1 })];
       const result = computeGlobalScore(tasks);
       expect(result.global_score).toBe(0);
       expect(result.tasks).toHaveLength(0);
+    });
+  });
+
+  describe('AI score blending', () => {
+    it('uses AI score when recent, blended 70/30 with mechanical', () => {
+      const tasks = [makeTask({ id: 'a', due_at: Date.now() + 48 * MS_PER_HOUR })];
+      const aiScore = { global_stress: 8, computed_at: Date.now() - 1000 };
+      const result = computeGlobalScore(tasks, { aiScore });
+      // AI normalized = 0.8, mechanical is tiny, so result ≈ 0.8 * 0.7 + tiny * 0.3
+      expect(result.global_score).toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('ignores stale AI score (older than 12h)', () => {
+      const tasks = [makeTask({ id: 'a', due_at: Date.now() + 48 * MS_PER_HOUR })];
+      const aiScore = { global_stress: 9, computed_at: Date.now() - AI_SCORE_MAX_AGE_MS - 1000 };
+      const result = computeGlobalScore(tasks, { aiScore });
+      // Falls back to mechanical only — should be low for distant event
+      expect(result.global_score).toBeLessThan(0.3);
+    });
+  });
+
+  describe('volume amplification', () => {
+    it('amplifies score when events exceed threshold', () => {
+      const fewTasks = Array.from({ length: 4 }, (_, i) =>
+        makeTask({ id: `t${i}`, due_at: Date.now() + 72 * MS_PER_HOUR }),
+      );
+      const manyTasks = Array.from({ length: 10 }, (_, i) =>
+        makeTask({ id: `t${i}`, due_at: Date.now() + 72 * MS_PER_HOUR }),
+      );
+
+      const fewResult = computeGlobalScore(fewTasks);
+      const manyResult = computeGlobalScore(manyTasks);
+
+      expect(manyResult.global_score).toBeGreaterThan(fewResult.global_score);
+    });
+
+    it('caps amplified score at 1.0', () => {
+      const tasks = Array.from({ length: 30 }, (_, i) =>
+        makeTask({ id: `t${i}`, due_at: Date.now() + 1 * MS_PER_HOUR, priority: 1 }),
+      );
+      const result = computeGlobalScore(tasks);
+      expect(result.global_score).toBeLessThanOrEqual(1.0);
     });
   });
 

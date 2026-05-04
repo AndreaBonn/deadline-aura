@@ -5,6 +5,9 @@ const db = require('../store/db');
 const DEFAULT_PRIORITY_WEIGHTS = [2.0, 1.5, 1.0, 0.5];
 const DEFAULT_K = 0.05;
 const MS_PER_HOUR = 3600000;
+const AI_SCORE_MAX_AGE_MS = 12 * 3600000; // AI score valid for 12 hours
+const VOLUME_THRESHOLD = 5; // Above this, volume amplifies mechanical score
+const VOLUME_AMPLIFIER = 0.15; // Per-event amplification above threshold
 
 function computeTaskUrgency(
   task,
@@ -65,6 +68,31 @@ function computeTaskUrgency(
   };
 }
 
+function computeMechanicalScore(scored, priorityWeights) {
+  if (scored.length === 0) {
+    return 0;
+  }
+
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const task of scored) {
+    const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
+    weightedSum += task.urgency_score * weight;
+    totalWeight += weight;
+  }
+
+  let base = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+  // Volume amplification: many events compound psychological load
+  // even if individually not urgent
+  const excessEvents = Math.max(0, scored.length - VOLUME_THRESHOLD);
+  const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
+  base = Math.min(1, base + volumeBoost * (1 - base));
+
+  return Math.round(base * 1000) / 1000;
+}
+
 function computeGlobalScore(tasks, options = {}) {
   const { priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = options;
 
@@ -80,17 +108,28 @@ function computeGlobalScore(tasks, options = {}) {
     };
   }
 
-  let weightedSum = 0;
-  let totalWeight = 0;
+  const mechanicalScore = computeMechanicalScore(scored, priorityWeights);
 
-  for (const task of scored) {
-    const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
-
-    weightedSum += task.urgency_score * weight;
-    totalWeight += weight;
+  // Check for recent AI score — it reflects true psychological load
+  let aiScore = options.aiScore || null;
+  if (!aiScore) {
+    try {
+      aiScore = db.getLatestAiScore();
+    } catch {
+      // DB not available (e.g. in tests), fall through to mechanical
+    }
   }
 
-  const globalScore = totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 1000) / 1000 : 0;
+  let globalScore;
+
+  if (aiScore && Date.now() - aiScore.computed_at < AI_SCORE_MAX_AGE_MS) {
+    const aiNormalized = aiScore.global_stress / 10;
+    // AI is authoritative, but blend with mechanical for recency sensitivity
+    // 70% AI (psychological truth) + 30% mechanical (temporal proximity)
+    globalScore = Math.round((aiNormalized * 0.7 + mechanicalScore * 0.3) * 1000) / 1000;
+  } else {
+    globalScore = mechanicalScore;
+  }
 
   return {
     global_score: globalScore,
@@ -115,17 +154,17 @@ function run(options = {}) {
   const configMs = lookaheadHours ? lookaheadHours * MS_PER_HOUR : 0;
   const effectiveMs = Math.max(endOfWeekMs, configMs);
   const tasks = db.getActiveTasks(effectiveMs);
-  const result = computeGlobalScore(tasks, options);
-
-  db.saveGlobalScore(result.global_score);
-
-  return result;
+  return computeGlobalScore(tasks, options);
 }
 
 module.exports = {
   computeTaskUrgency,
   computeGlobalScore,
+  computeMechanicalScore,
   run,
   DEFAULT_PRIORITY_WEIGHTS,
   DEFAULT_K,
+  AI_SCORE_MAX_AGE_MS,
+  VOLUME_THRESHOLD,
+  VOLUME_AMPLIFIER,
 };

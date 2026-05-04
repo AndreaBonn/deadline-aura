@@ -48,12 +48,19 @@ Current time: ${now}
 SCHEDULE:
 ${eventList}
 
-CALIBRATION ANCHORS (use these — do NOT inflate):
-1-2: Light. Few low-stakes items, ample recovery time between tasks.
-3-4: Normal sustainable workload. Moderate tasks, adequate breaks.
-5-6: Elevated. Multiple demanding items, limited breaks, noticeable context switching. Fatigue by end of day.
-7-8: High strain. Dense schedule, frequent domain switches between demanding tasks, emotional labor present. Recovery deficit accumulating.
-9-10: Overload. Back-to-back high-stakes items, no recovery windows, decision fatigue certain. Unsustainable if repeated.
+CALIBRATION ANCHORS (score the REAL psychological weight — underscoring is as wrong as inflating):
+1-2: Genuinely light. 1-3 low-stakes items, long recovery gaps, no travel, no deadlines this week.
+3-4: Manageable. A few meetings/tasks per day, single domain, no context-switching pressure. Most people feel "fine."
+5-6: Moderate load. Multiple commitments daily, some context switching, but still has breathing room. End-of-day tiredness but recoverable overnight.
+7-8: Heavy. Dense schedule across multiple days, travel (especially same-day return), multiple domains/clients/topics, emotional labor (teaching, presenting, evaluating). The person FEELS the weight — planning ahead, dreading the week, sleep may suffer. This is where most "busy weeks" actually land.
+9-10: Crushing. Back-to-back high-stakes across 4+ days, travel + deadlines + social performance simultaneously, zero recovery windows, decision fatigue guaranteed. Burnout risk if repeated.
+
+IMPORTANT CALIBRATION NOTES:
+- Travel (flights, trains, connections) is NOT "passive time" — it fragments the day, adds logistical stress, removes recovery, and creates anxiety about delays. Score it 4-6 per travel segment depending on complexity.
+- Teaching/lecturing requires PREPARATION time that isn't on the calendar. A 2h lecture = 4-6h cognitive commitment minimum.
+- Multiple video calls in one day compound: each one after the 3rd adds +1 to the day's effective stress.
+- Same-day multi-city travel (flight + train + meeting) is inherently 7+ regardless of what the meeting is about.
+- A week with 3+ "heavy days" (stress >= 7) should have global_stress >= 7, because recovery deficit compounds across days.
 
 EVALUATION DIMENSIONS:
 1. Cognitive complexity per event: deep analytical work (high) vs routine meeting (low) vs passive attendance (minimal)

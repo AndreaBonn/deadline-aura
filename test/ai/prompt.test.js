@@ -21,8 +21,8 @@ describe('prompt', () => {
       const prompt = buildScoringPrompt(events);
 
       expect(prompt).toContain('CALIBRATION ANCHORS');
-      expect(prompt).toContain('1-2: Light');
-      expect(prompt).toContain('9-10: Overload');
+      expect(prompt).toContain('1-2: Genuinely light');
+      expect(prompt).toContain('9-10: Crushing');
     });
 
     it('requests clinical_note and patterns in JSON schema', () => {

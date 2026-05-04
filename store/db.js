@@ -133,6 +133,21 @@ function getLastGlobalScore() {
     .get();
 }
 
+function getLatestAiScore() {
+  const row = getDb()
+    .prepare('SELECT response_json, computed_at FROM ai_cache ORDER BY computed_at DESC LIMIT 1')
+    .get();
+  if (!row) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(row.response_json);
+    return { global_stress: parsed.global_stress, computed_at: row.computed_at };
+  } catch {
+    return null;
+  }
+}
+
 function getAiCache(eventsHash) {
   return getDb().prepare('SELECT * FROM ai_cache WHERE events_hash = ?').get(eventsHash);
 }
@@ -170,6 +185,7 @@ module.exports = {
   updateAiScores,
   saveGlobalScore,
   getLastGlobalScore,
+  getLatestAiScore,
   getAiCache,
   setAiCache,
   cleanupOldRecords,
