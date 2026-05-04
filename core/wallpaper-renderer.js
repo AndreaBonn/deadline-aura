@@ -8,6 +8,18 @@ const { computeCanvasGeometry } = require('./display-manager');
 
 const BACKGROUNDS_DIR = path.join(__dirname, '..', 'assets', 'backgrounds');
 
+function truncateText(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+  const ellipsis = '…';
+  let truncated = text;
+  while (truncated.length > 0 && ctx.measureText(truncated + ellipsis).width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + ellipsis;
+}
+
 const SUPPORTED_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
 
 const BAND_NAMES = [
@@ -187,11 +199,7 @@ function drawDailyAgenda(ctx, allTasks, region) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
     const titleX = badgeX + badgeWidth + 10;
     const maxTitleWidth = 250;
-    let title = ev.title;
-    while (ctx.measureText(title).width > maxTitleWidth && title.length > 3) {
-      title = title.slice(0, -4) + '...';
-    }
-    ctx.fillText(title, titleX, y);
+    ctx.fillText(truncateText(ctx, ev.title, maxTitleWidth), titleX, y);
   }
 
   if (todayEvents.length > maxItems) {
@@ -226,7 +234,8 @@ function drawUrgencyInfo(ctx, engineResult, region) {
   ctx.font = '400 15px sans-serif';
   for (const task of tasks) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.fillText(task.title, region.x + margin, y);
+    const maxTitleWidth = 310;
+    ctx.fillText(truncateText(ctx, task.title, maxTitleWidth), region.x + margin, y);
 
     if (task.hours_remaining !== null) {
       const hrs = Math.abs(task.hours_remaining);
