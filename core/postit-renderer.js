@@ -45,8 +45,11 @@ function extractCode(taskId, title) {
   if (taskId.startsWith('gcal_') || taskId.startsWith('gcal-')) {
     return title || 'Calendar';
   }
-  const match = taskId.match(/^jira-(.+)/);
-  return match ? match[1] : taskId;
+  if (taskId.startsWith('jira_') || taskId.startsWith('jira-')) {
+    const match = title && title.match(/^([A-Z][A-Z0-9]*)-\d+/);
+    return match ? match[1] : 'JIRA';
+  }
+  return taskId;
 }
 
 function wrapText(ctx, text, maxWidth) {
@@ -146,6 +149,7 @@ function renderPostits(ctx, pinnedTasks, region) {
 module.exports = {
   renderPostit,
   renderPostits,
+  extractCode,
   POSTIT_WIDTH,
   POSTIT_HEIGHT,
 };
