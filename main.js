@@ -181,7 +181,13 @@ function createDockForDisplay(display) {
     palette: null,
     desktopPinned: false,
     displayId: String(display.id),
+    sidebarReady: false,
   };
+
+  sidebar.webContents.once('did-finish-load', () => {
+    dock.sidebarReady = true;
+    runUpdateCycle({ force: true });
+  });
 
   // Poll mouse position — detect hover over strip or sidebar
   dock.pollInterval = setInterval(() => {
@@ -308,7 +314,7 @@ async function runUpdateCycle({ force = false } = {}) {
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
 
     for (const dock of docks) {
-      if (dock.sidebar && !dock.sidebar.isDestroyed()) {
+      if (dock.sidebar && !dock.sidebar.isDestroyed() && dock.sidebarReady) {
         dock.sidebar.webContents.send('update', {
           engineResult,
           palette,
@@ -319,7 +325,11 @@ async function runUpdateCycle({ force = false } = {}) {
 
     return { engineResult, palette };
   } catch (err) {
-    console.error('Update cycle error:', err.message);
+    try {
+      console.error('Update cycle error:', err.message);
+    } catch {
+      // EPIPE — pipe closed, ignore logging failure
+    }
     return null;
   }
 }
