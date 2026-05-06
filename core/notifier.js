@@ -1,6 +1,6 @@
 'use strict';
 
-const { spawnSync } = require('child_process');
+const childProcess = require('child_process');
 
 let lastNotifiedAt = 0;
 
@@ -64,7 +64,7 @@ function send(engineResult, config) {
   const body = `${task.title} ${countdown}`.trim();
 
   try {
-    const result = spawnSync(
+    const result = childProcess.spawnSync(
       'notify-send',
       ['--urgency=normal', '--app-name=DeadlineAura', 'Scadenza imminente', body],
       { timeout: 5000, encoding: 'utf-8' },
@@ -79,4 +79,8 @@ function send(engineResult, config) {
   }
 }
 
-module.exports = { send, shouldNotify, findMostUrgentTask, formatCountdown };
+function _resetForTest() {
+  lastNotifiedAt = 0;
+}
+
+module.exports = { send, shouldNotify, findMostUrgentTask, formatCountdown, _resetForTest };

@@ -1,6 +1,6 @@
 'use strict';
 
-const { execFile } = require('child_process');
+const childProcess = require('child_process');
 
 const STRUT_RIGHT_END_Y = 65535;
 
@@ -43,7 +43,7 @@ function setX11Strut(win, display, strutWidth, screen) {
     // STRUT_RIGHT_END_Y = 65535: guarantees full-height coverage regardless of HiDPI scaling
     const strut = `0, ${strutWidth}, 0, 0, 0, 0, 0, ${STRUT_RIGHT_END_Y}, 0, 0, 0, 0`;
     const xidStr = String(xid);
-    execFile(
+    childProcess.execFile(
       'xprop',
       ['-id', xidStr, '-f', '_NET_WM_STRUT_PARTIAL', '32c', '-set', '_NET_WM_STRUT_PARTIAL', strut],
       (err) => {
@@ -53,7 +53,7 @@ function setX11Strut(win, display, strutWidth, screen) {
       },
     );
     // Make the window sticky across all workspaces so the strut applies everywhere
-    execFile(
+    childProcess.execFile(
       'xprop',
       ['-id', xidStr, '-f', '_NET_WM_DESKTOP', '32c', '-set', '_NET_WM_DESKTOP', '0xffffffff'],
       (err) => {
@@ -76,7 +76,7 @@ function setX11Strut(win, display, strutWidth, screen) {
  *   Called with a Set of occupied display ID strings, or null if wmctrl failed.
  */
 function getDisplaysWithWindows(screen, callback) {
-  execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
+  childProcess.execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
     if (err) {
       callback(null);
       return;

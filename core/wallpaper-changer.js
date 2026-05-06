@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { spawnSync } = require('child_process');
+const childProcess = require('child_process');
 const wallpaperRenderer = require('./wallpaper-renderer');
 const { detectDisplays } = require('./display-manager');
 const pinnedQueries = require('../store/pinned-queries');
@@ -39,7 +39,8 @@ function isOverlayOpen() {
 function setWallpaper(filePath) {
   const uri = `file://${filePath}`;
 
-  const gsettingsOk = (args) => spawnSync('gsettings', args, { timeout: 5000 }).status === 0;
+  const gsettingsOk = (args) =>
+    childProcess.spawnSync('gsettings', args, { timeout: 5000 }).status === 0;
 
   try {
     const displays = detectDisplays();
@@ -62,7 +63,7 @@ function setWallpaper(filePath) {
   }
 
   try {
-    const result = spawnSync('feh', ['--bg-scale', filePath], { timeout: 5000 });
+    const result = childProcess.spawnSync('feh', ['--bg-scale', filePath], { timeout: 5000 });
     if (result.status === 0) {
       return 'feh';
     }
