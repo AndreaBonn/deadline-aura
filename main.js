@@ -2,8 +2,8 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
-const { execFile, spawn } = require('child_process');
+const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
+const { execFile } = require('child_process');
 const path = require('path');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
@@ -488,11 +488,7 @@ app.whenReady().then(() => {
 
   ipcMain.on('open-link', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
-      const child = spawn('firefox', [url], {
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
+      shell.openExternal(url);
     }
   });
 
