@@ -31,6 +31,7 @@ let sidebarManualOpen = false;
 let stripWindows = new Map(); // displayId → BrowserWindow
 let desktopCheckInterval = null;
 let currentPaletteHex = '#334155';
+let isUpdateCycleRunning = false;
 
 function openSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -293,6 +294,10 @@ function initSidebar() {
 }
 
 async function runUpdateCycle({ force = false } = {}) {
+  if (isUpdateCycleRunning) {
+    return;
+  }
+  isUpdateCycleRunning = true;
   try {
     const engineResult = deadlineEngine.run({
       lookaheadHours: config.sync.lookahead_hours,
@@ -333,6 +338,8 @@ async function runUpdateCycle({ force = false } = {}) {
       // EPIPE — pipe closed, ignore logging failure
     }
     return null;
+  } finally {
+    isUpdateCycleRunning = false;
   }
 }
 
