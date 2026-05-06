@@ -8,7 +8,6 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   toggleSidebar: () => ipcRenderer.send('toggle-sidebar'),
   openConfig: () => ipcRenderer.send('open-config'),
   syncNow: () => ipcRenderer.send('sync-now'),
-  markDone: (taskId) => ipcRenderer.send('mark-done', taskId),
   openLink: (url) => ipcRenderer.send('open-link', url),
   pinTask: (taskId, displayId) => ipcRenderer.send('pin-task', { taskId, displayId }),
   unpinTask: (taskId, displayId) => ipcRenderer.send('unpin-task', { taskId, displayId }),

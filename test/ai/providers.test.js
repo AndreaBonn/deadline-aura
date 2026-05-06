@@ -159,11 +159,12 @@ describe('GeminiProvider', () => {
     expect(p.name).toBe('gemini');
   });
 
-  it('builds correct API URL with key', () => {
+  it('builds correct API URL without exposing key in URL', () => {
     const p = new GeminiProvider(['my-key']);
-    const url = p.getApiUrl('gemini-2.0-flash', 'my-key');
-    expect(url).toContain('my-key');
+    const url = p.getApiUrl('gemini-2.0-flash');
+    expect(url).not.toContain('my-key');
     expect(url).toContain('gemini-2.0-flash');
+    expect(url).not.toContain('?key=');
   });
 
   it('sends correct request and returns content', async () => {
@@ -173,12 +174,14 @@ describe('GeminiProvider', () => {
         candidates: [{ content: { parts: [{ text: '{"global_stress": 4}' }] } }],
       }),
     };
-    vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockResponse);
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockResponse);
 
     const p = new GeminiProvider(['gem-key']);
     const result = await p.score('test prompt');
 
     expect(result).toBe('{"global_stress": 4}');
+    const [, fetchOptions] = fetchSpy.mock.calls[0];
+    expect(fetchOptions.headers['x-goog-api-key']).toBe('gem-key');
 
     vi.restoreAllMocks();
   });
