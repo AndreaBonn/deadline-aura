@@ -8,6 +8,9 @@ const jira = require('../integrations/jira');
 const aiScorer = require('../ai/ai-scorer');
 const crypto = require('crypto');
 
+// SHA-256 is used here purely as a change-detection fingerprint, not for
+// security purposes. Collision probability (~2^-128) is negligible for this
+// use case and does not require explicit collision handling.
 function computeEventsHash(tasks) {
   const data = tasks
     .map((t) => `${t.id}|${t.title}|${t.due_at}|${t.priority}`)
