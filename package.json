@@ -18,7 +18,16 @@
     "node": ">=20.0.0"
   },
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "author": "Andrea Bonn",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndreaBonn/deadline-aura.git"
+  },
+  "homepage": "https://github.com/AndreaBonn/deadline-aura#readme",
+  "bugs": {
+    "url": "https://github.com/AndreaBonn/deadline-aura/issues"
+  },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
     "canvas": "^2.11.2",
