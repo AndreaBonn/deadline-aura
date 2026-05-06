@@ -15,7 +15,7 @@
     "sync": "node core/sync-daemon.js"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0 <24.0.0"
   },
   "private": true,
   "license": "Apache-2.0",

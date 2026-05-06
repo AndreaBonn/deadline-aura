@@ -4,6 +4,8 @@
 
 Desktop widget for Linux that maps your workload into an ambient visual signal — a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
 
+[![CI](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-see%20CI-informational)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/AndreaBonn/deadline-aura?style=social)](https://github.com/AndreaBonn/deadline-aura)
 
@@ -121,7 +123,7 @@ Click the gear icon in the sidebar to open the settings panel. In the Jira secti
 - **API token**: generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: filter for the issues you want to track (default: `assignee = currentUser() AND statusCategory != Done`)
 
-Credentials are stored in `~/.config/deadlineaura/config.json`.
+Credentials are stored in `~/.config/deadlineaura/config.json`, which is set to permissions `0600` on every save — readable only by your user account. This is the same security model used for the Google OAuth token at `~/.config/deadlineaura/google-token.json`. The file is local to the machine and is never transmitted.
 
 ### Step 8 — Autostart (optional)
 

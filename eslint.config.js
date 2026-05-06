@@ -52,6 +52,17 @@ module.exports = [
     },
   },
   {
+    // formatCountdown and urgencyToColor are loaded via <script src="sidebar-utils.js">
+    // before sidebar.js in index.html, making them available as browser globals.
+    files: ['renderer/sidebar.js'],
+    languageOptions: {
+      globals: {
+        formatCountdown: 'readonly',
+        urgencyToColor: 'readonly',
+      },
+    },
+  },
+  {
     ignores: ['node_modules/', 'dist/', 'coverage/'],
   },
 ];

@@ -2,9 +2,10 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
-const { execFile, spawn } = require('child_process');
+const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
+const { execFile } = require('child_process');
 const path = require('path');
+const { setX11Strut, getDisplaysWithWindows } = require('./core/display-controller');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
@@ -18,47 +19,11 @@ let config = loadConfig();
 let settingsWindow = null;
 let overlayWindow = null;
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
-const CLEANUP_INTERVAL_MS = 24 * 3600000;
+const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 20;
 const DESKTOP_CHECK_MS = 1000;
-
-function getVirtualScreenWidth() {
-  return screen.getAllDisplays().reduce((max, d) => Math.max(max, d.bounds.x + d.bounds.width), 0);
-}
-
-function setX11Strut(win, display, strutWidth) {
-  if (process.platform !== 'linux' || !process.env.DISPLAY) return;
-  if (!win || win.isDestroyed()) return;
-  try {
-    const xid = win.getNativeWindowHandle().readUInt32LE(0);
-    const virtualWidth = getVirtualScreenWidth();
-    const displayRightEdge = display.bounds.x + display.bounds.width;
-    // Solo se questo display è sul bordo destro dello schermo virtuale
-    if (displayRightEdge < virtualWidth) return;
-    // _NET_WM_STRUT_PARTIAL: left,right,top,bottom,l_sy,l_ey,r_sy,r_ey,t_sx,t_ex,b_sx,b_ex
-    // 65535 come right_end_y: garantisce copertura full-height indipendentemente da scaling HiDPI
-    const strut = `0, ${strutWidth}, 0, 0, 0, 0, 0, 65535, 0, 0, 0, 0`;
-    const xidStr = String(xid);
-    execFile(
-      'xprop',
-      ['-id', xidStr, '-f', '_NET_WM_STRUT_PARTIAL', '32c', '-set', '_NET_WM_STRUT_PARTIAL', strut],
-      (err) => {
-        if (err) console.error('[strut] xprop strut error:', err.message);
-      },
-    );
-    // Rendi la finestra sticky su tutti i workspace so che lo strut si applichi ovunque
-    execFile(
-      'xprop',
-      ['-id', xidStr, '-f', '_NET_WM_DESKTOP', '32c', '-set', '_NET_WM_DESKTOP', '0xffffffff'],
-      (err) => {
-        if (err) console.error('[strut] xprop desktop error:', err.message);
-      },
-    );
-  } catch (err) {
-    console.error('[strut] error:', err.message);
-  }
-}
 
 let sidebarWindow = null;
 let sidebarReady = false;
@@ -224,7 +189,7 @@ function createStrips() {
 
     stripWin.webContents.once('did-finish-load', () => {
       stripWin.webContents.send('strip-color', currentPaletteHex);
-      // Setta DOCK type + sticky desktop PRIMA di show() per GNOME Mutter
+      // Set DOCK type + sticky desktop BEFORE show() — required by GNOME Mutter
       if (process.platform === 'linux' && process.env.DISPLAY) {
         try {
           const xidStr = String(stripWin.getNativeWindowHandle().readUInt32LE(0));
@@ -255,12 +220,12 @@ function createStrips() {
                 ],
                 () => {
                   stripWin.show();
-                  setX11Strut(stripWin, display, STRIP_WIDTH);
+                  setX11Strut(stripWin, display, STRIP_WIDTH, screen);
                 },
               );
             },
           );
-        } catch (e) {
+        } catch {
           stripWin.show();
           setX11Strut(stripWin, display, STRIP_WIDTH);
         }
@@ -293,47 +258,12 @@ function updateStripColor(hex) {
 
 // --- Desktop state check ---
 
-function getDisplaysWithWindows(callback) {
-  execFile('wmctrl', ['-l', '-G', '-x'], (err, stdout) => {
-    if (err) {
-      callback(null);
-      return;
-    }
-
-    const occupiedDisplayIds = new Set();
-
-    for (const line of stdout.trim().split('\n')) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length < 9) {
-        continue;
-      }
-
-      const desktop = parseInt(parts[1], 10);
-      if (desktop === -1) {
-        continue;
-      }
-
-      const wmClass = parts[6].toLowerCase();
-      if (wmClass.includes('deadlineaura') || wmClass === 'electron.electron') {
-        continue;
-      }
-
-      const x = parseInt(parts[2], 10);
-      const y = parseInt(parts[3], 10);
-      const display = screen.getDisplayNearestPoint({ x, y });
-      occupiedDisplayIds.add(String(display.id));
-    }
-
-    callback(occupiedDisplayIds);
-  });
-}
-
 function checkDesktopState() {
   if (!sidebarWindow || sidebarWindow.isDestroyed() || !sidebarReady) {
     return;
   }
 
-  getDisplaysWithWindows((occupiedDisplayIds) => {
+  getDisplaysWithWindows(screen, (occupiedDisplayIds) => {
     if (!occupiedDisplayIds) {
       return;
     }
@@ -373,7 +303,7 @@ async function runUpdateCycle({ force = false } = {}) {
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
 
     if (config.wallpaper.enabled) {
-      const calendarEvents = db.getUpcomingCalendarEvents(24 * 3600000);
+      const calendarEvents = db.getUpcomingCalendarEvents(ONE_DAY_MS);
       await wallpaperChanger.update(palette, {
         engineResult,
         force,
@@ -477,11 +407,7 @@ app.whenReady().then(() => {
 
   ipcMain.on('open-link', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
-      const child = spawn('firefox', [url], {
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
+      shell.openExternal(url);
     }
   });
 
