@@ -47,6 +47,7 @@ function saveConfig(newConfig) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(newConfig, null, 2), 'utf-8');
+  fs.chmodSync(CONFIG_PATH, 0o600);
 }
 
 module.exports = { loadConfig, saveConfig, CONFIG_PATH, deepMerge };

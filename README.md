@@ -121,7 +121,7 @@ Click the gear icon in the sidebar to open the settings panel. In the Jira secti
 - **API token**: generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: filter for the issues you want to track (default: `assignee = currentUser() AND statusCategory != Done`)
 
-Credentials are stored in `~/.config/deadlineaura/config.json`.
+Credentials are stored in `~/.config/deadlineaura/config.json`, which is set to permissions `0600` on every save — readable only by your user account. This is the same security model used for the Google OAuth token at `~/.config/deadlineaura/google-token.json`. The file is local to the machine and is never transmitted.
 
 ### Step 8 — Autostart (optional)
 
