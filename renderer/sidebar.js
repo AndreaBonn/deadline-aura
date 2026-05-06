@@ -16,27 +16,6 @@ function updateClock() {
   document.getElementById('clockDate').textContent = now.toLocaleDateString('it-IT', options);
 }
 
-function formatCountdown(hoursRemaining) {
-  if (hoursRemaining === null) {
-    return '';
-  }
-  if (hoursRemaining < 0) {
-    return 'scaduto';
-  }
-  if (hoursRemaining < 1) {
-    return `${Math.round(hoursRemaining * 60)}m`;
-  }
-  if (hoursRemaining < 24) {
-    const hrs = Math.floor(hoursRemaining);
-    const mins = Math.round((hoursRemaining - hrs) * 60);
-    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
-  }
-  if (hoursRemaining < 48) {
-    return 'domani';
-  }
-  return `${Math.round(hoursRemaining / 24)} giorni`;
-}
-
 function renderUrgencyBar(globalScore, palette) {
   const bar = document.getElementById('urgencyBar');
   bar.style.width = `${globalScore * 100}%`;
@@ -100,13 +79,6 @@ function renderTaskList(tasks, palette) {
       newInput.setSelectionRange(cursorPos, cursorPos);
     }
   }
-}
-
-function urgencyToColor(score) {
-  const hue = Math.round(160 - score * 160);
-  const sat = Math.round(35 + score * 25);
-  const light = Math.round(30 + score * 15);
-  return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 function createTaskCard(task) {
