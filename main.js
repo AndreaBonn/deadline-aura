@@ -28,14 +28,20 @@ function getVirtualScreenWidth() {
 }
 
 function setX11Strut(win, display, strutWidth) {
-  if (process.platform !== 'linux' || !process.env.DISPLAY) return;
-  if (!win || win.isDestroyed()) return;
+  if (process.platform !== 'linux' || !process.env.DISPLAY) {
+    return;
+  }
+  if (!win || win.isDestroyed()) {
+    return;
+  }
   try {
     const xid = win.getNativeWindowHandle().readUInt32LE(0);
     const virtualWidth = getVirtualScreenWidth();
     const displayRightEdge = display.bounds.x + display.bounds.width;
     // Solo se questo display è sul bordo destro dello schermo virtuale
-    if (displayRightEdge < virtualWidth) return;
+    if (displayRightEdge < virtualWidth) {
+      return;
+    }
     // _NET_WM_STRUT_PARTIAL: left,right,top,bottom,l_sy,l_ey,r_sy,r_ey,t_sx,t_ex,b_sx,b_ex
     // 65535 come right_end_y: garantisce copertura full-height indipendentemente da scaling HiDPI
     const strut = `0, ${strutWidth}, 0, 0, 0, 0, 0, 65535, 0, 0, 0, 0`;
@@ -44,7 +50,9 @@ function setX11Strut(win, display, strutWidth) {
       'xprop',
       ['-id', xidStr, '-f', '_NET_WM_STRUT_PARTIAL', '32c', '-set', '_NET_WM_STRUT_PARTIAL', strut],
       (err) => {
-        if (err) console.error('[strut] xprop strut error:', err.message);
+        if (err) {
+          console.error('[strut] xprop strut error:', err.message);
+        }
       },
     );
     // Rendi la finestra sticky su tutti i workspace so che lo strut si applichi ovunque
@@ -52,7 +60,9 @@ function setX11Strut(win, display, strutWidth) {
       'xprop',
       ['-id', xidStr, '-f', '_NET_WM_DESKTOP', '32c', '-set', '_NET_WM_DESKTOP', '0xffffffff'],
       (err) => {
-        if (err) console.error('[strut] xprop desktop error:', err.message);
+        if (err) {
+          console.error('[strut] xprop desktop error:', err.message);
+        }
       },
     );
   } catch (err) {
@@ -260,7 +270,7 @@ function createStrips() {
               );
             },
           );
-        } catch (e) {
+        } catch {
           stripWin.show();
           setX11Strut(stripWin, display, STRIP_WIDTH);
         }
