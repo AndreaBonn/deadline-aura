@@ -5,6 +5,7 @@
 Desktop widget for Linux that maps your workload into an ambient visual signal — a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
 
 [![CI](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-see%20CI-informational)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/AndreaBonn/deadline-aura?style=social)](https://github.com/AndreaBonn/deadline-aura)
 
