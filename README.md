@@ -182,7 +182,22 @@ npm run test:coverage     # run with v8 coverage report
 npm run lint              # ESLint
 ```
 
-Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, and `integrations/`.
+Tests run under Node 20 directly (not inside Electron). If you previously ran `npx electron-rebuild` to start the app, the native modules will be compiled for Electron's ABI and `npm test` will fail with a version mismatch. Recompile for Node 20 before running tests:
+
+```bash
+nvm use 20
+npm rebuild
+npm test
+```
+
+To return to running the app after testing, recompile for Electron again:
+
+```bash
+npx electron-rebuild
+npm start
+```
+
+Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, `integrations/`, and `renderer/`.
 
 ## Contributing
 
