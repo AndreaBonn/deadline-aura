@@ -9,8 +9,8 @@ class GeminiProvider extends BaseProvider {
     super('gemini', apiKeys);
   }
 
-  getApiUrl(model, key) {
-    return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  getApiUrl(model) {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   }
 
   async score(prompt, options = {}) {
@@ -21,11 +21,14 @@ class GeminiProvider extends BaseProvider {
     const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const url = this.getApiUrl(DEFAULT_MODEL, key);
+      const url = this.getApiUrl(DEFAULT_MODEL);
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': key,
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
