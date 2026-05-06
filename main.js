@@ -18,8 +18,9 @@ let config = loadConfig();
 let settingsWindow = null;
 let overlayWindow = null;
 
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
-const CLEANUP_INTERVAL_MS = 24 * 3600000;
+const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 20;
 const DESKTOP_CHECK_MS = 1000;
 
@@ -383,7 +384,7 @@ async function runUpdateCycle({ force = false } = {}) {
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
 
     if (config.wallpaper.enabled) {
-      const calendarEvents = db.getUpcomingCalendarEvents(24 * 3600000);
+      const calendarEvents = db.getUpcomingCalendarEvents(ONE_DAY_MS);
       await wallpaperChanger.update(palette, {
         engineResult,
         force,
