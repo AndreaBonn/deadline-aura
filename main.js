@@ -38,7 +38,7 @@ function setX11Strut(win, display, strutWidth) {
     const xid = win.getNativeWindowHandle().readUInt32LE(0);
     const virtualWidth = getVirtualScreenWidth();
     const displayRightEdge = display.bounds.x + display.bounds.width;
-    // Solo se questo display è sul bordo destro dello schermo virtuale
+    // Only apply strut if this display is on the right edge of the virtual screen
     if (displayRightEdge < virtualWidth) {
       return;
     }
@@ -55,7 +55,7 @@ function setX11Strut(win, display, strutWidth) {
         }
       },
     );
-    // Rendi la finestra sticky su tutti i workspace so che lo strut si applichi ovunque
+    // Make the window sticky across all workspaces so the strut applies everywhere
     execFile(
       'xprop',
       ['-id', xidStr, '-f', '_NET_WM_DESKTOP', '32c', '-set', '_NET_WM_DESKTOP', '0xffffffff'],
@@ -234,7 +234,7 @@ function createStrips() {
 
     stripWin.webContents.once('did-finish-load', () => {
       stripWin.webContents.send('strip-color', currentPaletteHex);
-      // Setta DOCK type + sticky desktop PRIMA di show() per GNOME Mutter
+      // Set DOCK type + sticky desktop BEFORE show() — required by GNOME Mutter
       if (process.platform === 'linux' && process.env.DISPLAY) {
         try {
           const xidStr = String(stripWin.getNativeWindowHandle().readUInt32LE(0));
