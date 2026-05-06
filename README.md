@@ -199,6 +199,14 @@ npm start
 
 Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, `integrations/`, and `renderer/`.
 
+## Architecture decisions
+
+Key design choices are documented as Architecture Decision Records in [`docs/decisions/`](./docs/decisions/):
+
+- [ADR-001: canvas over sharp for wallpaper rendering](./docs/decisions/001-canvas-over-sharp.md)
+- [ADR-002: CommonJS over ESM](./docs/decisions/002-cjs-over-esm.md)
+- [ADR-003: AI/mechanical score blending](./docs/decisions/003-ai-mechanical-blend.md)
+
 ## Contributing
 
 Open an issue to discuss changes before submitting a pull request. Code must pass `npm run lint` and `npm test` before review. There is no formal contributing guide at this stage.
