@@ -264,12 +264,17 @@ function checkDesktopState() {
     return;
   }
 
+  // Auto-show only when multiple displays are connected (one free = sidebar target)
+  const displays = screen.getAllDisplays();
+  if (displays.length < 2) {
+    return;
+  }
+
   getDisplaysWithWindows(screen, (occupiedDisplayIds) => {
     if (!occupiedDisplayIds) {
       return;
     }
 
-    const displays = screen.getAllDisplays();
     const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
 
     if (freeDisplay && !sidebarWindow.isVisible()) {
@@ -283,6 +288,15 @@ function checkDesktopState() {
 // --- Init ---
 
 function initSidebar() {
+  // Compute initial color before creating strips so they start with the correct palette
+  const initialResult = deadlineEngine.run({
+    lookaheadHours: config.sync.lookahead_hours,
+    k: config.engine.k_constant,
+    priorityWeights: config.engine.priority_weights,
+  });
+  const initialPalette = colorMapper.mapScoreToColor(initialResult.global_score);
+  currentPaletteHex = initialPalette.accent_hex;
+
   createSidebar();
   createStrips();
 
@@ -389,6 +403,11 @@ function openOverlay(displayId) {
     overlayWindow = null;
     wallpaperChanger.setOverlayOpen(false);
   });
+}
+
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
 }
 
 app.whenReady().then(() => {
