@@ -457,7 +457,22 @@ app.whenReady().then(() => {
 
   ipcMain.on('open-link', (_event, url) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) {
-      shell.openExternal(url);
+      const { spawn, execFileSync } = require('child_process');
+      const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
+      let opened = false;
+      for (const bin of browsers) {
+        try {
+          execFileSync('which', [bin], { stdio: 'ignore' });
+          spawn(bin, [url], { detached: true, stdio: 'ignore' }).unref();
+          opened = true;
+          break;
+        } catch {
+          /* not found, try next */
+        }
+      }
+      if (!opened) {
+        spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+      }
     }
   });
 
