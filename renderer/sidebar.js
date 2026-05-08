@@ -85,7 +85,111 @@ function renderTaskList(tasks, palette) {
   }
 }
 
+function createEditForm(task) {
+  const form = document.createElement('div');
+  form.className = 'task-card edit-form-card';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.className = 'quick-add-input';
+  titleInput.value = task.title;
+
+  const row = document.createElement('div');
+  row.className = 'quick-add-row';
+
+  const dateInput = document.createElement('input');
+  dateInput.type = 'datetime-local';
+  dateInput.className = 'quick-add-date';
+  if (task.due_at) {
+    const d = new Date(task.due_at);
+    const pad = function (n) {
+      return String(n).padStart(2, '0');
+    };
+    dateInput.value =
+      d.getFullYear() +
+      '-' +
+      pad(d.getMonth() + 1) +
+      '-' +
+      pad(d.getDate()) +
+      'T' +
+      pad(d.getHours()) +
+      ':' +
+      pad(d.getMinutes());
+  }
+
+  const prioritySelect = document.createElement('select');
+  prioritySelect.className = 'quick-add-priority';
+  const priorities = [
+    { value: '1', label: 'P1' },
+    { value: '2', label: 'P2' },
+    { value: '3', label: 'P3' },
+    { value: '4', label: 'P4' },
+  ];
+  for (let i = 0; i < priorities.length; i++) {
+    const opt = document.createElement('option');
+    opt.value = priorities[i].value;
+    opt.textContent = priorities[i].label;
+    if (String(task.priority) === priorities[i].value) {
+      opt.selected = true;
+    }
+    prioritySelect.appendChild(opt);
+  }
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'quick-add-save';
+  saveBtn.textContent = 'Salva';
+  saveBtn.addEventListener('click', function () {
+    const title = titleInput.value.trim();
+    if (!title) {
+      titleInput.focus();
+      return;
+    }
+    const dueAt = dateInput.value ? new Date(dateInput.value).getTime() : null;
+    const priority = parseInt(prioritySelect.value, 10);
+    window.deadlineAura.updateLocalTask({
+      id: task.id,
+      title: title,
+      dueAt: dueAt,
+      priority: priority,
+    });
+    editingTaskId = null;
+  });
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'local-action-btn';
+  cancelBtn.textContent = '\u2715';
+  cancelBtn.title = 'Annulla';
+  cancelBtn.addEventListener('click', function () {
+    editingTaskId = null;
+    renderTaskList(lastTasks, lastPalette);
+  });
+
+  titleInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      saveBtn.click();
+    }
+    if (e.key === 'Escape') {
+      editingTaskId = null;
+      renderTaskList(lastTasks, lastPalette);
+    }
+  });
+
+  row.appendChild(dateInput);
+  row.appendChild(prioritySelect);
+  row.appendChild(saveBtn);
+  row.appendChild(cancelBtn);
+
+  form.appendChild(titleInput);
+  form.appendChild(row);
+
+  return form;
+}
+
 function createTaskCard(task) {
+  if (task.source === 'local' && editingTaskId === task.id) {
+    return createEditForm(task);
+  }
+
   const card = document.createElement('div');
   card.className = 'task-card';
   if (task.web_url) {
@@ -150,6 +254,17 @@ function createTaskCard(task) {
       window.deadlineAura.completeLocalTask(task.id);
     });
     actionsWrap.appendChild(doneBtn);
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'local-action-btn edit-btn';
+    editBtn.textContent = '✏';
+    editBtn.title = 'Modifica';
+    editBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      editingTaskId = task.id;
+      renderTaskList(lastTasks, lastPalette);
+    });
+    actionsWrap.appendChild(editBtn);
 
     const delBtn = document.createElement('button');
     delBtn.className = 'local-action-btn del-btn';
@@ -277,6 +392,7 @@ function renderJiraSection(container, tasks, _palette) {
 }
 
 let addFormVisible = false;
+let editingTaskId = null;
 
 function renderLocalSection(container, tasks, _palette) {
   const label = document.createElement('div');
