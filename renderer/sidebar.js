@@ -102,7 +102,8 @@ function createTaskCard(task) {
   card.style.borderLeftColor = color;
 
   const isCritical = task.urgency_score > 0.8;
-  const countdown = formatCountdown(task.hours_remaining);
+  const hoursToShow = task.start_at ? (task.start_at - Date.now()) / 3600000 : task.hours_remaining;
+  const countdown = formatCountdown(hoursToShow);
 
   const header = document.createElement('div');
   header.className = 'task-header';
