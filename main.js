@@ -12,6 +12,8 @@ const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
 const localQueries = require('./store/local-queries');
+const burnoutDetector = require('./core/burnout-detector');
+const notifier = require('./core/notifier');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
@@ -337,11 +339,17 @@ async function runUpdateCycle({ force = false } = {}) {
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
 
+    const aiResponse = db.getLatestAiCacheResponse();
+    const clinicalNote = aiResponse?.clinical_note || null;
+    const stressForecast = aiResponse?.daily_breakdown || [];
+
     if (sidebarWindow && !sidebarWindow.isDestroyed() && sidebarReady) {
       sidebarWindow.webContents.send('update', {
         engineResult,
         palette,
         pinnedTaskIds: Array.from(pinnedIds),
+        clinicalNote,
+        stressForecast,
       });
     }
 
@@ -417,6 +425,21 @@ app.whenReady().then(() => {
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
+
+  const burnoutIntervalMs = (config.burnout?.check_interval_hours || 2) * 3600000;
+  setInterval(() => {
+    if (!config.burnout?.enabled) {
+      return;
+    }
+    const aiCacheHistory = db.getAiCacheHistory(7);
+    const warning = burnoutDetector.detectBurnoutRisk(aiCacheHistory, {
+      stress_threshold: config.burnout?.stress_threshold,
+      consecutive_days: config.burnout?.consecutive_days,
+    });
+    if (warning.isAtRisk) {
+      notifier.sendBurnoutWarning(warning, config);
+    }
+  }, burnoutIntervalMs);
 
   ipcMain.on('toggle-sidebar', () => {
     toggleSidebar();

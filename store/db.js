@@ -237,6 +237,38 @@ function getLatestAiScore() {
   }
 }
 
+function getLatestAiCacheResponse() {
+  const row = getDb()
+    .prepare('SELECT response_json FROM ai_cache ORDER BY computed_at DESC LIMIT 1')
+    .get();
+  if (!row) {
+    return null;
+  }
+  try {
+    return JSON.parse(row.response_json);
+  } catch {
+    return null;
+  }
+}
+
+function getScoreHistory(days) {
+  const since = Date.now() - days * 24 * 3600000;
+  return getDb()
+    .prepare(
+      'SELECT global_score, computed_at FROM scores WHERE computed_at >= ? ORDER BY computed_at ASC',
+    )
+    .all(since);
+}
+
+function getAiCacheHistory(days) {
+  const since = Date.now() - days * 24 * 3600000;
+  return getDb()
+    .prepare(
+      'SELECT response_json, computed_at FROM ai_cache WHERE computed_at >= ? ORDER BY computed_at ASC',
+    )
+    .all(since);
+}
+
 function getAiCache(eventsHash) {
   return getDb().prepare('SELECT * FROM ai_cache WHERE events_hash = ?').get(eventsHash);
 }
@@ -284,6 +316,9 @@ module.exports = {
   saveGlobalScore,
   getLastGlobalScore,
   getLatestAiScore,
+  getLatestAiCacheResponse,
+  getScoreHistory,
+  getAiCacheHistory,
   getAiCache,
   setAiCache,
   deleteTask,

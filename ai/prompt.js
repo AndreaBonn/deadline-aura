@@ -101,7 +101,7 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
   "patterns": [
     "Specific invisible pattern with evidence, e.g.: 3 creative tasks consecutive 14:00-17:30 with no break — decision quality degrades after 2nd"
   ],
-  "clinical_note": "1-3 sentences: what a psychologist would flag about this schedule — the one thing the person does not see but should know"
+  "clinical_note": "1-3 frasi IN ITALIANO: cosa uno psicologo segnalerebbe di questa agenda — la cosa che la persona non vede ma dovrebbe sapere"
 }`;
 }
 

@@ -49,6 +49,13 @@ const DEFAULTS = {
     threshold_score: 0.85,
     cooldown_minutes: 30,
   },
+  burnout: {
+    enabled: true,
+    check_interval_hours: 2,
+    cooldown_hours: 24,
+    stress_threshold: 7,
+    consecutive_days: 3,
+  },
   ui: {
     max_tasks_shown: 8,
     show_source_badge: true,

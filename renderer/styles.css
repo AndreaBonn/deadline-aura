@@ -72,6 +72,66 @@ body {
   letter-spacing: 1px;
 }
 
+/* --- Clinical note --- */
+
+.clinical-note {
+  display: none;
+  padding: 10px 20px;
+  margin: 0 12px 8px;
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.45;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 6px 6px 0;
+}
+
+/* --- Stress forecast sparkline --- */
+
+.stress-forecast {
+  display: none;
+  padding: 8px 20px 12px;
+  gap: 8px;
+  justify-content: center;
+}
+
+.forecast-col {
+  flex: 1;
+  max-width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.forecast-col:hover {
+  opacity: 1;
+}
+
+.forecast-col.forecast-today {
+  opacity: 1;
+}
+
+.forecast-col.forecast-today .forecast-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+}
+
+.forecast-value {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.forecast-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: capitalize;
+}
+
 .divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.06);

@@ -425,9 +425,74 @@ document.getElementById('btnClose').addEventListener('click', function () {
   window.deadlineAura.toggleSidebar();
 });
 
+function renderClinicalNote(note) {
+  const el = document.getElementById('clinicalNote');
+  if (!el) {
+    return;
+  }
+  if (!note) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  el.textContent = note;
+}
+
+function stressToColor(stress) {
+  const score = Math.max(0, Math.min(stress, 10)) / 10;
+  return urgencyToColor(score);
+}
+
+function renderStressForecast(dailyBreakdown) {
+  const container = document.getElementById('stressForecast');
+  if (!container) {
+    return;
+  }
+  container.innerHTML = '';
+
+  if (!dailyBreakdown || dailyBreakdown.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+
+  const days = dailyBreakdown.slice(0, 5);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
+    const col = document.createElement('div');
+    col.className = 'forecast-col';
+
+    const value = document.createElement('div');
+    value.className = 'forecast-value';
+    value.textContent = day.stress;
+    value.style.color = stressToColor(day.stress);
+
+    const label = document.createElement('div');
+    label.className = 'forecast-label';
+    const dateObj = new Date(day.date + 'T00:00:00');
+    label.textContent = dateObj.toLocaleDateString('it-IT', { weekday: 'short' }).slice(0, 3);
+
+    if (day.date === todayStr) {
+      col.classList.add('forecast-today');
+    }
+
+    if (day.reasoning) {
+      col.title = day.reasoning;
+    }
+
+    col.appendChild(value);
+    col.appendChild(label);
+    container.appendChild(col);
+  }
+}
+
 window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
+  renderClinicalNote(data.clinicalNote);
+  renderStressForecast(data.stressForecast);
   renderTaskList(data.engineResult.tasks, data.palette);
   document.getElementById('syncStatus').textContent = 'aggiornato';
 });

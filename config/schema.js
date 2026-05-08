@@ -62,6 +62,15 @@ const configSchema = z.object({
     threshold_score: z.number().min(0).max(1),
     cooldown_minutes: z.number().int().min(1).max(1440),
   }),
+  burnout: z
+    .object({
+      enabled: z.boolean(),
+      check_interval_hours: z.number().int().min(1).max(24),
+      cooldown_hours: z.number().int().min(1).max(168),
+      stress_threshold: z.number().int().min(1).max(10),
+      consecutive_days: z.number().int().min(2).max(7),
+    })
+    .optional(),
   ui: z.object({
     max_tasks_shown: z.number().int().min(1).max(20),
     show_source_badge: z.boolean(),

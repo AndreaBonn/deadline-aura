@@ -267,6 +267,88 @@ describe('db module exported functions', () => {
     });
   });
 
+  describe('getLatestAiCacheResponse', () => {
+    beforeEach(() => {
+      db.getDb().prepare('DELETE FROM ai_cache').run();
+    });
+
+    it('returns null when no cache entries exist', () => {
+      expect(db.getLatestAiCacheResponse()).toBeNull();
+    });
+
+    it('returns parsed JSON from latest cache entry', () => {
+      db.setAiCache('hash_a', '{"clinical_note": "Take a break"}');
+      const result = db.getLatestAiCacheResponse();
+      expect(result.clinical_note).toBe('Take a break');
+    });
+
+    it('returns latest entry when multiple exist', () => {
+      db.setAiCache('hash_old', '{"clinical_note": "old"}');
+      db.setAiCache('hash_new', '{"clinical_note": "new"}');
+      const result = db.getLatestAiCacheResponse();
+      expect(result.clinical_note).toBe('new');
+    });
+
+    it('returns null for malformed JSON', () => {
+      db.getDb()
+        .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
+        .run('bad', 'not-json', Date.now());
+      expect(db.getLatestAiCacheResponse()).toBeNull();
+    });
+  });
+
+  describe('getScoreHistory', () => {
+    beforeEach(() => {
+      db.getDb().prepare('DELETE FROM scores').run();
+    });
+
+    it('returns empty array when no scores exist', () => {
+      expect(db.getScoreHistory(7)).toEqual([]);
+    });
+
+    it('returns scores within the specified day range', () => {
+      db.saveGlobalScore(0.5);
+      const oldTime = Date.now() - 10 * 24 * 3600000;
+      db.getDb()
+        .prepare('INSERT INTO scores (global_score, computed_at) VALUES (?, ?)')
+        .run(0.3, oldTime);
+
+      const result = db.getScoreHistory(7);
+      expect(result).toHaveLength(1);
+      expect(result[0].global_score).toBeCloseTo(0.5, 2);
+    });
+
+    it('returns scores ordered by computed_at ASC', () => {
+      db.saveGlobalScore(0.8);
+      db.saveGlobalScore(0.3);
+      const result = db.getScoreHistory(7);
+      expect(result[0].global_score).toBeCloseTo(0.8, 2);
+      expect(result[1].global_score).toBeCloseTo(0.3, 2);
+    });
+  });
+
+  describe('getAiCacheHistory', () => {
+    beforeEach(() => {
+      db.getDb().prepare('DELETE FROM ai_cache').run();
+    });
+
+    it('returns empty array when no cache entries exist', () => {
+      expect(db.getAiCacheHistory(7)).toEqual([]);
+    });
+
+    it('returns cache entries within the specified day range', () => {
+      db.setAiCache('recent_hash', '{"global_stress": 5}');
+      const oldTime = Date.now() - 10 * 24 * 3600000;
+      db.getDb()
+        .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
+        .run('old_hash', '{"global_stress": 3}', oldTime);
+
+      const result = db.getAiCacheHistory(7);
+      expect(result).toHaveLength(1);
+      expect(JSON.parse(result[0].response_json).global_stress).toBe(5);
+    });
+  });
+
   describe('close', () => {
     it('closes and allows reopening', () => {
       db.close();

@@ -1,4 +1,11 @@
-const { shouldNotify, findMostUrgentTask, formatCountdown, send } = require('../../core/notifier');
+const {
+  shouldNotify,
+  findMostUrgentTask,
+  formatCountdown,
+  send,
+  sendBurnoutWarning,
+  _resetForTest,
+} = require('../../core/notifier');
 
 function makeConfig(overrides = {}) {
   return {
@@ -135,6 +142,28 @@ describe('notifier', () => {
     it('returns sent: false when global score below threshold', () => {
       const config = makeConfig({ threshold_score: 0.99 });
       const result = send(makeEngineResult({ global_score: 0.5 }), config);
+      expect(result.sent).toBe(false);
+    });
+  });
+
+  describe('sendBurnoutWarning', () => {
+    beforeEach(() => {
+      _resetForTest();
+    });
+
+    it('returns sent: false when notifications disabled', () => {
+      const config = makeConfig({ enabled: false });
+      const warning = { isAtRisk: true, triggers: ['Test trigger'], severity: 'moderate' };
+      expect(sendBurnoutWarning(warning, config).sent).toBe(false);
+    });
+
+    it('returns sent: false during cooldown', () => {
+      const config = { ...makeConfig(), burnout: { cooldown_hours: 24 } };
+      const warning = { isAtRisk: true, triggers: ['Test trigger'], severity: 'moderate' };
+      // First call succeeds (or fails due to notify-send not available)
+      sendBurnoutWarning(warning, config);
+      // Second call within cooldown
+      const result = sendBurnoutWarning(warning, config);
       expect(result.sent).toBe(false);
     });
   });

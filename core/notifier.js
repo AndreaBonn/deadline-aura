@@ -3,6 +3,7 @@
 const childProcess = require('child_process');
 
 let lastNotifiedAt = 0;
+let lastBurnoutNotifiedAt = 0;
 
 function shouldNotify(engineResult, config) {
   if (!config.notifications.enabled) {
@@ -79,8 +80,46 @@ function send(engineResult, config) {
   }
 }
 
-function _resetForTest() {
-  lastNotifiedAt = 0;
+function sendBurnoutWarning(warning, config) {
+  if (!config.notifications.enabled) {
+    return { sent: false };
+  }
+
+  const cooldownMs = (config.burnout?.cooldown_hours || 24) * 3600000;
+  if (Date.now() - lastBurnoutNotifiedAt < cooldownMs) {
+    return { sent: false, reason: 'cooldown' };
+  }
+
+  const title =
+    warning.severity === 'high' ? 'Rischio burnout elevato' : 'Attenzione: rischio burnout';
+  const body = warning.triggers.join('\n');
+
+  try {
+    const result = childProcess.spawnSync(
+      'notify-send',
+      ['--urgency=critical', '--app-name=DeadlineAura', title, body],
+      { timeout: 5000, encoding: 'utf-8' },
+    );
+    if (result.error || result.status !== 0) {
+      return { sent: false, error: 'notify-send failed' };
+    }
+    lastBurnoutNotifiedAt = Date.now();
+    return { sent: true, severity: warning.severity };
+  } catch {
+    return { sent: false, error: 'notify-send failed' };
+  }
 }
 
-module.exports = { send, shouldNotify, findMostUrgentTask, formatCountdown, _resetForTest };
+function _resetForTest() {
+  lastNotifiedAt = 0;
+  lastBurnoutNotifiedAt = 0;
+}
+
+module.exports = {
+  send,
+  shouldNotify,
+  findMostUrgentTask,
+  formatCountdown,
+  sendBurnoutWarning,
+  _resetForTest,
+};
