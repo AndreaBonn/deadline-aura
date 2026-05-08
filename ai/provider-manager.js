@@ -61,17 +61,27 @@ async function scoreEvents(events, config) {
   }
 
   const prompt = buildScoringPrompt(events);
-  const aiOptions = {
-    timeout: config.ai?.timeout_ms || 10000,
-    temperature: config.ai?.temperature || 0.15,
-  };
+  const providerTimeout = config.ai?.provider_timeout_ms || 5000;
+  const totalTimeout = config.ai?.total_timeout_ms || 15000;
+  const temperature = config.ai?.temperature || 0.15;
+
+  const deadline = Date.now() + totalTimeout;
 
   for (const provider of providers) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      console.error('[ai] total timeout exceeded, aborting failover');
+      break;
+    }
+
+    const timeout = Math.min(providerTimeout, remaining);
+
     try {
-      const rawResponse = await provider.score(prompt, aiOptions);
+      const rawResponse = await provider.score(prompt, { timeout, temperature });
       const parsed = parseAiResponse(rawResponse);
 
       if (parsed && typeof parsed.global_stress === 'number') {
+        console.log(`[ai] scored by ${provider.name}`);
         return parsed;
       }
 

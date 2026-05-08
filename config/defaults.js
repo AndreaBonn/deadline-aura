@@ -25,7 +25,8 @@ const DEFAULTS = {
     enabled: true,
     provider_priority: ['groq', 'gemini', 'openai', 'anthropic'],
     recalc_hours: 6,
-    timeout_ms: 10000,
+    provider_timeout_ms: 5000,
+    total_timeout_ms: 15000,
     temperature: 0.15,
   },
   wallpaper: {

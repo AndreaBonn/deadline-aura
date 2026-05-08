@@ -47,7 +47,12 @@ describe('scoreEvents', () => {
     });
 
     const config = {
-      ai: { provider_priority: ['groq'], timeout_ms: 5000, temperature: 0.15 },
+      ai: {
+        provider_priority: ['groq'],
+        provider_timeout_ms: 5000,
+        total_timeout_ms: 15000,
+        temperature: 0.15,
+      },
     };
     const events = [{ id: '1', title: 'Test' }];
     const result = await scoreEvents(events, config);
@@ -76,7 +81,12 @@ describe('scoreEvents', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const config = {
-      ai: { provider_priority: ['groq', 'openai'], timeout_ms: 5000, temperature: 0.15 },
+      ai: {
+        provider_priority: ['groq', 'openai'],
+        provider_timeout_ms: 5000,
+        total_timeout_ms: 15000,
+        temperature: 0.15,
+      },
     };
     const result = await scoreEvents([{ id: '1', title: 'Test' }], config);
 
@@ -91,7 +101,12 @@ describe('scoreEvents', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const config = {
-      ai: { provider_priority: ['groq'], timeout_ms: 5000, temperature: 0.15 },
+      ai: {
+        provider_priority: ['groq'],
+        provider_timeout_ms: 5000,
+        total_timeout_ms: 15000,
+        temperature: 0.15,
+      },
     };
     const result = await scoreEvents([{ id: '1', title: 'Test' }], config);
 
@@ -111,11 +126,39 @@ describe('scoreEvents', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const config = {
-      ai: { provider_priority: ['groq'], timeout_ms: 5000, temperature: 0.15 },
+      ai: {
+        provider_priority: ['groq'],
+        provider_timeout_ms: 5000,
+        total_timeout_ms: 15000,
+        temperature: 0.15,
+      },
     };
     const result = await scoreEvents([{ id: '1', title: 'Test' }], config);
 
     expect(result).toBeNull();
     vi.restoreAllMocks();
+  });
+
+  it('aborts failover when total timeout exceeded', async () => {
+    process.env.GROQ_API_KEYS = 'key1';
+    process.env.OPENAI_API_KEYS = 'key2';
+
+    const fetchSpy = vi.spyOn(global, 'fetch').mockRejectedValue(new Error('slow'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const config = {
+      ai: {
+        provider_priority: ['groq', 'openai'],
+        provider_timeout_ms: 5000,
+        total_timeout_ms: -1,
+        temperature: 0.15,
+      },
+    };
+    const result = await scoreEvents([{ id: '1', title: 'Test' }], config);
+
+    expect(result).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalledWith('[ai] total timeout exceeded, aborting failover');
+    consoleSpy.mockRestore();
   });
 });
