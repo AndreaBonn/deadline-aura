@@ -1,0 +1,3 @@
+-- 005: Allow 'local' as a task source
+-- SQLite cannot ALTER CHECK constraints, so we handle this in db.js migration code
+-- This file exists as a placeholder for migration ordering consistency

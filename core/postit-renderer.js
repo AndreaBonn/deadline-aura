@@ -49,6 +49,9 @@ function extractCode(taskId, title) {
     const match = title && title.match(/^([A-Z][A-Z0-9]*)-\d+/);
     return match ? match[1] : 'JIRA';
   }
+  if (taskId.startsWith('local_')) {
+    return 'TODO';
+  }
   return taskId;
 }
 

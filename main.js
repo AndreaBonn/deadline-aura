@@ -11,6 +11,7 @@ const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
+const localQueries = require('./store/local-queries');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
@@ -493,6 +494,60 @@ app.whenReady().then(() => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.close();
     }
+  });
+
+  ipcMain.handle('local-task:create', (_event, { title, dueAt, priority }) => {
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return { ok: false, error: 'INVALID_TITLE' };
+    }
+    const p = priority !== undefined ? Number(priority) : 3;
+    if (!Number.isInteger(p) || p < 1 || p > 4) {
+      return { ok: false, error: 'INVALID_PRIORITY' };
+    }
+    const id = localQueries.createLocalTask({ title: title.trim(), dueAt, priority: p });
+    runUpdateCycle({ force: true });
+    return { ok: true, id };
+  });
+
+  ipcMain.handle('local-task:update', (_event, { id, title, dueAt, priority }) => {
+    if (!id || typeof id !== 'string') {
+      return { ok: false, error: 'INVALID_ID' };
+    }
+    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+      return { ok: false, error: 'INVALID_TITLE' };
+    }
+    if (priority !== undefined) {
+      const p = Number(priority);
+      if (!Number.isInteger(p) || p < 1 || p > 4) {
+        return { ok: false, error: 'INVALID_PRIORITY' };
+      }
+    }
+    localQueries.updateLocalTask({
+      id,
+      title: title !== undefined ? title.trim() : undefined,
+      dueAt,
+      priority,
+    });
+    runUpdateCycle({ force: true });
+    return { ok: true };
+  });
+
+  ipcMain.handle('local-task:delete', (_event, taskId) => {
+    if (!taskId || typeof taskId !== 'string') {
+      return { ok: false, error: 'INVALID_ID' };
+    }
+    localQueries.deleteLocalTask(taskId);
+    runUpdateCycle({ force: true });
+    return { ok: true };
+  });
+
+  ipcMain.handle('local-task:complete', (_event, taskId) => {
+    if (!taskId || typeof taskId !== 'string') {
+      return { ok: false, error: 'INVALID_ID' };
+    }
+    localQueries.completeLocalTask(taskId);
+    runUpdateCycle({ force: true });
+    return { ok: true };
   });
 });
 

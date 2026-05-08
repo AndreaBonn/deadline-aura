@@ -43,6 +43,16 @@ describe('extractCode', () => {
     });
   });
 
+  describe('local tasks', () => {
+    it('returns TODO for local_ prefix', () => {
+      expect(extractCode('local_1234_abc12345', 'Pagare bolletta')).toBe('TODO');
+    });
+
+    it('returns TODO regardless of title', () => {
+      expect(extractCode('local_9999_ff00ff00', '')).toBe('TODO');
+    });
+  });
+
   describe('unknown source', () => {
     it('returns taskId as-is for unknown prefix', () => {
       expect(extractCode('unknown_xyz', 'Some task')).toBe('unknown_xyz');

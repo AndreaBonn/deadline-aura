@@ -86,16 +86,53 @@ function runMigrations(database) {
     });
     backfill(needsBackfill);
   }
+
+  // 006: extend source CHECK to include 'local' (idempotent)
+  // SQLite cannot ALTER CHECK constraints — recreate table with new constraint
+  const sourceCheck = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
+    .get();
+  if (sourceCheck && !sourceCheck.sql.includes("'local'")) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS tasks_new (
+        id          TEXT PRIMARY KEY,
+        source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local')),
+        title       TEXT NOT NULL,
+        due_at      INTEGER,
+        priority    INTEGER NOT NULL DEFAULT 3 CHECK(priority BETWEEN 1 AND 4),
+        is_done     INTEGER NOT NULL DEFAULT 0,
+        is_stale    INTEGER NOT NULL DEFAULT 0,
+        raw_json    TEXT,
+        synced_at   INTEGER NOT NULL,
+        ai_stress     INTEGER CHECK(ai_stress BETWEEN 1 AND 10),
+        ai_category   TEXT CHECK(ai_category IN ('work-critical', 'work-routine', 'personal', 'admin')),
+        ai_reasoning  TEXT,
+        ai_scored_at  INTEGER,
+        web_url     TEXT,
+        ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
+        start_at    INTEGER
+      );
+      INSERT INTO tasks_new SELECT id, source, title, due_at, priority, is_done, is_stale,
+        raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
+        web_url, ai_cognitive_type, start_at FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
+      CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
+    `);
+  }
 }
 
 function getActiveTasks(lookaheadMs) {
   const deadline = Date.now() + lookaheadMs;
-  const jiraTasks = getDb()
+  // Jira + local tasks: no lookahead limit, never stale from sync
+  const persistentTasks = getDb()
     .prepare(
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
-       AND source = 'jira'
+       AND source IN ('jira', 'local')
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
     .all();
@@ -104,12 +141,12 @@ function getActiveTasks(lookaheadMs) {
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
-       AND source != 'jira'
+       AND source NOT IN ('jira', 'local')
        AND (due_at IS NULL OR due_at <= ?)
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
     .all(deadline);
-  return [...jiraTasks, ...otherTasks];
+  return [...persistentTasks, ...otherTasks];
 }
 
 function getUpcomingCalendarEvents(horizonMs) {
@@ -213,6 +250,14 @@ function setAiCache(eventsHash, responseJson) {
     .run(eventsHash, responseJson, Date.now());
 }
 
+function deleteTask(taskId) {
+  return getDb().prepare('DELETE FROM tasks WHERE id = ?').run(taskId);
+}
+
+function markTaskDone(taskId) {
+  return getDb().prepare('UPDATE tasks SET is_done = 1 WHERE id = ?').run(taskId);
+}
+
 function cleanupOldRecords() {
   const sevenDaysAgo = Date.now() - 7 * 24 * 3600000;
   const fortyEightHoursAgo = Date.now() - 48 * 3600000;
@@ -241,6 +286,8 @@ module.exports = {
   getLatestAiScore,
   getAiCache,
   setAiCache,
+  deleteTask,
+  markTaskDone,
   cleanupOldRecords,
   close,
   DB_PATH,

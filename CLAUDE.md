@@ -37,6 +37,7 @@ ai/providers/       — Provider implementations (groq, gemini, openai, anthropi
 integrations/       — Client API esterne (Google Calendar, Jira)
 store/              — SQLite init, migrations, query helpers
 store/pinned-queries.js — CRUD pinned tasks (pin/unpin, posizioni, query per display)
+store/local-queries.js  — CRUD task locali (source='local', no sync esterno)
 config/             — Defaults e schema Zod
 renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
 renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
@@ -57,6 +58,8 @@ test/               — Mirror struttura src/
 - Overlay Electron trasparente effimero per drag & drop posizionamento
 - Posizioni post-it in percentuale (x%, y%) per adattarsi a qualsiasi risoluzione
 - Preload separato per overlay (principio minimo privilegio)
+- Task locali (source='local'): CRUD dalla sidebar, no sync esterno, pinnabili come post-it
+- Task locali non diventano stale e non hanno lookahead limit (come Jira)
 
 ## Configurazione
 

@@ -12,4 +12,8 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   pinTask: (taskId, displayId) => ipcRenderer.send('pin-task', { taskId, displayId }),
   unpinTask: (taskId, displayId) => ipcRenderer.send('unpin-task', { taskId, displayId }),
   openOverlay: (displayId) => ipcRenderer.send('open-overlay', { displayId }),
+  createLocalTask: (task) => ipcRenderer.invoke('local-task:create', task),
+  updateLocalTask: (task) => ipcRenderer.invoke('local-task:update', task),
+  deleteLocalTask: (taskId) => ipcRenderer.invoke('local-task:delete', taskId),
+  completeLocalTask: (taskId) => ipcRenderer.invoke('local-task:complete', taskId),
 });
