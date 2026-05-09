@@ -1,6 +1,6 @@
 'use strict';
 
-/* global t, _i18nReady, initI18n, formatCountdown, urgencyToColor */
+/* global t, _i18nReady, initI18n */
 
 const COLLAPSED_LIMIT = 5;
 const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;

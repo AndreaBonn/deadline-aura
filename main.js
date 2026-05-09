@@ -2,7 +2,7 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
 const { setX11Strut, getDisplaysWithWindows } = require('./core/display-controller');

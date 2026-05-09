@@ -1,6 +1,7 @@
 'use strict';
 
 /* eslint-disable no-unused-vars */
+/* global t */
 /* Field rendering helpers for settings UI — consumed by settings.js via <script> */
 
 function createToggle(value, onChange) {
@@ -84,7 +85,7 @@ function createTextInput(value, { placeholder = '' } = {}, onChange) {
 }
 
 function createTagInput(values, { placeholder } = {}, onChange) {
-  var defaultPlaceholder =
+  const defaultPlaceholder =
     typeof t === 'function' ? t('settings.tag_add_placeholder') : 'Aggiungi...';
   placeholder = placeholder || defaultPlaceholder;
   const container = document.createElement('div');

@@ -14,7 +14,7 @@ function _getTranslator() {
   };
 }
 
-var _t = _getTranslator();
+const _t = _getTranslator();
 
 /**
  * Formats a remaining-hours value into a human-readable countdown string.

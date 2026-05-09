@@ -3,11 +3,7 @@
 // formatCountdown and getPostitColor are not exported — test through extractCode
 // and the exported constants. renderPostit/renderPostits require canvas mocking.
 
-const {
-  extractCode,
-  POSTIT_WIDTH,
-  POSTIT_HEIGHT,
-} = require('../../core/postit-renderer');
+require('../../core/postit-renderer');
 
 // We test the internal formatCountdown behavior by re-importing via a seam:
 // postit-renderer does not export formatCountdown, so we test its effects
@@ -76,9 +72,7 @@ describe('postit-renderer — formatCountdown (via mock canvas)', () => {
 
   it('renders without throwing when scale is not provided (defaults to 1)', () => {
     const ctx = makeCtx();
-    expect(() =>
-      renderPostit(ctx, { task: makeTask(), x: 0, y: 0 }),
-    ).not.toThrow();
+    expect(() => renderPostit(ctx, { task: makeTask(), x: 0, y: 0 })).not.toThrow();
   });
 
   it('renders text content with fillText calls', () => {
@@ -121,14 +115,24 @@ describe('postit-renderer — formatCountdown (via mock canvas)', () => {
 
     it('shows hours when 1-24 hours remaining', () => {
       const ctx = makeCtx();
-      renderPostit(ctx, { task: makeTask({ due_at: Date.now() + 5 * 3600000 }), x: 0, y: 0, scale: 1 });
+      renderPostit(ctx, {
+        task: makeTask({ due_at: Date.now() + 5 * 3600000 }),
+        x: 0,
+        y: 0,
+        scale: 1,
+      });
       const texts = ctx._calls.filter((c) => c.op === 'fillText').map((c) => c.text);
       expect(texts.some((t) => /^\d+h$/.test(t))).toBe(true);
     });
 
     it('shows days when more than 24 hours remaining', () => {
       const ctx = makeCtx();
-      renderPostit(ctx, { task: makeTask({ due_at: Date.now() + 72 * 3600000 }), x: 0, y: 0, scale: 1 });
+      renderPostit(ctx, {
+        task: makeTask({ due_at: Date.now() + 72 * 3600000 }),
+        x: 0,
+        y: 0,
+        scale: 1,
+      });
       const texts = ctx._calls.filter((c) => c.op === 'fillText').map((c) => c.text);
       expect(texts.some((t) => /^\d+g$/.test(t))).toBe(true);
     });
@@ -176,8 +180,22 @@ describe('postit-renderer — renderPostits', () => {
   it('renders each pinned task without throwing', () => {
     const ctx = makeCtx();
     const pinnedTasks = [
-      { task_id: 'gcal_1', title: 'Event A', priority: 1, due_at: Date.now() + 3600000, x_pct: 10, y_pct: 20 },
-      { task_id: 'jira_2', title: 'PROJ-1 · Task B', priority: 2, due_at: Date.now() + 7200000, x_pct: 50, y_pct: 50 },
+      {
+        task_id: 'gcal_1',
+        title: 'Event A',
+        priority: 1,
+        due_at: Date.now() + 3600000,
+        x_pct: 10,
+        y_pct: 20,
+      },
+      {
+        task_id: 'jira_2',
+        title: 'PROJ-1 · Task B',
+        priority: 2,
+        due_at: Date.now() + 7200000,
+        x_pct: 50,
+        y_pct: 50,
+      },
     ];
     expect(() => renderPostits(ctx, pinnedTasks, region)).not.toThrow();
   });
@@ -187,7 +205,11 @@ describe('postit-renderer — renderPostits', () => {
     const narrowRegion = { x: 0, y: 0, width: 960, height: 540 };
     // Should clamp scale to 0.8 minimum for narrow regions
     expect(() =>
-      renderPostits(ctx, [{ task_id: 'gcal_x', title: 'T', priority: 3, due_at: null, x_pct: 10, y_pct: 10 }], narrowRegion),
+      renderPostits(
+        ctx,
+        [{ task_id: 'gcal_x', title: 'T', priority: 3, due_at: null, x_pct: 10, y_pct: 10 }],
+        narrowRegion,
+      ),
     ).not.toThrow();
   });
 });

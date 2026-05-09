@@ -1,12 +1,16 @@
 'use strict';
 
 const childProcess = require('child_process');
-const { getVirtualScreenWidth, setX11Strut, getDisplaysWithWindows } = require('../../core/display-controller');
+const {
+  getVirtualScreenWidth,
+  setX11Strut,
+  getDisplaysWithWindows,
+} = require('../../core/display-controller');
 
 function makeScreen(displays = []) {
   return {
     getAllDisplays: () => displays,
-    getDisplayNearestPoint: ({ x, y }) => {
+    getDisplayNearestPoint: ({ x, _y }) => {
       for (const d of displays) {
         if (x >= d.bounds.x && x < d.bounds.x + d.bounds.width) {
           return d;
@@ -112,7 +116,10 @@ describe('display-controller — setX11Strut', () => {
     process.env.DISPLAY = ':0';
     const spy = vi.spyOn(childProcess, 'execFile');
     const leftDisplay = makeDisplay({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } });
-    const rightDisplay = makeDisplay({ id: 2, bounds: { x: 1920, y: 0, width: 2560, height: 1440 } });
+    const rightDisplay = makeDisplay({
+      id: 2,
+      bounds: { x: 1920, y: 0, width: 2560, height: 1440 },
+    });
     const screen = makeScreen([leftDisplay, rightDisplay]);
     const win = { isDestroyed: () => false, getNativeWindowHandle: () => Buffer.alloc(4) };
 
@@ -124,7 +131,9 @@ describe('display-controller — setX11Strut', () => {
   it('calls xprop twice for right-edge display (strut + desktop)', () => {
     Object.defineProperty(process, 'platform', { value: 'linux' });
     process.env.DISPLAY = ':0';
-    const spy = vi.spyOn(childProcess, 'execFile').mockImplementation((_cmd, _args, cb) => cb(null));
+    const spy = vi
+      .spyOn(childProcess, 'execFile')
+      .mockImplementation((_cmd, _args, cb) => cb(null));
     const display = makeDisplay({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } });
     const screen = makeScreen([display]);
     const xidBuf = Buffer.alloc(4);
@@ -145,7 +154,9 @@ describe('display-controller — setX11Strut', () => {
     const spy = vi.spyOn(childProcess, 'execFile');
     const win = {
       isDestroyed: () => false,
-      getNativeWindowHandle: () => { throw new Error('no handle'); },
+      getNativeWindowHandle: () => {
+        throw new Error('no handle');
+      },
     };
     const display = makeDisplay();
     const screen = makeScreen([display]);

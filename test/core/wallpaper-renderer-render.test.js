@@ -1,10 +1,8 @@
 'use strict';
 
-const { render, getBackgroundFile } = require('../../core/wallpaper-renderer');
+const { render } = require('../../core/wallpaper-renderer');
 
-const SINGLE_DISPLAY = [
-  { id: 'eDP-1', width: 800, height: 600, x: 0, y: 0 },
-];
+const SINGLE_DISPLAY = [{ id: 'eDP-1', width: 800, height: 600, x: 0, y: 0 }];
 
 const DUAL_DISPLAY = [
   { id: 'eDP-1', width: 800, height: 600, x: 0, y: 0 },
@@ -61,9 +59,7 @@ describe('wallpaper-renderer — render()', () => {
   it('renders mental load indicator when engineResult provided', async () => {
     const engineResult = {
       global_score: 0.75,
-      tasks: [
-        { id: 't1', title: 'Task 1', urgency_score: 0.8, priority: 1, source: 'gcal' },
-      ],
+      tasks: [{ id: 't1', title: 'Task 1', urgency_score: 0.8, priority: 1, source: 'gcal' }],
     };
 
     const canvas = await render({
@@ -113,9 +109,7 @@ describe('wallpaper-renderer — render()', () => {
 
   it('renders pinned postit tasks on displays', async () => {
     const pinnedByDisplay = {
-      'eDP-1': [
-        { task_id: 't1', title: 'Pinned Task', x_pct: 50, y_pct: 50, priority: 1 },
-      ],
+      'eDP-1': [{ task_id: 't1', title: 'Pinned Task', x_pct: 50, y_pct: 50, priority: 1 }],
     };
 
     const canvas = await render({
@@ -172,9 +166,30 @@ describe('wallpaper-renderer — render()', () => {
   it('filters out past calendar events (only shows next 24h)', async () => {
     const now = Date.now();
     const calendarEvents = [
-      { id: 'past', title: 'Past', start_at: now - 3600000, due_at: now - 1800000, source: 'gcal', priority: 3 },
-      { id: 'future', title: 'Future', start_at: now + 3600000, due_at: now + 7200000, source: 'gcal', priority: 3 },
-      { id: 'far', title: 'Far Future', start_at: now + 48 * 3600000, due_at: now + 49 * 3600000, source: 'gcal', priority: 3 },
+      {
+        id: 'past',
+        title: 'Past',
+        start_at: now - 3600000,
+        due_at: now - 1800000,
+        source: 'gcal',
+        priority: 3,
+      },
+      {
+        id: 'future',
+        title: 'Future',
+        start_at: now + 3600000,
+        due_at: now + 7200000,
+        source: 'gcal',
+        priority: 3,
+      },
+      {
+        id: 'far',
+        title: 'Far Future',
+        start_at: now + 48 * 3600000,
+        due_at: now + 49 * 3600000,
+        source: 'gcal',
+        priority: 3,
+      },
     ];
 
     const canvas = await render({
