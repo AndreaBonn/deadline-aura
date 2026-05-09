@@ -40,7 +40,17 @@
     "updated": "updated",
     "complete": "Complete",
     "pin_to_desktop": "Pin to desktop",
-    "unpin_from_desktop": "Unpin from desktop"
+    "unpin_from_desktop": "Unpin from desktop",
+    "log_time": "Log time",
+    "log_time_title": "Log time to calendar",
+    "select_calendar": "Select calendar...",
+    "duration_minutes": "Duration (min)",
+    "time_logged": "Time logged",
+    "logging": "Sending...",
+    "select_jira_task": "Select Jira task...",
+    "no_task_code": "No task code found",
+    "or_manual_code": "or type task code",
+    "manual_code_placeholder": "e.g. PROJ-123"
   },
   "priorities": {
     "p1_full": "P1 - Critical",

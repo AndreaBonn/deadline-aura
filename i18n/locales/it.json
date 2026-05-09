@@ -40,7 +40,17 @@
     "updated": "aggiornato",
     "complete": "Completa",
     "pin_to_desktop": "Appunta sul desktop",
-    "unpin_from_desktop": "Rimuovi dal desktop"
+    "unpin_from_desktop": "Rimuovi dal desktop",
+    "log_time": "Log tempo",
+    "log_time_title": "Log tempo su calendario",
+    "select_calendar": "Seleziona calendario...",
+    "duration_minutes": "Durata (min)",
+    "time_logged": "Tempo loggato",
+    "logging": "Invio...",
+    "select_jira_task": "Seleziona task Jira...",
+    "no_task_code": "Nessun codice task",
+    "or_manual_code": "oppure digita codice task",
+    "manual_code_placeholder": "es. PROJ-123"
   },
   "priorities": {
     "p1_full": "P1 - Critico",

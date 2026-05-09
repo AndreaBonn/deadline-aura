@@ -13,6 +13,7 @@ const configSchema = z.object({
       enabled: z.boolean(),
       calendars: z.array(z.string()).min(1),
       priority_keywords: z.array(z.string()),
+      default_log_calendar: z.string().optional(),
     }),
     jira: z.object({
       enabled: z.boolean(),

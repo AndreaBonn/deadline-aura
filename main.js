@@ -13,6 +13,7 @@ const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
 const localQueries = require('./store/local-queries');
 const burnoutDetector = require('./core/burnout-detector');
+const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { DEFAULTS } = require('./config/defaults');
@@ -594,6 +595,57 @@ app.whenReady().then(() => {
     runUpdateCycle({ force: true });
     return { ok: true };
   });
+
+  ipcMain.handle('calendar:list', async () => {
+    try {
+      const calendars = await gcal.listCalendars(config);
+      return { ok: true, calendars };
+    } catch (err) {
+      console.error('calendar:list error:', err.message);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('calendar:get-default', () => {
+    return { ok: true, calendarId: config.sources.google_calendar.default_log_calendar || '' };
+  });
+
+  ipcMain.handle('calendar:set-default', (_event, calendarId) => {
+    if (!calendarId || typeof calendarId !== 'string') {
+      return { ok: false, error: 'INVALID_CALENDAR_ID' };
+    }
+    config.sources.google_calendar.default_log_calendar = calendarId;
+    saveConfig(config);
+    return { ok: true };
+  });
+
+  ipcMain.handle(
+    'calendar:log-time',
+    async (_event, { summary, startTime, durationMinutes, calendarId }) => {
+      if (!summary || typeof summary !== 'string') {
+        return { ok: false, error: 'INVALID_SUMMARY' };
+      }
+      if (!startTime || typeof durationMinutes !== 'number' || durationMinutes < 1) {
+        return { ok: false, error: 'INVALID_TIME' };
+      }
+      const targetCalendar = calendarId || config.sources.google_calendar.default_log_calendar;
+      if (!targetCalendar) {
+        return { ok: false, error: 'NO_CALENDAR_SELECTED' };
+      }
+      try {
+        const result = await gcal.createEvent(config, {
+          calendarId: targetCalendar,
+          summary,
+          startTime,
+          durationMinutes,
+        });
+        return { ok: true, eventId: result.id, htmlLink: result.htmlLink };
+      } catch (err) {
+        console.error('calendar:log-time error:', err.message);
+        return { ok: false, error: err.message };
+      }
+    },
+  );
 });
 
 app.on('window-all-closed', () => {

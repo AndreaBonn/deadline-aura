@@ -10,7 +10,7 @@ const { URL } = require('url');
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'deadlineaura');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'google-token.json');
 const OAUTH_PORT = 34567;
-const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
@@ -232,10 +232,65 @@ async function fetchEvents(config) {
   return allEvents;
 }
 
+async function listCalendars(config) {
+  const { google_calendar: gcalConfig } = config.sources;
+  if (!gcalConfig.enabled) {
+    return [];
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return [];
+  }
+
+  const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+  const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+  const response = await calendar.calendarList.list();
+
+  return (response.data.items || [])
+    .filter(function (cal) {
+      return cal.accessRole === 'owner' || cal.accessRole === 'writer';
+    })
+    .map(function (cal) {
+      return { id: cal.id, summary: cal.summary || cal.id, accessRole: cal.accessRole };
+    });
+}
+
+async function createEvent(config, { calendarId, summary, startTime, durationMinutes }) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+  }
+
+  const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+  const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+  const start = new Date(startTime);
+  if (isNaN(start.getTime())) {
+    throw new Error('Invalid startTime');
+  }
+  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+
+  const response = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary,
+      start: { dateTime: start.toISOString() },
+      end: { dateTime: end.toISOString() },
+    },
+  });
+
+  return { id: response.data.id, htmlLink: response.data.htmlLink };
+}
+
 module.exports = {
   fetchEvents,
   normalizeEvent,
   assignPriority,
   getAuthenticatedClient,
+  listCalendars,
+  createEvent,
   TOKEN_PATH,
 };

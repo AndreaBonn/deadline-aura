@@ -11,6 +11,7 @@ const DEFAULTS = {
       enabled: true,
       calendars: ['primary'],
       priority_keywords: ['urgent', 'deadline', 'release', 'deploy', 'critico'],
+      default_log_calendar: '',
     },
     jira: {
       enabled: true,

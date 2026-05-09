@@ -570,6 +570,189 @@ body {
   padding: 8px 12px;
 }
 
+/* --- Time log button & form --- */
+
+.time-log-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 10px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.time-log-btn:hover {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: rgba(251, 191, 36, 0.9);
+}
+
+.time-log-btn.logged {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: rgba(34, 197, 94, 0.7);
+  cursor: default;
+}
+
+.time-log-form {
+  margin: 0 12px 6px;
+  padding: 8px 12px;
+  background: rgba(251, 191, 36, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.12);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.time-log-form .time-log-header {
+  font-size: 10px;
+  color: rgba(251, 191, 36, 0.7);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.time-log-form .time-log-summary {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  word-break: break-word;
+}
+
+.time-log-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.time-log-date,
+.time-log-time,
+.time-log-duration {
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-family: inherit;
+  outline: none;
+  color-scheme: dark;
+}
+
+.time-log-date {
+  flex: 1;
+}
+
+.time-log-time {
+  width: 70px;
+}
+
+.time-log-duration {
+  width: 55px;
+  text-align: center;
+}
+
+.time-log-calendar-select {
+  width: 100%;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.time-log-jira-select {
+  width: 100%;
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+.time-log-or-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.2);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 0;
+}
+
+.time-log-manual-key {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.15);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s;
+}
+
+.time-log-manual-key:focus {
+  border-color: rgba(251, 191, 36, 0.4);
+}
+
+.time-log-manual-key::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.time-log-send {
+  padding: 5px 12px;
+  background: rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 5px;
+  color: rgba(251, 191, 36, 0.9);
+  font-size: 10px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.time-log-send:hover {
+  background: rgba(251, 191, 36, 0.35);
+  color: rgba(251, 191, 36, 1);
+}
+
+.time-log-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @keyframes pulse-dot {
   0%,
   100% {

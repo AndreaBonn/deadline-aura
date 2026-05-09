@@ -3,10 +3,15 @@
 /* global t, _i18nReady, initI18n, formatCountdown, urgencyToColor */
 
 const COLLAPSED_LIMIT = 5;
+const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
+
 let jiraFilter = '';
 let lastTasks = null;
 let lastPalette = null;
 let pinnedTaskIds = new Set();
+let timeLogTaskId = null;
+const loggedTaskIds = new Set();
+let cachedCalendars = null;
 
 function updateClock() {
   const now = new Date();
@@ -189,6 +194,240 @@ function createEditForm(task) {
   return form;
 }
 
+function extractJiraKey(title) {
+  const match = title.match(JIRA_KEY_PATTERN);
+  return match ? match[1] : null;
+}
+
+function buildEventSummary(jiraKey, title) {
+  if (!jiraKey) {
+    return title;
+  }
+  const cleanTitle = title
+    .replace(jiraKey, '')
+    .replace(/^[\s·-]+/, '')
+    .trim();
+  return '[' + jiraKey + '] - ' + cleanTitle;
+}
+
+function padTwo(n) {
+  return String(n).padStart(2, '0');
+}
+
+function createTimeLogForm(task) {
+  const form = document.createElement('div');
+  form.className = 'time-log-form';
+
+  const header = document.createElement('div');
+  header.className = 'time-log-header';
+  header.textContent = t('sidebar.log_time_title');
+  form.appendChild(header);
+
+  const jiraKey = extractJiraKey(task.title);
+  const needsJiraSelect = task.source === 'local' && !jiraKey;
+
+  const summary = buildEventSummary(jiraKey, task.title);
+  const summaryEl = document.createElement('div');
+  summaryEl.className = 'time-log-summary';
+  summaryEl.textContent = summary;
+  form.appendChild(summaryEl);
+
+  let jiraSelect = null;
+  let manualKeyInput = null;
+  if (needsJiraSelect) {
+    jiraSelect = document.createElement('select');
+    jiraSelect.className = 'time-log-jira-select';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('sidebar.select_jira_task');
+    jiraSelect.appendChild(placeholder);
+
+    const jiraTasks = (lastTasks || []).filter(function (item) {
+      return item.source === 'jira';
+    });
+    for (let i = 0; i < jiraTasks.length; i++) {
+      const opt = document.createElement('option');
+      const key = extractJiraKey(jiraTasks[i].title);
+      opt.value = key || jiraTasks[i].title;
+      opt.textContent = jiraTasks[i].title;
+      jiraSelect.appendChild(opt);
+    }
+
+    jiraSelect.addEventListener('change', function () {
+      const selectedKey = jiraSelect.value;
+      if (selectedKey) {
+        manualKeyInput.value = '';
+        summaryEl.textContent = '[' + selectedKey + '] - ' + task.title;
+      } else {
+        summaryEl.textContent = task.title;
+      }
+    });
+
+    form.appendChild(jiraSelect);
+
+    const orLabel = document.createElement('div');
+    orLabel.className = 'time-log-or-label';
+    orLabel.textContent = t('sidebar.or_manual_code');
+    form.appendChild(orLabel);
+
+    manualKeyInput = document.createElement('input');
+    manualKeyInput.type = 'text';
+    manualKeyInput.className = 'time-log-manual-key';
+    manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
+    manualKeyInput.addEventListener('input', function () {
+      const val = manualKeyInput.value.trim().toUpperCase();
+      if (val) {
+        jiraSelect.value = '';
+        summaryEl.textContent = '[' + val + '] - ' + task.title;
+      } else if (!jiraSelect.value) {
+        summaryEl.textContent = task.title;
+      }
+    });
+    form.appendChild(manualKeyInput);
+  }
+
+  const now = new Date();
+  const roundedMinutes = Math.floor(now.getMinutes() / 15) * 15;
+  now.setMinutes(roundedMinutes, 0, 0);
+
+  const row1 = document.createElement('div');
+  row1.className = 'time-log-row';
+
+  const dateInput = document.createElement('input');
+  dateInput.type = 'date';
+  dateInput.className = 'time-log-date';
+  dateInput.value =
+    now.getFullYear() + '-' + padTwo(now.getMonth() + 1) + '-' + padTwo(now.getDate());
+
+  const timeInput = document.createElement('input');
+  timeInput.type = 'time';
+  timeInput.className = 'time-log-time';
+  timeInput.value = padTwo(now.getHours()) + ':' + padTwo(now.getMinutes());
+
+  const durationInput = document.createElement('input');
+  durationInput.type = 'number';
+  durationInput.className = 'time-log-duration';
+  durationInput.min = '15';
+  durationInput.max = '480';
+  durationInput.step = '15';
+  durationInput.value = '60';
+  durationInput.title = t('sidebar.duration_minutes');
+
+  row1.appendChild(dateInput);
+  row1.appendChild(timeInput);
+  row1.appendChild(durationInput);
+  form.appendChild(row1);
+
+  const row2 = document.createElement('div');
+  row2.className = 'time-log-row';
+
+  const calendarSelect = document.createElement('select');
+  calendarSelect.className = 'time-log-calendar-select';
+  const loadingOpt = document.createElement('option');
+  loadingOpt.value = '';
+  loadingOpt.textContent = t('sidebar.select_calendar');
+  calendarSelect.appendChild(loadingOpt);
+
+  loadCalendarOptions(calendarSelect);
+
+  const sendBtn = document.createElement('button');
+  sendBtn.className = 'time-log-send';
+  sendBtn.textContent = t('sidebar.log_time');
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'local-action-btn';
+  cancelBtn.textContent = '\u2715';
+  cancelBtn.title = t('common.cancel');
+  cancelBtn.addEventListener('click', function () {
+    timeLogTaskId = null;
+    renderTaskList(lastTasks, lastPalette);
+  });
+
+  sendBtn.addEventListener('click', function () {
+    const finalSummary = summaryEl.textContent;
+    const manualVal = manualKeyInput ? manualKeyInput.value.trim() : '';
+    if (needsJiraSelect && !jiraSelect.value && !manualVal) {
+      manualKeyInput.focus();
+      return;
+    }
+    const startTime = new Date(dateInput.value + 'T' + timeInput.value + ':00').toISOString();
+    const duration = parseInt(durationInput.value, 10);
+    if (!duration || duration < 1) {
+      durationInput.focus();
+      return;
+    }
+    const calId = calendarSelect.value;
+    if (!calId) {
+      calendarSelect.focus();
+      return;
+    }
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = t('sidebar.logging');
+
+    window.deadlineAura
+      .logTimeToCalendar({
+        summary: finalSummary,
+        startTime: startTime,
+        durationMinutes: duration,
+        calendarId: calId,
+      })
+      .then(function (result) {
+        if (result.ok) {
+          loggedTaskIds.add(task.id);
+          window.deadlineAura.setDefaultLogCalendar(calId);
+          timeLogTaskId = null;
+          renderTaskList(lastTasks, lastPalette);
+        } else {
+          sendBtn.disabled = false;
+          sendBtn.textContent = result.error || 'Error';
+        }
+      });
+  });
+
+  row2.appendChild(calendarSelect);
+  row2.appendChild(sendBtn);
+  row2.appendChild(cancelBtn);
+  form.appendChild(row2);
+
+  return form;
+}
+
+function loadCalendarOptions(selectEl) {
+  if (cachedCalendars) {
+    populateCalendarSelect(selectEl, cachedCalendars);
+    return;
+  }
+  window.deadlineAura.listCalendars().then(function (result) {
+    if (result.ok && result.calendars) {
+      cachedCalendars = result.calendars;
+      populateCalendarSelect(selectEl, result.calendars);
+    }
+  });
+}
+
+function populateCalendarSelect(selectEl, calendars) {
+  selectEl.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = t('sidebar.select_calendar');
+  selectEl.appendChild(placeholder);
+
+  for (let i = 0; i < calendars.length; i++) {
+    const opt = document.createElement('option');
+    opt.value = calendars[i].id;
+    opt.textContent = calendars[i].summary;
+    selectEl.appendChild(opt);
+  }
+
+  window.deadlineAura.getDefaultLogCalendar().then(function (result) {
+    if (result.ok && result.calendarId) {
+      selectEl.value = result.calendarId;
+    }
+  });
+}
+
 function createTaskCard(task) {
   if (task.source === 'local' && editingTaskId === task.id) {
     return createEditForm(task);
@@ -199,7 +438,7 @@ function createTaskCard(task) {
   if (task.web_url) {
     card.classList.add('clickable');
     card.addEventListener('click', function (e) {
-      if (e.target.closest('.pin-btn')) {
+      if (e.target.closest('.pin-btn') || e.target.closest('.time-log-btn')) {
         return;
       }
       window.deadlineAura.openLink(task.web_url);
@@ -301,8 +540,33 @@ function createTaskCard(task) {
     meta.appendChild(pinBtn);
   }
 
+  // Time log button — per task Jira e local
+  if (task.source === 'jira' || task.source === 'local') {
+    const isLogged = loggedTaskIds.has(task.id);
+    const timeBtn = document.createElement('button');
+    timeBtn.className = 'time-log-btn' + (isLogged ? ' logged' : '');
+    timeBtn.textContent = isLogged ? '\u2713' : '\u23F1';
+    timeBtn.title = isLogged ? t('sidebar.time_logged') : t('sidebar.log_time');
+    if (!isLogged) {
+      timeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        timeLogTaskId = timeLogTaskId === task.id ? null : task.id;
+        renderTaskList(lastTasks, lastPalette);
+      });
+    }
+    meta.appendChild(timeBtn);
+  }
+
   card.appendChild(header);
   card.appendChild(meta);
+
+  // Append time log form if this task is being logged
+  if (timeLogTaskId === task.id) {
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(card);
+    wrapper.appendChild(createTimeLogForm(task));
+    return wrapper;
+  }
 
   return card;
 }

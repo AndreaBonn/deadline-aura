@@ -80,6 +80,10 @@ systemd/            — Service + timer per sync background
 - Core i18n: `require('../i18n').t` diretto nel main process
 - Lookahead dinamico: finestra eventi = max(7 giorni da oggi arrotondati a domenica successiva, config lookahead_hours). Task Jira e locali sempre inclusi senza limite temporale
 - Burnout detector: analisi storico AI 7 giorni, 3 trigger indipendenti (stress medio, recovery insufficiente, emotional load alto), severity none/moderate/high
+- Time log su Google Calendar: bottone orologio su task Jira/local nella sidebar → crea evento `[CODICE] - Titolo` su GCal → Tempo lo legge per worklog
+- Time log: calendario di destinazione selezionato una volta e memorizzato in config (`default_log_calendar`)
+- Time log task locali: se il titolo contiene codice Jira (pattern `PROJ-123`) lo usa; altrimenti mostra dropdown task Jira per associazione
+- OAuth scope: `calendar.events` (read+write) - ri-auth necessaria una tantum al primo utilizzo
 - Notifiche desktop via `notify-send`: threshold score + cooldown configurabile, urgency critical per burnout
 - Strip come `_NET_WM_WINDOW_TYPE_DOCK` con `_NET_WM_STRUT_PARTIAL` per riservare spazio schermo
 - Auto-show sidebar su display senza finestre (rilevamento via `wmctrl`)
