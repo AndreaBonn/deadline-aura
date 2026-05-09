@@ -1,5 +1,7 @@
 'use strict';
 
+const { t } = require('../i18n');
+
 const POSTIT_WIDTH = 220;
 const POSTIT_HEIGHT = 100;
 const POSTIT_PADDING = 14;
@@ -30,7 +32,7 @@ function formatCountdown(dueAt) {
   }
   const hoursRemaining = (dueAt - Date.now()) / 3600000;
   if (hoursRemaining < 0) {
-    return 'scaduto';
+    return t('postit.expired');
   }
   if (hoursRemaining < 1) {
     return `${Math.round(hoursRemaining * 60)}m`;
@@ -38,19 +40,19 @@ function formatCountdown(dueAt) {
   if (hoursRemaining < 24) {
     return `${Math.floor(hoursRemaining)}h`;
   }
-  return `${Math.round(hoursRemaining / 24)}g`;
+  return `${Math.round(hoursRemaining / 24)}${t('countdown.days_short')}`;
 }
 
 function extractCode(taskId, title) {
   if (taskId.startsWith('gcal_') || taskId.startsWith('gcal-')) {
-    return title || 'Calendar';
+    return title || t('postit.calendar_fallback');
   }
   if (taskId.startsWith('jira_') || taskId.startsWith('jira-')) {
     const match = title && title.match(/^([A-Z][A-Z0-9]*)-\d+/);
-    return match ? match[1] : 'JIRA';
+    return match ? match[1] : t('postit.jira_fallback');
   }
   if (taskId.startsWith('local_')) {
-    return 'TODO';
+    return t('postit.todo');
   }
   return taskId;
 }

@@ -20,8 +20,12 @@ function createNumberInput(value, { min, max, step = 1 } = {}, onChange) {
   const input = document.createElement('input');
   input.type = 'number';
   input.value = value;
-  if (min !== undefined) { input.min = min; }
-  if (max !== undefined) { input.max = max; }
+  if (min !== undefined) {
+    input.min = min;
+  }
+  if (max !== undefined) {
+    input.max = max;
+  }
   input.step = step;
   input.addEventListener('change', () => onChange(Number(input.value)));
   return input;
@@ -61,7 +65,9 @@ function createSelect(value, options, onChange) {
     const o = document.createElement('option');
     o.value = opt.value || opt;
     o.textContent = opt.label || opt;
-    if ((opt.value || opt) === value) { o.selected = true; }
+    if ((opt.value || opt) === value) {
+      o.selected = true;
+    }
     select.appendChild(o);
   }
   select.addEventListener('change', () => onChange(select.value));
@@ -77,7 +83,10 @@ function createTextInput(value, { placeholder = '' } = {}, onChange) {
   return input;
 }
 
-function createTagInput(values, { placeholder = 'Aggiungi...' } = {}, onChange) {
+function createTagInput(values, { placeholder } = {}, onChange) {
+  var defaultPlaceholder =
+    typeof t === 'function' ? t('settings.tag_add_placeholder') : 'Aggiungi...';
+  placeholder = placeholder || defaultPlaceholder;
   const container = document.createElement('div');
   container.className = 'tag-container';
   const currentValues = [...values];

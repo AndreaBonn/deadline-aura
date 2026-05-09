@@ -3,6 +3,7 @@
 const { z } = require('zod');
 
 const configSchema = z.object({
+  language: z.enum(['it', 'en']).optional(),
   sync: z.object({
     interval_minutes: z.number().int().min(1).max(60),
     lookahead_hours: z.number().int().min(1).max(720),
@@ -38,7 +39,8 @@ const configSchema = z.object({
     enabled: z.boolean(),
     provider_priority: z.array(z.enum(['groq', 'gemini', 'openai', 'anthropic'])),
     recalc_hours: z.number().int().min(1).max(24),
-    timeout_ms: z.number().int().min(1000).max(30000),
+    provider_timeout_ms: z.number().int().min(1000).max(30000),
+    total_timeout_ms: z.number().int().min(1000).max(60000),
     temperature: z.number().min(0).max(1),
   }),
   wallpaper: z.object({

@@ -1,6 +1,7 @@
 'use strict';
 
 const childProcess = require('child_process');
+const { t } = require('../i18n');
 
 let lastNotifiedAt = 0;
 let lastBurnoutNotifiedAt = 0;
@@ -43,12 +44,12 @@ function formatCountdown(hoursRemaining) {
     return '';
   }
   if (hoursRemaining < 0) {
-    return 'scaduto';
+    return t('countdown.expired');
   }
   if (hoursRemaining < 1) {
-    return `tra ${Math.round(hoursRemaining * 60)} minuti`;
+    return t('countdown.in_minutes', { n: Math.round(hoursRemaining * 60) });
   }
-  return `tra ${Math.round(hoursRemaining)} ore`;
+  return t('countdown.in_hours', { n: Math.round(hoursRemaining) });
 }
 
 function send(engineResult, config) {
@@ -67,7 +68,7 @@ function send(engineResult, config) {
   try {
     const result = childProcess.spawnSync(
       'notify-send',
-      ['--urgency=normal', '--app-name=DeadlineAura', 'Scadenza imminente', body],
+      ['--urgency=normal', '--app-name=DeadlineAura', t('notifications.deadline_imminent'), body],
       { timeout: 5000, encoding: 'utf-8' },
     );
     if (result.error || result.status !== 0) {
@@ -91,7 +92,9 @@ function sendBurnoutWarning(warning, config) {
   }
 
   const title =
-    warning.severity === 'high' ? 'Rischio burnout elevato' : 'Attenzione: rischio burnout';
+    warning.severity === 'high'
+      ? t('notifications.burnout_risk_high')
+      : t('notifications.burnout_risk_normal');
   const body = warning.triggers.join('\n');
 
   try {

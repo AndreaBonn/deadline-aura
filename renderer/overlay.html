@@ -11,11 +11,16 @@
   </head>
   <body>
     <div class="overlay-toolbar">
-      <span class="toolbar-label">Sposta i post-it dove vuoi, poi salva</span>
-      <button class="toolbar-btn save-btn" id="btnSave">Salva</button>
-      <button class="toolbar-btn cancel-btn" id="btnCancel">Annulla</button>
+      <span class="toolbar-label" data-i18n="overlay.instruction"
+        >Sposta i post-it dove vuoi, poi salva</span
+      >
+      <button class="toolbar-btn save-btn" id="btnSave" data-i18n="common.save">Salva</button>
+      <button class="toolbar-btn cancel-btn" id="btnCancel" data-i18n="common.cancel">
+        Annulla
+      </button>
     </div>
     <div class="overlay-canvas" id="overlayCanvas"></div>
+    <script src="i18n-renderer.js"></script>
     <script src="overlay.js"></script>
   </body>
 </html>

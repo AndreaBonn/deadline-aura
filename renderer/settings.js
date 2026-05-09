@@ -2,7 +2,7 @@
 
 /* global settingsApi, createToggle, createNumberInput, createRangeWithValue,
    createSelect, createTextInput, createTagInput, createPriorityList,
-   createField, createFieldGroup */
+   createField, createFieldGroup, initI18n, t */
 
 let config = {};
 let defaults = {};
@@ -28,12 +28,12 @@ document.getElementById('btnClose').addEventListener('click', () => settingsApi.
 document.getElementById('btnSave').addEventListener('click', async () => {
   const result = await settingsApi.saveConfig(config);
   if (result.ok) {
-    feedback.textContent = 'Salvato';
+    feedback.textContent = t('settings.saved');
     setTimeout(() => {
       feedback.textContent = '';
     }, 2000);
   } else {
-    feedback.textContent = 'Errore validazione';
+    feedback.textContent = t('settings.validation_error');
     feedback.style.color = 'rgba(255, 80, 80, 0.8)';
     setTimeout(() => {
       feedback.textContent = '';
@@ -50,62 +50,66 @@ document.getElementById('btnReset').addEventListener('click', () => {
     wallpaper: ['wallpaper'],
     sidebar: ['sidebar'],
     notifiche: ['notifications'],
-    ui: ['ui'],
+    ui: ['ui', 'language'],
     avanzate: ['engine'],
   };
   const sections = sectionMap[activeTab] || [];
   for (const key of sections) {
-    config[key] = JSON.parse(JSON.stringify(defaults[key]));
+    if (key === 'language') {
+      config.language = defaults.language;
+    } else {
+      config[key] = JSON.parse(JSON.stringify(defaults[key]));
+    }
   }
   renderTab();
 });
 
 // Section renderers
 function renderGenerale() {
-  const group = createFieldGroup('Sincronizzazione');
+  const group = createFieldGroup(t('settings.sync_group'));
   group.append(
     createField(
-      'Intervallo sync',
+      t('settings.sync_interval'),
       createNumberInput(config.sync.interval_minutes, { min: 1, max: 60 }, (v) => {
         config.sync.interval_minutes = v;
       }),
-      'Minuti tra ogni sincronizzazione',
+      t('settings.sync_interval_hint'),
     ),
     createField(
-      'Finestra lookahead',
+      t('settings.lookahead_window'),
       createNumberInput(config.sync.lookahead_hours, { min: 1, max: 720 }, (v) => {
         config.sync.lookahead_hours = v;
       }),
-      'Ore nel futuro da considerare',
+      t('settings.lookahead_hint'),
     ),
   );
   return [group];
 }
 
 function renderSorgenti() {
-  const gcal = createFieldGroup('Google Calendar');
+  const gcal = createFieldGroup(t('sidebar.google_calendar'));
   gcal.append(
     createField(
-      'Abilitato',
+      t('common.enabled'),
       createToggle(config.sources.google_calendar.enabled, (v) => {
         config.sources.google_calendar.enabled = v;
       }),
     ),
     createField(
-      'Calendari',
+      t('settings.calendars'),
       createTagInput(
         config.sources.google_calendar.calendars,
-        { placeholder: 'ID calendario...' },
+        { placeholder: t('settings.calendar_id_placeholder') },
         (v) => {
           config.sources.google_calendar.calendars = v;
         },
       ),
     ),
     createField(
-      'Keyword priorità',
+      t('settings.priority_keywords'),
       createTagInput(
         config.sources.google_calendar.priority_keywords,
-        { placeholder: 'Keyword...' },
+        { placeholder: t('settings.keyword_placeholder') },
         (v) => {
           config.sources.google_calendar.priority_keywords = v;
         },
@@ -113,19 +117,23 @@ function renderSorgenti() {
     ),
   );
 
-  const jira = createFieldGroup('Jira');
+  const jira = createFieldGroup(t('sidebar.jira'));
   jira.append(
     createField(
-      'Abilitato',
+      t('common.enabled'),
       createToggle(config.sources.jira.enabled, (v) => {
         config.sources.jira.enabled = v;
       }),
     ),
     createField(
-      'JQL',
-      createTextInput(config.sources.jira.jql, { placeholder: 'JQL query...' }, (v) => {
-        config.sources.jira.jql = v;
-      }),
+      t('settings.jql'),
+      createTextInput(
+        config.sources.jira.jql,
+        { placeholder: t('settings.jql_placeholder') },
+        (v) => {
+          config.sources.jira.jql = v;
+        },
+      ),
     ),
   );
 
@@ -138,10 +146,10 @@ function renderSorgenti() {
     header.className = 'instance-header';
     const title = document.createElement('span');
     title.className = 'instance-title';
-    title.textContent = `Istanza ${i + 1}`;
+    title.textContent = t('settings.instance_n', { n: i + 1 });
     const removeBtn = document.createElement('button');
     removeBtn.className = 'btn btn--danger';
-    removeBtn.textContent = 'Rimuovi';
+    removeBtn.textContent = t('common.remove');
     removeBtn.addEventListener('click', () => {
       instances.splice(i, 1);
       renderTab();
@@ -150,19 +158,19 @@ function renderSorgenti() {
     card.appendChild(header);
     card.append(
       createField(
-        'Domain',
+        t('settings.jira_domain'),
         createTextInput(instances[i].domain, {}, (v) => {
           instances[i].domain = v;
         }),
       ),
       createField(
-        'Email',
+        t('settings.jira_email'),
         createTextInput(instances[i].email, {}, (v) => {
           instances[i].email = v;
         }),
       ),
       createField(
-        'API Token',
+        t('settings.jira_api_token'),
         createTextInput(instances[i].api_token, {}, (v) => {
           instances[i].api_token = v;
         }),
@@ -173,7 +181,7 @@ function renderSorgenti() {
 
   const addBtn = document.createElement('button');
   addBtn.className = 'btn btn--secondary btn--small';
-  addBtn.textContent = '+ Aggiungi istanza';
+  addBtn.textContent = t('settings.add_instance');
   addBtn.addEventListener('click', () => {
     if (!config.sources.jira.instances) {
       config.sources.jira.instances = [];
@@ -187,36 +195,40 @@ function renderSorgenti() {
 }
 
 function renderAI() {
-  const group = createFieldGroup('AI Scoring');
+  const group = createFieldGroup(t('settings.ai_scoring'));
   group.append(
     createField(
-      'Abilitato',
+      t('common.enabled'),
       createToggle(config.ai.enabled, (v) => {
         config.ai.enabled = v;
       }),
     ),
     createField(
-      'Priorità provider',
+      t('settings.provider_priority'),
       createPriorityList(config.ai.provider_priority, (v) => {
         config.ai.provider_priority = v;
       }),
     ),
     createField(
-      'Ricalcolo ogni',
+      t('settings.recalc_every'),
       createNumberInput(config.ai.recalc_hours, { min: 1, max: 24 }, (v) => {
         config.ai.recalc_hours = v;
       }),
-      'Ore',
+      t('settings.hours'),
     ),
     createField(
-      'Timeout',
-      createNumberInput(config.ai.timeout_ms, { min: 1000, max: 30000, step: 1000 }, (v) => {
-        config.ai.timeout_ms = v;
-      }),
-      'Millisecondi',
+      t('settings.timeout'),
+      createNumberInput(
+        config.ai.provider_timeout_ms,
+        { min: 1000, max: 30000, step: 1000 },
+        (v) => {
+          config.ai.provider_timeout_ms = v;
+        },
+      ),
+      t('settings.milliseconds'),
     ),
     createField(
-      'Temperature',
+      t('settings.temperature'),
       createRangeWithValue(config.ai.temperature, { min: 0, max: 1, step: 0.05 }, (v) => {
         config.ai.temperature = v;
       }),
@@ -226,16 +238,16 @@ function renderAI() {
 }
 
 function renderWallpaper() {
-  const group = createFieldGroup('Wallpaper');
+  const group = createFieldGroup(t('settings.tabs.wallpaper'));
   group.append(
     createField(
-      'Abilitato',
+      t('common.enabled'),
       createToggle(config.wallpaper.enabled, (v) => {
         config.wallpaper.enabled = v;
       }),
     ),
     createField(
-      'Delta minimo score',
+      t('settings.min_score_delta'),
       createRangeWithValue(
         config.wallpaper.min_score_delta,
         { min: 0, max: 0.5, step: 0.01 },
@@ -243,27 +255,27 @@ function renderWallpaper() {
           config.wallpaper.min_score_delta = v;
         },
       ),
-      'Cambio minimo per aggiornare wallpaper',
+      t('settings.min_score_delta_hint'),
     ),
     createField(
-      'Mostra testo',
+      t('settings.show_text'),
       createToggle(config.wallpaper.show_text, (v) => {
         config.wallpaper.show_text = v;
       }),
     ),
     createField(
-      'Sfondi fotografici',
+      t('settings.photo_backgrounds'),
       createToggle(config.wallpaper.use_backgrounds, (v) => {
         config.wallpaper.use_backgrounds = v;
       }),
     ),
     createField(
-      'Risoluzione',
+      t('settings.resolution'),
       createSelect(
         config.wallpaper.resolution === 'auto' ? 'auto' : 'custom',
         [
-          { value: 'auto', label: 'Automatica' },
-          { value: 'custom', label: 'Personalizzata' },
+          { value: 'auto', label: t('settings.auto') },
+          { value: 'custom', label: t('settings.custom') },
         ],
         (v) => {
           if (v === 'auto') {
@@ -278,7 +290,7 @@ function renderWallpaper() {
   if (config.wallpaper.resolution !== 'auto') {
     group.appendChild(
       createField(
-        'Risoluzione custom',
+        t('settings.custom_resolution'),
         createTextInput(config.wallpaper.resolution, { placeholder: '1920x1080' }, (v) => {
           config.wallpaper.resolution = v;
         }),
@@ -286,16 +298,16 @@ function renderWallpaper() {
     );
   }
 
-  const postit = createFieldGroup('Post-it');
+  const postit = createFieldGroup(t('settings.postit'));
   postit.append(
     createField(
-      'Abilitati',
+      t('settings.postit_enabled'),
       createToggle(config.wallpaper.postit.enabled, (v) => {
         config.wallpaper.postit.enabled = v;
       }),
     ),
     createField(
-      'Max per display',
+      t('settings.max_per_display'),
       createNumberInput(config.wallpaper.postit.max_per_display, { min: 1, max: 20 }, (v) => {
         config.wallpaper.postit.max_per_display = v;
       }),
@@ -305,15 +317,15 @@ function renderWallpaper() {
 }
 
 function renderSidebar() {
-  const group = createFieldGroup('Sidebar');
+  const group = createFieldGroup(t('settings.tabs.sidebar'));
   group.append(
     createField(
-      'Posizione',
+      t('settings.position'),
       createSelect(
         config.sidebar.position,
         [
-          { value: 'left', label: 'Sinistra' },
-          { value: 'right', label: 'Destra' },
+          { value: 'left', label: t('settings.left') },
+          { value: 'right', label: t('settings.right') },
         ],
         (v) => {
           config.sidebar.position = v;
@@ -321,14 +333,14 @@ function renderSidebar() {
       ),
     ),
     createField(
-      'Larghezza',
+      t('settings.width'),
       createNumberInput(config.sidebar.width, { min: 200, max: 400 }, (v) => {
         config.sidebar.width = v;
       }),
-      'Pixel',
+      t('settings.pixels'),
     ),
     createField(
-      'Opacità',
+      t('settings.opacity'),
       createRangeWithValue(config.sidebar.opacity, { min: 0.1, max: 1, step: 0.05 }, (v) => {
         config.sidebar.opacity = v;
       }),
@@ -338,16 +350,16 @@ function renderSidebar() {
 }
 
 function renderNotifiche() {
-  const group = createFieldGroup('Notifiche');
+  const group = createFieldGroup(t('settings.notifications_group'));
   group.append(
     createField(
-      'Abilitate',
+      t('settings.notifications_enabled'),
       createToggle(config.notifications.enabled, (v) => {
         config.notifications.enabled = v;
       }),
     ),
     createField(
-      'Soglia score',
+      t('settings.score_threshold'),
       createRangeWithValue(
         config.notifications.threshold_score,
         { min: 0, max: 1, step: 0.05 },
@@ -355,43 +367,57 @@ function renderNotifiche() {
           config.notifications.threshold_score = v;
         },
       ),
-      'Score minimo per notifica',
+      t('settings.score_threshold_hint'),
     ),
     createField(
-      'Cooldown',
+      t('settings.cooldown'),
       createNumberInput(config.notifications.cooldown_minutes, { min: 1, max: 1440 }, (v) => {
         config.notifications.cooldown_minutes = v;
       }),
-      'Minuti tra notifiche',
+      t('settings.cooldown_hint'),
     ),
   );
   return [group];
 }
 
 function renderUI() {
-  const group = createFieldGroup('Interfaccia');
+  const group = createFieldGroup(t('settings.ui_group'));
   group.append(
     createField(
-      'Max task visibili',
+      t('settings.language'),
+      createSelect(
+        config.language || 'it',
+        [
+          { value: 'it', label: 'Italiano' },
+          { value: 'en', label: 'English' },
+        ],
+        (v) => {
+          config.language = v;
+        },
+      ),
+      t('settings.language_hint'),
+    ),
+    createField(
+      t('settings.max_tasks_shown'),
       createNumberInput(config.ui.max_tasks_shown, { min: 1, max: 20 }, (v) => {
         config.ui.max_tasks_shown = v;
       }),
     ),
     createField(
-      'Badge sorgente',
+      t('settings.source_badge'),
       createToggle(config.ui.show_source_badge, (v) => {
         config.ui.show_source_badge = v;
       }),
-      'Mostra icona Google/Jira',
+      t('settings.source_badge_hint'),
     ),
     createField(
-      'Formato countdown',
+      t('settings.countdown_format'),
       createSelect(
         config.ui.countdown_format,
         [
-          { value: 'relative', label: 'Relativo (tra 2h)' },
-          { value: 'absolute', label: 'Assoluto (15:30)' },
-          { value: 'both', label: 'Entrambi' },
+          { value: 'relative', label: t('settings.relative') },
+          { value: 'absolute', label: t('settings.absolute') },
+          { value: 'both', label: t('settings.both') },
         ],
         (v) => {
           config.ui.countdown_format = v;
@@ -403,23 +429,28 @@ function renderUI() {
 }
 
 function renderAvanzate() {
-  const group = createFieldGroup('Engine');
+  const group = createFieldGroup(t('settings.engine'));
   group.append(
     createField(
-      'Costante K',
+      t('settings.k_constant'),
       createRangeWithValue(config.engine.k_constant, { min: 0.01, max: 1, step: 0.01 }, (v) => {
         config.engine.k_constant = v;
       }),
-      'Fattore decadimento urgenza',
+      t('settings.k_constant_hint'),
     ),
   );
 
   const weights = config.engine.priority_weights;
-  const labels = ['Critico', 'Alto', 'Medio', 'Basso'];
+  const labelKeys = [
+    'priorities.critical',
+    'priorities.high',
+    'priorities.medium',
+    'priorities.low',
+  ];
   for (let i = 0; i < 4; i++) {
     group.appendChild(
       createField(
-        `Peso ${labels[i]}`,
+        t('settings.weight_label', { label: t(labelKeys[i]) }),
         createNumberInput(weights[i], { min: 0, max: 5, step: 0.1 }, (v) => {
           config.engine.priority_weights[i] = v;
         }),
@@ -450,6 +481,7 @@ function renderTab() {
 
 // Init
 (async () => {
+  await initI18n(settingsApi);
   config = await settingsApi.getConfig();
   defaults = await settingsApi.getDefaults();
   renderTab();

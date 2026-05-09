@@ -39,6 +39,10 @@ store/              — SQLite init, migrations, query helpers
 store/pinned-queries.js — CRUD pinned tasks (pin/unpin, posizioni, query per display)
 store/local-queries.js  — CRUD task locali (source='local', no sync esterno)
 config/             — Defaults e schema Zod
+i18n/               — Internazionalizzazione (modulo CJS + locale JSON)
+i18n/index.js       — t(), setLanguage(), getTranslations() per main process
+i18n/locales/       — File traduzione (it.json, en.json)
+renderer/i18n-renderer.js — t() globale per renderer (browser context)
 renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
 renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
 assets/backgrounds/ — 5 immagini sfondo mappate su bande urgenza
@@ -60,6 +64,9 @@ test/               — Mirror struttura src/
 - Preload separato per overlay (principio minimo privilegio)
 - Task locali (source='local'): CRUD dalla sidebar, no sync esterno, pinnabili come post-it
 - Task locali non diventano stale e non hanno lookahead limit (come Jira)
+- i18n: bilingue IT/EN via config `language`, traduzioni JSON in `i18n/locales/`, `t()` con dot-notation e interpolazione `{placeholder}`
+- Renderer i18n: `i18n-renderer.js` carica traduzioni via IPC, espone `t()` globale + `translateDom()` per attributi `data-i18n`
+- Core i18n: `require('../i18n').t` diretto nel main process
 
 ## Configurazione
 

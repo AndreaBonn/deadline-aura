@@ -33,19 +33,39 @@
       <div class="divider"></div>
 
       <div class="tasks-container" id="tasksContainer">
-        <div class="empty-state">Nessun task in arrivo</div>
+        <div class="empty-state" data-i18n="sidebar.no_tasks">Nessun task in arrivo</div>
       </div>
 
       <div class="sidebar-footer">
-        <button class="footer-btn" id="btnConfig" title="Config">&#9881;</button>
-        <button class="footer-btn footer-btn--text" id="btnLayout" title="Layout">Layout</button>
+        <button class="footer-btn" id="btnConfig" data-i18n-title="common.config" title="Config">
+          &#9881;
+        </button>
+        <button
+          class="footer-btn footer-btn--text"
+          id="btnLayout"
+          data-i18n-title="common.layout"
+          data-i18n="common.layout"
+          title="Layout"
+        >
+          Layout
+        </button>
         <span class="footer-spacer"></span>
         <span class="sync-status" id="syncStatus">--</span>
-        <button class="footer-btn" id="btnSync" title="Sync">&#8635;</button>
-        <button class="footer-btn footer-btn--close" id="btnClose" title="Chiudi">&#10005;</button>
+        <button class="footer-btn" id="btnSync" data-i18n-title="common.sync" title="Sync">
+          &#8635;
+        </button>
+        <button
+          class="footer-btn footer-btn--close"
+          id="btnClose"
+          data-i18n-title="common.close"
+          title="Chiudi"
+        >
+          &#10005;
+        </button>
       </div>
     </div>
 
+    <script src="i18n-renderer.js"></script>
     <script src="sidebar-utils.js"></script>
     <script src="sidebar.js"></script>
   </body>

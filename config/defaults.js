@@ -1,6 +1,7 @@
 'use strict';
 
 const DEFAULTS = {
+  language: 'it',
   sync: {
     interval_minutes: 5,
     lookahead_hours: 72,

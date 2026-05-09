@@ -1,17 +1,33 @@
 'use strict';
 
+/* global t */
+// i18n: use global t() in browser, require module in Node.js (tests)
+function _getTranslator() {
+  if (typeof t === 'function') {
+    return t;
+  }
+  if (typeof module !== 'undefined') {
+    return require('../i18n').t;
+  }
+  return function (key) {
+    return key;
+  };
+}
+
+var _t = _getTranslator();
+
 /**
- * Formats a remaining-hours value into a human-readable Italian countdown string.
+ * Formats a remaining-hours value into a human-readable countdown string.
  *
  * @param {number|null} hoursRemaining - Hours until the deadline, or null if no due date.
- * @returns {string} Formatted string: '', 'scaduto', '30m', '2h 15m', 'domani', '3 giorni'.
+ * @returns {string} Formatted string: '', 'scaduto'/'expired', '30m', '2h 15m', etc.
  */
 function formatCountdown(hoursRemaining) {
   if (hoursRemaining === null) {
     return '';
   }
   if (hoursRemaining < 0) {
-    return 'scaduto';
+    return _t('countdown.expired');
   }
   if (hoursRemaining < 1) {
     return `${Math.round(hoursRemaining * 60)}m`;
@@ -22,9 +38,9 @@ function formatCountdown(hoursRemaining) {
     return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
   }
   if (hoursRemaining < 48) {
-    return 'domani';
+    return _t('countdown.tomorrow');
   }
-  return `${Math.round(hoursRemaining / 24)} giorni`;
+  return `${Math.round(hoursRemaining / 24)} ${_t('countdown.days')}`;
 }
 
 /**

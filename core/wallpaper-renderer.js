@@ -1,6 +1,7 @@
 'use strict';
 
 const { createCanvas, loadImage } = require('canvas');
+const { t } = require('../i18n');
 const fs = require('fs');
 const path = require('path');
 const { renderPostits } = require('./postit-renderer');
@@ -22,6 +23,7 @@ function truncateText(ctx, text, maxWidth) {
 
 const SUPPORTED_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
 
+// Filesystem filenames — NOT translatable (map to assets/backgrounds/{name}.png)
 const BAND_NAMES = [
   { max: 0.2, name: 'calmo' },
   { max: 0.4, name: 'normale' },
@@ -169,7 +171,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.letterSpacing = '2px';
-  ctx.fillText('PROSSIME 24H', startX, startY);
+  ctx.fillText(t('wallpaper.next_24h'), startX, startY);
 
   // Separator line
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.40)';
@@ -195,7 +197,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
 
     // Source badge
     const badgeX = startX + 52;
-    const badgeLabel = ev.source === 'gcal' ? 'CAL' : 'JIRA';
+    const badgeLabel = ev.source === 'gcal' ? t('wallpaper.cal_badge') : t('wallpaper.jira_badge');
     const badgeColor = ev.source === 'gcal' ? 'rgba(66, 133, 244, 0.5)' : 'rgba(255, 152, 0, 0.5)';
 
     ctx.fillStyle = badgeColor;
@@ -219,7 +221,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
     const y = startY + 28 + maxItems * lineHeight;
     ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
     ctx.font = '400 11px "Ubuntu", system-ui, sans-serif';
-    ctx.fillText(`+ ${todayEvents.length - maxItems} altri`, startX, y);
+    ctx.fillText(t('wallpaper.others', { n: todayEvents.length - maxItems }), startX, y);
   }
 }
 
@@ -244,7 +246,7 @@ function drawMentalLoad(ctx, engineResult, region) {
   const pctWidth = ctx.measureText(`${pct}%`).width;
   ctx.font = '400 16px "Ubuntu", system-ui, sans-serif';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.fillText('carico mentale', region.x + margin + pctWidth + 12, y - 5);
+  ctx.fillText(t('wallpaper.mental_load'), region.x + margin + pctWidth + 12, y - 5);
 }
 
 async function render({ displays, palette, score, engineResult, pinnedByDisplay, calendarEvents }) {

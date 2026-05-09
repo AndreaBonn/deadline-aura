@@ -1,5 +1,7 @@
 'use strict';
 
+/* global t, _i18nReady, initI18n, formatCountdown, urgencyToColor */
+
 const COLLAPSED_LIMIT = 5;
 let jiraFilter = '';
 let lastTasks = null;
@@ -12,8 +14,10 @@ function updateClock() {
   const m = String(now.getMinutes()).padStart(2, '0');
   document.getElementById('clock').textContent = `${h}:${m}`;
 
+  const rawLocale = _i18nReady ? t('meta.dateLocale') : 'it-IT';
+  const locale = rawLocale.includes('-') ? rawLocale : 'it-IT';
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  document.getElementById('clockDate').textContent = now.toLocaleDateString('it-IT', options);
+  document.getElementById('clockDate').textContent = now.toLocaleDateString(locale, options);
 }
 
 function renderUrgencyBar(globalScore, palette) {
@@ -30,8 +34,8 @@ function filterJiraTasks(tasks) {
     return tasks;
   }
   const query = jiraFilter.toLowerCase();
-  return tasks.filter(function (t) {
-    return t.title.toLowerCase().includes(query);
+  return tasks.filter(function (task) {
+    return task.title.toLowerCase().includes(query);
   });
 }
 
@@ -48,29 +52,29 @@ function renderTaskList(tasks, palette) {
   lastPalette = palette;
 
   if (!tasks || tasks.length === 0) {
-    container.innerHTML = '<div class="empty-state">Nessun task in arrivo</div>';
+    container.innerHTML = '<div class="empty-state">' + t('sidebar.no_tasks') + '</div>';
     return;
   }
 
   const gcalTasks = tasks
-    .filter(function (t) {
-      return t.source === 'gcal';
+    .filter(function (task) {
+      return task.source === 'gcal';
     })
     .sort(function (a, b) {
       return (a.due_at || 0) - (b.due_at || 0);
     });
   const jiraTasks = filterJiraTasks(
-    tasks.filter(function (t) {
-      return t.source === 'jira';
+    tasks.filter(function (task) {
+      return task.source === 'jira';
     }),
   );
-  const localTasks = tasks.filter(function (t) {
-    return t.source === 'local';
+  const localTasks = tasks.filter(function (task) {
+    return task.source === 'local';
   });
 
   renderLocalSection(container, localTasks, palette);
   if (gcalTasks.length > 0) {
-    renderSection(container, 'Google Calendar', gcalTasks, palette, 'gcal');
+    renderSection(container, t('sidebar.google_calendar'), gcalTasks, palette, 'gcal');
   }
   if (jiraTasks.length > 0 || jiraFilter) {
     renderJiraSection(container, jiraTasks, palette);
@@ -137,7 +141,7 @@ function createEditForm(task) {
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'quick-add-save';
-  saveBtn.textContent = 'Salva';
+  saveBtn.textContent = t('common.save');
   saveBtn.addEventListener('click', function () {
     const title = titleInput.value.trim();
     if (!title) {
@@ -158,7 +162,7 @@ function createEditForm(task) {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'local-action-btn';
   cancelBtn.textContent = '\u2715';
-  cancelBtn.title = 'Annulla';
+  cancelBtn.title = t('common.cancel');
   cancelBtn.addEventListener('click', function () {
     editingTaskId = null;
     renderTaskList(lastTasks, lastPalette);
@@ -248,7 +252,7 @@ function createTaskCard(task) {
     const doneBtn = document.createElement('button');
     doneBtn.className = 'local-action-btn done-btn';
     doneBtn.textContent = '\u2713';
-    doneBtn.title = 'Completa';
+    doneBtn.title = t('sidebar.complete');
     doneBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       window.deadlineAura.completeLocalTask(task.id);
@@ -258,7 +262,7 @@ function createTaskCard(task) {
     const editBtn = document.createElement('button');
     editBtn.className = 'local-action-btn edit-btn';
     editBtn.textContent = '✏';
-    editBtn.title = 'Modifica';
+    editBtn.title = t('common.edit');
     editBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       editingTaskId = task.id;
@@ -269,7 +273,7 @@ function createTaskCard(task) {
     const delBtn = document.createElement('button');
     delBtn.className = 'local-action-btn del-btn';
     delBtn.textContent = '\u2715';
-    delBtn.title = 'Elimina';
+    delBtn.title = t('common.delete');
     delBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       window.deadlineAura.deleteLocalTask(task.id);
@@ -285,7 +289,7 @@ function createTaskCard(task) {
     const isPinned = pinnedTaskIds.has(task.id);
     pinBtn.className = 'pin-btn' + (isPinned ? ' pinned' : '');
     pinBtn.textContent = isPinned ? '✕' : '📌';
-    pinBtn.title = isPinned ? 'Rimuovi dal desktop' : 'Appunta sul desktop';
+    pinBtn.title = isPinned ? t('sidebar.unpin_from_desktop') : t('sidebar.pin_to_desktop');
     pinBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       if (isPinned) {
@@ -326,8 +330,8 @@ function renderSection(container, title, tasks, _palette, sectionId) {
     const expandBtn = document.createElement('button');
     expandBtn.className = 'expand-btn';
     expandBtn.textContent = isExpanded
-      ? 'Mostra meno'
-      : `Mostra tutti (${tasks.length - COLLAPSED_LIMIT} altri)`;
+      ? t('sidebar.show_less')
+      : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset['expanded_' + sectionId] = isExpanded ? '0' : '1';
       renderTaskList(lastTasks, lastPalette);
@@ -339,7 +343,7 @@ function renderSection(container, title, tasks, _palette, sectionId) {
 function renderJiraSection(container, tasks, _palette) {
   const label = document.createElement('div');
   label.className = 'section-label';
-  label.textContent = 'Jira';
+  label.textContent = t('sidebar.jira');
   if (tasks.length > 0) {
     const count = document.createElement('span');
     count.className = 'section-count';
@@ -353,7 +357,7 @@ function renderJiraSection(container, tasks, _palette) {
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.className = 'jira-search';
-  searchInput.placeholder = 'Filtra per codice o titolo...';
+  searchInput.placeholder = t('sidebar.filter_placeholder');
   searchInput.value = jiraFilter;
   searchInput.addEventListener('input', function () {
     jiraFilter = searchInput.value;
@@ -365,7 +369,7 @@ function renderJiraSection(container, tasks, _palette) {
   if (tasks.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = jiraFilter ? 'Nessun risultato' : 'Nessun task Jira';
+    empty.textContent = jiraFilter ? t('sidebar.no_results') : t('sidebar.no_jira_tasks');
     container.appendChild(empty);
     return;
   }
@@ -381,8 +385,8 @@ function renderJiraSection(container, tasks, _palette) {
     const expandBtn = document.createElement('button');
     expandBtn.className = 'expand-btn';
     expandBtn.textContent = isExpanded
-      ? 'Mostra meno'
-      : `Mostra tutti (${tasks.length - COLLAPSED_LIMIT} altri)`;
+      ? t('sidebar.show_less')
+      : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset.expanded_jira = isExpanded ? '0' : '1';
       renderTaskList(lastTasks, lastPalette);
@@ -397,7 +401,7 @@ let editingTaskId = null;
 function renderLocalSection(container, tasks, _palette) {
   const label = document.createElement('div');
   label.className = 'section-label';
-  label.textContent = 'Personali';
+  label.textContent = t('sidebar.local');
   if (tasks.length > 0) {
     const count = document.createElement('span');
     count.className = 'section-count';
@@ -408,7 +412,7 @@ function renderLocalSection(container, tasks, _palette) {
   const addToggle = document.createElement('button');
   addToggle.className = 'local-add-toggle';
   addToggle.textContent = addFormVisible ? '\u2212' : '+';
-  addToggle.title = 'Nuovo task';
+  addToggle.title = t('sidebar.new_task');
   addToggle.addEventListener('click', function () {
     addFormVisible = !addFormVisible;
     renderTaskList(lastTasks, lastPalette);
@@ -423,7 +427,7 @@ function renderLocalSection(container, tasks, _palette) {
   if (tasks.length === 0 && !addFormVisible) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = 'Nessun task personale';
+    empty.textContent = t('sidebar.no_local_tasks');
     container.appendChild(empty);
     return;
   }
@@ -439,8 +443,8 @@ function renderLocalSection(container, tasks, _palette) {
     const expandBtn = document.createElement('button');
     expandBtn.className = 'expand-btn';
     expandBtn.textContent = isExpanded
-      ? 'Mostra meno'
-      : `Mostra tutti (${tasks.length - COLLAPSED_LIMIT} altri)`;
+      ? t('sidebar.show_less')
+      : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset.expanded_local = isExpanded ? '0' : '1';
       renderTaskList(lastTasks, lastPalette);
@@ -456,7 +460,7 @@ function createQuickAddForm() {
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
   titleInput.className = 'quick-add-input';
-  titleInput.placeholder = 'Titolo task...';
+  titleInput.placeholder = t('sidebar.task_title_placeholder');
   titleInput.id = 'quickAddTitle';
 
   const row = document.createElement('div');
@@ -471,10 +475,10 @@ function createQuickAddForm() {
   prioritySelect.className = 'quick-add-priority';
   prioritySelect.id = 'quickAddPriority';
   const priorities = [
-    { value: '1', label: 'P1 - Critico' },
-    { value: '2', label: 'P2 - Alto' },
-    { value: '3', label: 'P3 - Medio' },
-    { value: '4', label: 'P4 - Basso' },
+    { value: '1', label: t('priorities.p1_full') },
+    { value: '2', label: t('priorities.p2_full') },
+    { value: '3', label: t('priorities.p3_full') },
+    { value: '4', label: t('priorities.p4_full') },
   ];
   for (let i = 0; i < priorities.length; i++) {
     const opt = document.createElement('option');
@@ -488,7 +492,7 @@ function createQuickAddForm() {
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'quick-add-save';
-  saveBtn.textContent = 'Aggiungi';
+  saveBtn.textContent = t('common.add');
   saveBtn.addEventListener('click', function () {
     const title = titleInput.value.trim();
     if (!title) {
@@ -526,7 +530,7 @@ setInterval(updateClock, 1000);
 
 document.getElementById('btnSync').addEventListener('click', function () {
   window.deadlineAura.syncNow();
-  document.getElementById('syncStatus').textContent = 'sync...';
+  document.getElementById('syncStatus').textContent = t('sidebar.syncing');
 });
 
 document.getElementById('btnConfig').addEventListener('click', function () {
@@ -574,6 +578,8 @@ function renderStressForecast(dailyBreakdown) {
 
   const days = dailyBreakdown.slice(0, 5);
   const todayStr = new Date().toISOString().slice(0, 10);
+  const rawLocale = _i18nReady ? t('meta.dateLocale') : 'it-IT';
+  const locale = rawLocale.includes('-') ? rawLocale : 'it-IT';
 
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
@@ -585,10 +591,10 @@ function renderStressForecast(dailyBreakdown) {
     value.textContent = day.stress;
     value.style.color = stressToColor(day.stress);
 
-    const label = document.createElement('div');
-    label.className = 'forecast-label';
+    const labelEl = document.createElement('div');
+    labelEl.className = 'forecast-label';
     const dateObj = new Date(day.date + 'T00:00:00');
-    label.textContent = dateObj.toLocaleDateString('it-IT', { weekday: 'short' }).slice(0, 3);
+    labelEl.textContent = dateObj.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 3);
 
     if (day.date === todayStr) {
       col.classList.add('forecast-today');
@@ -599,10 +605,13 @@ function renderStressForecast(dailyBreakdown) {
     }
 
     col.appendChild(value);
-    col.appendChild(label);
+    col.appendChild(labelEl);
     container.appendChild(col);
   }
 }
+
+// Init i18n before first render
+initI18n(window.deadlineAura);
 
 window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);
@@ -610,5 +619,5 @@ window.deadlineAura.onUpdate(function (data) {
   renderClinicalNote(data.clinicalNote);
   renderStressForecast(data.stressForecast);
   renderTaskList(data.engineResult.tasks, data.palette);
-  document.getElementById('syncStatus').textContent = 'aggiornato';
+  document.getElementById('syncStatus').textContent = t('sidebar.updated');
 });

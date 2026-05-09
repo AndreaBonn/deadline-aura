@@ -17,7 +17,9 @@ const notifier = require('./core/notifier');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
+const i18n = require('./i18n');
 let config = loadConfig();
+i18n.setLanguage(config.language || 'it');
 
 let settingsWindow = null;
 let overlayWindow = null;
@@ -479,6 +481,8 @@ app.whenReady().then(() => {
   ipcMain.on('open-config', () => {
     openSettingsWindow();
   });
+
+  ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
 
   ipcMain.handle('settings:get-config', () => config);
   ipcMain.handle('settings:get-defaults', () => DEFAULTS);

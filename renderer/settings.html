@@ -11,32 +11,47 @@
   </head>
   <body>
     <div class="titlebar">
-      <span class="titlebar-title">Impostazioni</span>
+      <span class="titlebar-title" data-i18n="settings.title">Impostazioni</span>
       <button class="titlebar-close" id="btnClose">&#10005;</button>
     </div>
 
     <div class="settings-layout">
       <nav class="settings-nav" id="settingsNav">
-        <button class="nav-item active" data-tab="generale">Generale</button>
-        <button class="nav-item" data-tab="sorgenti">Sorgenti</button>
-        <button class="nav-item" data-tab="ai">AI</button>
-        <button class="nav-item" data-tab="wallpaper">Wallpaper</button>
-        <button class="nav-item" data-tab="sidebar">Sidebar</button>
-        <button class="nav-item" data-tab="notifiche">Notifiche</button>
-        <button class="nav-item" data-tab="ui">Interfaccia</button>
-        <button class="nav-item" data-tab="avanzate">Avanzate</button>
+        <button class="nav-item active" data-tab="generale" data-i18n="settings.tabs.general">
+          Generale
+        </button>
+        <button class="nav-item" data-tab="sorgenti" data-i18n="settings.tabs.sources">
+          Sorgenti
+        </button>
+        <button class="nav-item" data-tab="ai" data-i18n="settings.tabs.ai">AI</button>
+        <button class="nav-item" data-tab="wallpaper" data-i18n="settings.tabs.wallpaper">
+          Wallpaper
+        </button>
+        <button class="nav-item" data-tab="sidebar" data-i18n="settings.tabs.sidebar">
+          Sidebar
+        </button>
+        <button class="nav-item" data-tab="notifiche" data-i18n="settings.tabs.notifications">
+          Notifiche
+        </button>
+        <button class="nav-item" data-tab="ui" data-i18n="settings.tabs.ui">Interfaccia</button>
+        <button class="nav-item" data-tab="avanzate" data-i18n="settings.tabs.advanced">
+          Avanzate
+        </button>
       </nav>
 
       <main class="settings-content" id="settingsContent"></main>
     </div>
 
     <div class="settings-actions">
-      <button class="btn btn--secondary" id="btnReset">Reset sezione</button>
+      <button class="btn btn--secondary" id="btnReset" data-i18n="settings.reset_section">
+        Reset sezione
+      </button>
       <div class="actions-spacer"></div>
       <span class="save-feedback" id="saveFeedback"></span>
-      <button class="btn btn--primary" id="btnSave">Salva</button>
+      <button class="btn btn--primary" id="btnSave" data-i18n="common.save">Salva</button>
     </div>
 
+    <script src="i18n-renderer.js"></script>
     <script src="settings-fields.js"></script>
     <script src="settings.js"></script>
   </body>

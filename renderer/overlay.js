@@ -1,5 +1,7 @@
 'use strict';
 
+/* global t, initI18n */
+
 let pinnedTasks = [];
 let currentDisplayId = 'default';
 let dragState = null;
@@ -10,7 +12,7 @@ function formatCountdown(dueAt) {
   }
   const hoursRemaining = (dueAt - Date.now()) / 3600000;
   if (hoursRemaining < 0) {
-    return 'scaduto';
+    return t('countdown.expired');
   }
   if (hoursRemaining < 1) {
     return Math.round(hoursRemaining * 60) + 'm';
@@ -18,7 +20,7 @@ function formatCountdown(dueAt) {
   if (hoursRemaining < 24) {
     return Math.floor(hoursRemaining) + 'h';
   }
-  return Math.round(hoursRemaining / 24) + 'g';
+  return Math.round(hoursRemaining / 24) + t('countdown.days_short');
 }
 
 function extractCode(taskId) {
@@ -158,6 +160,9 @@ document.getElementById('btnCancel').addEventListener('click', function () {
   window.overlayApi.cancel();
 });
 
-window.overlayApi.onInit(function (data) {
-  init(data);
+// Init i18n before registering overlay data handler to avoid race condition
+initI18n(window.overlayApi).then(function () {
+  window.overlayApi.onInit(function (data) {
+    init(data);
+  });
 });
