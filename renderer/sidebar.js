@@ -541,6 +541,28 @@ document.getElementById('btnLayout').addEventListener('click', function () {
   window.deadlineAura.openOverlay();
 });
 
+// Toggle AI notes panel on urgency bar click
+(function initAiNotesToggle() {
+  const urgencySection = document.querySelector('.urgency-section');
+  const aiPanel = document.getElementById('aiNotesPanel');
+  if (!urgencySection || !aiPanel) {
+    return;
+  }
+
+  const indicator = document.createElement('span');
+  indicator.className = 'toggle-indicator';
+  indicator.textContent = '▼';
+  const urgencyLabel = document.getElementById('urgencyLabel');
+  if (urgencyLabel) {
+    urgencyLabel.appendChild(indicator);
+  }
+
+  urgencySection.addEventListener('click', function () {
+    const isExpanded = aiPanel.classList.toggle('expanded');
+    urgencySection.classList.toggle('expanded', isExpanded);
+  });
+})();
+
 document.getElementById('btnClose').addEventListener('click', function () {
   window.deadlineAura.toggleSidebar();
 });
@@ -554,7 +576,7 @@ function renderClinicalNote(note) {
     el.style.display = 'none';
     return;
   }
-  el.style.display = 'block';
+  el.style.display = '';
   el.textContent = note;
 }
 

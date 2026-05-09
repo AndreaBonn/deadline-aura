@@ -44,6 +44,36 @@ body {
 
 .urgency-section {
   padding: 0 20px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.urgency-section:hover .urgency-meta {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.urgency-section .toggle-indicator {
+  font-size: 8px;
+  margin-left: 4px;
+  opacity: 0.5;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.urgency-section.expanded .toggle-indicator {
+  transform: rotate(180deg);
+}
+
+/* --- AI notes collapsible panel --- */
+
+.ai-notes-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+
+.ai-notes-panel.expanded {
+  max-height: 300px;
 }
 
 .urgency-bar-container {
@@ -75,7 +105,6 @@ body {
 /* --- Clinical note --- */
 
 .clinical-note {
-  display: none;
   padding: 10px 20px;
   margin: 0 12px 8px;
   font-size: 11px;
