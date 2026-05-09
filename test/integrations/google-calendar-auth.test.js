@@ -1,9 +1,5 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-
 // Must mock googleapis before requiring the module
 vi.mock('googleapis', () => {
   const mockOAuth2 = vi.fn().mockImplementation(() => ({
