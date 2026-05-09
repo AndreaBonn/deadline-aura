@@ -29,6 +29,15 @@ This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 - Multi-monitor support: one strip per display, single spanned wallpaper PNG
 - Config validated with Zod on startup and on every settings save
 - X11 strut reservation so the strip does not overlap the GNOME work area
+- Local tasks: create, edit, complete, and delete personal tasks directly from the sidebar — no external sync needed
+- Burnout early warning: analyzes 7 days of AI scoring history across three independent triggers (sustained stress, insufficient recovery, high emotional load) and fires desktop notifications at moderate/high severity
+- AI clinical note: natural-language assessment from a simulated occupational psychologist, plus a 5-day stress forecast chart — both visible in a collapsible panel toggled by clicking the urgency bar
+- Desktop notifications via `notify-send` with configurable score threshold and cooldown; critical urgency for burnout alerts
+- Bilingual interface (Italian/English) switchable from settings; translations loaded via IPC with dot-notation keys and placeholder interpolation
+- Settings panel with 8 configuration tabs (General, Sources, AI, Wallpaper, Sidebar, Notifications, Interface, Advanced) and per-section reset
+- Auto-show sidebar on any display with no visible windows (detected via `wmctrl`)
+- Single-instance lock prevents duplicate widget processes
+- Dynamic lookahead window: events fetched for at least 7 days ahead, extended to the following Sunday; Jira and local tasks are always included regardless of due date
 
 ## Setup
 

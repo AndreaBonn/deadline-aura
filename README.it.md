@@ -27,18 +27,29 @@ Questa è una release iniziale (v0.1.0). Esistono difetti noti. Solo Linux/X11/G
 - Supporto multi-monitor: una striscia per display, singolo PNG wallpaper spanned
 - Config validata con Zod all'avvio e ad ogni salvataggio delle impostazioni
 - Riserva dello strut X11 perché la striscia non si sovrapponga all'area di lavoro GNOME
+- Task locali: creazione, modifica, completamento e cancellazione di task personali direttamente dalla sidebar, senza sync esterno
+- Early warning burnout: analizza 7 giorni di storico AI su tre trigger indipendenti (stress sostenuto, recovery insufficiente, carico emotivo alto) e invia notifiche desktop a severità moderate/high
+- Clinical note AI: valutazione in linguaggio naturale da psicologo occupazionale simulato, con grafico di previsione stress a 5 giorni — visibili in pannello collassabile attivato cliccando la barra di urgenza
+- Notifiche desktop via `notify-send` con soglia di score e cooldown configurabili; urgenza critica per alert burnout
+- Interfaccia bilingue (italiano/inglese) selezionabile dalle impostazioni; traduzioni caricate via IPC con chiavi dot-notation e interpolazione placeholder
+- Pannello impostazioni con 8 tab di configurazione (Generale, Sorgenti, AI, Wallpaper, Sidebar, Notifiche, Interfaccia, Avanzate) e reset per sezione
+- Auto-show sidebar su display senza finestre visibili (rilevamento via `wmctrl`)
+- Lock singola istanza per impedire processi widget duplicati
+- Finestra di lookahead dinamica: eventi raccolti per almeno 7 giorni in avanti, estesi alla domenica successiva; task Jira e locali sempre inclusi indipendentemente dalla scadenza
 
 ## Installazione
 
 ### Passo 1 — Installa le dipendenze di sistema
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt install build-essential libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
 sudo apt install x11-utils wmctrl libnotify-bin
 ```
 
 **Fedora:**
+
 ```bash
 sudo dnf install gcc-c++ cairo-devel pango-devel libjpeg-turbo-devel giflib-devel librsvg2-devel
 sudo dnf install xprop wmctrl libnotify
@@ -113,6 +124,7 @@ Dopo l'autorizzazione, la striscia colorata appare sul bordo destro di ogni disp
 ### Passo 7 — Configura Jira (opzionale)
 
 Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Nella sezione Jira, inserisci:
+
 - **Dominio**: il tuo dominio Atlassian (es. `tuaazienda.atlassian.net`)
 - **Email**: l'indirizzo email del tuo account Atlassian
 - **API token**: generane uno su [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)

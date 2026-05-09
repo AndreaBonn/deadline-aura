@@ -21,8 +21,12 @@ npm test                  # Vitest run
 npm run test:watch        # Vitest watch mode
 npm run test:coverage     # Coverage report
 npm run lint              # ESLint
+npm run lint:fix           # ESLint auto-fix
+npm run format             # Prettier write
+npm run format:check       # Prettier check
+npm run sync               # Sync manuale (alias node core/sync-daemon.js)
+node scripts/seed-demo.js  # Popola DB con task demo
 npm start                 # Avvia Electron
-node core/sync-daemon.js  # Sync manuale
 ```
 
 ## Struttura
@@ -32,6 +36,8 @@ core/               — Business logic (engine, color-mapper, wallpaper, notifie
 core/wallpaper-renderer.js  — Rendering wallpaper: sfondo immagine + tint + post-it + calendar
 core/postit-renderer.js     — Disegno singolo post-it su canvas
 core/display-manager.js     — Detect multi-monitor, geometria canvas composito
+core/display-controller.js  — Gestione strip + sidebar + auto-show su display libero
+core/burnout-detector.js    — Early warning burnout da storico AI (7 giorni, 3 trigger)
 ai/                 — AI scoring (multi-provider con failover e key rotation)
 ai/providers/       — Provider implementations (groq, gemini, openai, anthropic)
 integrations/       — Client API esterne (Google Calendar, Jira)
@@ -45,8 +51,13 @@ i18n/locales/       — File traduzione (it.json, en.json)
 renderer/i18n-renderer.js — t() globale per renderer (browser context)
 renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
 renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
+renderer/strip.*    — Striscia 20px bordo destro, click toggle sidebar, DOCK X11
+renderer/settings.* — Pannello impostazioni (8 tab, validazione Zod)
 assets/backgrounds/ — 5 immagini sfondo mappate su bande urgenza
 test/               — Mirror struttura src/
+scripts/            — Utility (seed-demo.js)
+autostart/          — .desktop file per GNOME autostart
+systemd/            — Service + timer per sync background
 ```
 
 ## Decisioni architetturali
@@ -67,6 +78,15 @@ test/               — Mirror struttura src/
 - i18n: bilingue IT/EN via config `language`, traduzioni JSON in `i18n/locales/`, `t()` con dot-notation e interpolazione `{placeholder}`
 - Renderer i18n: `i18n-renderer.js` carica traduzioni via IPC, espone `t()` globale + `translateDom()` per attributi `data-i18n`
 - Core i18n: `require('../i18n').t` diretto nel main process
+- Lookahead dinamico: finestra eventi = max(7 giorni da oggi arrotondati a domenica successiva, config lookahead_hours). Task Jira e locali sempre inclusi senza limite temporale
+- Burnout detector: analisi storico AI 7 giorni, 3 trigger indipendenti (stress medio, recovery insufficiente, emotional load alto), severity none/moderate/high
+- Notifiche desktop via `notify-send`: threshold score + cooldown configurabile, urgency critical per burnout
+- Strip come `_NET_WM_WINDOW_TYPE_DOCK` con `_NET_WM_STRUT_PARTIAL` per riservare spazio schermo
+- Auto-show sidebar su display senza finestre (rilevamento via `wmctrl`)
+- Single instance lock via `app.requestSingleInstanceLock()`
+- Tre preload separati (sidebar, overlay, settings) con `contextIsolation: true`
+- AI clinical note: testo in lingua da psicologo occupazionale + stress forecast 5 giorni
+- AI notes collassabile nella sidebar via click su urgency bar
 
 ## Configurazione
 
