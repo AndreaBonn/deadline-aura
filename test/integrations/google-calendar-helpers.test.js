@@ -37,8 +37,8 @@ describe('google-calendar — normalizeEvent', () => {
     const event = {
       id: 'ev1',
       summary: 'Sprint Review',
-      start: { dateTime: '2026-05-08T10:00:00+02:00' },
-      end: { dateTime: '2026-05-08T11:00:00+02:00' },
+      start: { dateTime: '2030-05-08T10:00:00+02:00' },
+      end: { dateTime: '2030-05-08T11:00:00+02:00' },
       htmlLink: 'https://calendar.google.com/event/ev1',
     };
     const result = normalizeEvent(event);
@@ -55,8 +55,8 @@ describe('google-calendar — normalizeEvent', () => {
     const event = {
       id: 'ev2',
       summary: 'Conference',
-      start: { date: '2026-05-10' },
-      end: { date: '2026-05-11' },
+      start: { date: '2030-05-10' },
+      end: { date: '2030-05-11' },
     };
     const result = normalizeEvent(event);
     expect(result.all_day).toBe(true);
@@ -76,8 +76,8 @@ describe('google-calendar — normalizeEvent', () => {
   it('handles event without summary', () => {
     const event = {
       id: 'no-title',
-      start: { dateTime: '2026-05-08T10:00:00Z' },
-      end: { dateTime: '2026-05-08T11:00:00Z' },
+      start: { dateTime: '2030-05-08T10:00:00Z' },
+      end: { dateTime: '2030-05-08T11:00:00Z' },
     };
     const result = normalizeEvent(event);
     expect(result.title).toBe('(no title)');
@@ -87,7 +87,7 @@ describe('google-calendar — normalizeEvent', () => {
     const event = {
       id: 'no-end',
       summary: 'Test',
-      start: { dateTime: '2026-05-08T10:00:00Z' },
+      start: { dateTime: '2030-05-08T10:00:00Z' },
     };
     const result = normalizeEvent(event);
     // end is undefined → endTime is null → does not filter as past
@@ -99,8 +99,8 @@ describe('google-calendar — normalizeEvent', () => {
     const event = {
       id: 'raw',
       summary: 'Test',
-      start: { dateTime: '2026-05-08T10:00:00Z' },
-      end: { dateTime: '2026-05-08T11:00:00Z' },
+      start: { dateTime: '2030-05-08T10:00:00Z' },
+      end: { dateTime: '2030-05-08T11:00:00Z' },
     };
     const result = normalizeEvent(event);
     const parsed = JSON.parse(result.raw_json);
