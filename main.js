@@ -450,7 +450,10 @@ app.whenReady().then(() => {
   ipcMain.on('sync-now', async () => {
     try {
       const syncDaemon = require('./core/sync-daemon');
-      await syncDaemon.sync(config);
+      const syncResult = await syncDaemon.sync(config);
+      if (syncResult.errors && syncResult.errors.length > 0) {
+        console.error('[sync-now] errors:', JSON.stringify(syncResult.errors));
+      }
       runUpdateCycle();
     } catch (err) {
       console.error('Manual sync error:', err.message);
