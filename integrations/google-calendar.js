@@ -15,14 +15,16 @@ const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
 
-function getEndOfWeek() {
+function getLookaheadEnd() {
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
-  const nextSunday = new Date(now);
-  nextSunday.setDate(now.getDate() + daysUntilSunday);
-  nextSunday.setHours(23, 59, 59, 999);
-  return nextSunday;
+  const minEnd = new Date(now);
+  minEnd.setDate(now.getDate() + 7);
+  const dayOfWeek = minEnd.getDay();
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const endDate = new Date(minEnd);
+  endDate.setDate(minEnd.getDate() + daysUntilSunday);
+  endDate.setHours(23, 59, 59, 999);
+  return endDate;
 }
 
 function createOAuthClient(clientId, clientSecret) {
@@ -202,7 +204,7 @@ async function fetchEvents(config) {
   const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
   const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
-  const timeMax = getEndOfWeek().toISOString();
+  const timeMax = getLookaheadEnd().toISOString();
 
   const allEvents = [];
 

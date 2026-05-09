@@ -141,21 +141,23 @@ function computeGlobalScore(tasks, options = {}) {
   };
 }
 
-function getEndOfWeekMs() {
+function getLookaheadMs() {
   const now = new Date();
-  const dayOfWeek = now.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
-  const nextSunday = new Date(now);
-  nextSunday.setDate(now.getDate() + daysUntilSunday);
-  nextSunday.setHours(23, 59, 59, 999);
-  return nextSunday.getTime() - Date.now();
+  const minEnd = new Date(now);
+  minEnd.setDate(now.getDate() + 7);
+  const dayOfWeek = minEnd.getDay();
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+  const endDate = new Date(minEnd);
+  endDate.setDate(minEnd.getDate() + daysUntilSunday);
+  endDate.setHours(23, 59, 59, 999);
+  return endDate.getTime() - Date.now();
 }
 
 function run(options = {}) {
   const { lookaheadHours } = options;
-  const endOfWeekMs = getEndOfWeekMs();
+  const lookaheadMs = getLookaheadMs();
   const configMs = lookaheadHours ? lookaheadHours * MS_PER_HOUR : 0;
-  const effectiveMs = Math.max(endOfWeekMs, configMs);
+  const effectiveMs = Math.max(lookaheadMs, configMs);
   const tasks = db.getActiveTasks(effectiveMs);
   return computeGlobalScore(tasks, options);
 }
