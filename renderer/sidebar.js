@@ -10,7 +10,7 @@ let lastTasks = null;
 let lastPalette = null;
 let pinnedTaskIds = new Set();
 let timeLogTaskId = null;
-const loggedTaskIds = new Set();
+let temporaryLoggedTaskId = null;
 let cachedCalendars = null;
 
 function updateClock() {
@@ -375,10 +375,14 @@ function createTimeLogForm(task) {
       })
       .then(function (result) {
         if (result.ok) {
-          loggedTaskIds.add(task.id);
           window.deadlineAura.setDefaultLogCalendar(calId);
           timeLogTaskId = null;
+          temporaryLoggedTaskId = task.id;
           renderTaskList(lastTasks, lastPalette);
+          setTimeout(function () {
+            temporaryLoggedTaskId = null;
+            renderTaskList(lastTasks, lastPalette);
+          }, 3000);
         } else {
           sendBtn.disabled = false;
           sendBtn.textContent = result.error || 'Error';
@@ -542,7 +546,7 @@ function createTaskCard(task) {
 
   // Time log button — per task Jira e local
   if (task.source === 'jira' || task.source === 'local') {
-    const isLogged = loggedTaskIds.has(task.id);
+    const isLogged = temporaryLoggedTaskId === task.id;
     const timeBtn = document.createElement('button');
     timeBtn.className = 'time-log-btn' + (isLogged ? ' logged' : '');
     timeBtn.textContent = isLogged ? '\u2713' : '\u23F1';
