@@ -9,6 +9,7 @@ let jiraFilter = '';
 let lastTasks = null;
 let lastPalette = null;
 let pinnedTaskIds = new Set();
+let favoriteTaskIds = new Set();
 let timeLogTaskId = null;
 let temporaryLoggedTaskId = null;
 let cachedCalendars = null;
@@ -77,9 +78,16 @@ function renderTaskList(tasks, palette) {
     return task.source === 'local';
   });
 
+  const favoriteTasks = tasks.filter(function (task) {
+    return task.source === 'jira' && favoriteTaskIds.has(task.id);
+  });
+
   renderLocalSection(container, localTasks, palette);
   if (gcalTasks.length > 0) {
     renderSection(container, t('sidebar.google_calendar'), gcalTasks, palette, 'gcal');
+  }
+  if (favoriteTasks.length > 0) {
+    renderSection(container, t('sidebar.jira_favorites'), favoriteTasks, palette, 'jira_favorites');
   }
   if (jiraTasks.length > 0 || jiraFilter) {
     renderJiraSection(container, jiraTasks, palette);
@@ -442,7 +450,11 @@ function createTaskCard(task) {
   if (task.web_url) {
     card.classList.add('clickable');
     card.addEventListener('click', function (e) {
-      if (e.target.closest('.pin-btn') || e.target.closest('.time-log-btn')) {
+      if (
+        e.target.closest('.pin-btn') ||
+        e.target.closest('.time-log-btn') ||
+        e.target.closest('.favorite-btn')
+      ) {
         return;
       }
       window.deadlineAura.openLink(task.web_url);
@@ -524,6 +536,24 @@ function createTaskCard(task) {
     actionsWrap.appendChild(delBtn);
 
     meta.appendChild(actionsWrap);
+  }
+
+  // Favorite button — solo per task Jira
+  if (task.source === 'jira') {
+    const favBtn = document.createElement('button');
+    const isFav = favoriteTaskIds.has(task.id);
+    favBtn.className = 'favorite-btn' + (isFav ? ' favorited' : '');
+    favBtn.textContent = '\u2605';
+    favBtn.title = isFav ? t('sidebar.remove_from_favorites') : t('sidebar.add_to_favorites');
+    favBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (isFav) {
+        window.deadlineAura.unfavoriteTask(task.id);
+      } else {
+        window.deadlineAura.favoriteTask(task.id);
+      }
+    });
+    meta.appendChild(favBtn);
   }
 
   // Pin/unpin button — per task Jira e local
@@ -905,6 +935,7 @@ initI18n(window.deadlineAura);
 
 window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);
+  favoriteTaskIds = new Set(data.favoriteTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
   renderClinicalNote(data.clinicalNote);
   renderStressForecast(data.stressForecast);

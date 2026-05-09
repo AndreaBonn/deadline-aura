@@ -400,6 +400,46 @@ body {
   color: rgba(239, 68, 68, 0.8);
 }
 
+/* --- Favorite button --- */
+
+.favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.favorite-btn:hover {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.3);
+  color: rgba(250, 204, 21, 0.9);
+}
+
+.favorite-btn.favorited {
+  background: rgba(250, 204, 21, 0.15);
+  border-color: rgba(250, 204, 21, 0.3);
+  color: rgba(250, 204, 21, 0.9);
+}
+
+.favorite-btn.favorited:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: rgba(239, 68, 68, 0.8);
+}
+
 /* --- Local tasks: quick-add form --- */
 
 .local-add-toggle {

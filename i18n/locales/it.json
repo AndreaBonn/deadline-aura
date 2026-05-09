@@ -50,7 +50,10 @@
     "select_jira_task": "Seleziona task Jira...",
     "no_task_code": "Nessun codice task",
     "or_manual_code": "oppure digita codice task",
-    "manual_code_placeholder": "es. PROJ-123"
+    "manual_code_placeholder": "es. PROJ-123",
+    "jira_favorites": "Preferiti Jira",
+    "add_to_favorites": "Aggiungi ai preferiti",
+    "remove_from_favorites": "Rimuovi dai preferiti"
   },
   "priorities": {
     "p1_full": "P1 - Critico",

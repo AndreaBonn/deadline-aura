@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   openConfig: () => ipcRenderer.send('open-config'),
   syncNow: () => ipcRenderer.send('sync-now'),
   openLink: (url) => ipcRenderer.send('open-link', url),
+  favoriteTask: (taskId) => ipcRenderer.send('favorite-task', taskId),
+  unfavoriteTask: (taskId) => ipcRenderer.send('unfavorite-task', taskId),
   pinTask: (taskId, displayId) => ipcRenderer.send('pin-task', { taskId, displayId }),
   unpinTask: (taskId, displayId) => ipcRenderer.send('unpin-task', { taskId, displayId }),
   openOverlay: (displayId) => ipcRenderer.send('open-overlay', { displayId }),

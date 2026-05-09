@@ -50,7 +50,10 @@
     "select_jira_task": "Select Jira task...",
     "no_task_code": "No task code found",
     "or_manual_code": "or type task code",
-    "manual_code_placeholder": "e.g. PROJ-123"
+    "manual_code_placeholder": "e.g. PROJ-123",
+    "jira_favorites": "Jira Favorites",
+    "add_to_favorites": "Add to favorites",
+    "remove_from_favorites": "Remove from favorites"
   },
   "priorities": {
     "p1_full": "P1 - Critical",

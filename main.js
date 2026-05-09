@@ -12,6 +12,7 @@ const wallpaperChanger = require('./core/wallpaper-changer');
 const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
 const localQueries = require('./store/local-queries');
+const favoriteQueries = require('./store/favorite-queries');
 const burnoutDetector = require('./core/burnout-detector');
 const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
@@ -341,6 +342,7 @@ async function runUpdateCycle({ force = false } = {}) {
 
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
+    const favoriteIds = favoriteQueries.getAllFavoriteIds();
 
     const aiResponse = db.getLatestAiCacheResponse();
     const clinicalNote = aiResponse?.clinical_note || null;
@@ -351,6 +353,7 @@ async function runUpdateCycle({ force = false } = {}) {
         engineResult,
         palette,
         pinnedTaskIds: Array.from(pinnedIds),
+        favoriteTaskIds: favoriteIds,
         clinicalNote,
         stressForecast,
       });
@@ -507,6 +510,16 @@ app.whenReady().then(() => {
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.close();
     }
+  });
+
+  ipcMain.on('favorite-task', (_event, taskId) => {
+    favoriteQueries.favoriteTask(taskId);
+    runUpdateCycle({ force: true });
+  });
+
+  ipcMain.on('unfavorite-task', (_event, taskId) => {
+    favoriteQueries.unfavoriteTask(taskId);
+    runUpdateCycle({ force: true });
   });
 
   ipcMain.on('pin-task', (_event, { taskId, displayId }) => {
