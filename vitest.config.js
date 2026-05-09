@@ -8,6 +8,7 @@ module.exports = defineConfig({
     coverage: {
       provider: 'v8',
       include: ['core/**', 'store/**', 'ai/**', 'integrations/**'],
+      reporter: ['text', 'json-summary'],
       thresholds: {
         lines: 70,
         functions: 70,

@@ -4,8 +4,18 @@
 
 Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo ambientale — una striscia colorata, uno sfondo cromatico e task su post-it che si aggiornano man mano che le scadenze si avvicinano.
 
+<div align="center">
+
+[![CI](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AndreaBonn/deadline-aura/main/badges/test-badge.json)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AndreaBonn/deadline-aura/main/badges/coverage-badge.json)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
+[![ESLint](https://img.shields.io/badge/lint-ESLint-4B32C3.svg)](https://eslint.org/)
+[![Prettier](https://img.shields.io/badge/code_style-Prettier-ff69b4.svg)](https://prettier.io/)
+[![Security Policy](https://img.shields.io/badge/security-policy-green.svg)](./SECURITY.md)
 [![GitHub stars](https://img.shields.io/github/stars/AndreaBonn/deadline-aura?style=social)](https://github.com/AndreaBonn/deadline-aura)
+
+</div>
 
 ## Cosa fa
 
