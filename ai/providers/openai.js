@@ -3,7 +3,7 @@
 const { BaseProvider } = require('./base-provider');
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_MODEL = 'gpt-4.1-nano';
 
 class OpenAIProvider extends BaseProvider {
   constructor(apiKeys) {
@@ -28,7 +28,7 @@ class OpenAIProvider extends BaseProvider {
           model: DEFAULT_MODEL,
           messages: [{ role: 'user', content: prompt }],
           temperature,
-          max_tokens: 2000,
+          max_tokens: 4000,
           response_format: { type: 'json_object' },
         }),
         signal: controller.signal,
