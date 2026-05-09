@@ -60,7 +60,7 @@ async function scoreEvents(events, config) {
     return null;
   }
 
-  const prompt = buildScoringPrompt(events);
+  const prompt = buildScoringPrompt(events, config.language || 'it');
   const providerTimeout = config.ai?.provider_timeout_ms || 5000;
   const totalTimeout = config.ai?.total_timeout_ms || 15000;
   const temperature = config.ai?.temperature || 0.15;
@@ -75,6 +75,7 @@ async function scoreEvents(events, config) {
     }
 
     const timeout = Math.min(providerTimeout, remaining);
+    console.log(`[ai] trying ${provider.name} (timeout=${timeout}ms, remaining=${remaining}ms)`);
 
     try {
       const rawResponse = await provider.score(prompt, { timeout, temperature });

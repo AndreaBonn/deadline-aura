@@ -62,6 +62,38 @@ describe('prompt', () => {
       const prompt = buildScoringPrompt(events);
       expect(prompt).toContain('Simple event');
     });
+
+    it('defaults clinical_note language to Italian', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events);
+      expect(prompt).toContain('Write in Italian');
+    });
+
+    it('uses English for clinical_note when language is en', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events, 'en');
+      expect(prompt).toContain('Write in English');
+      expect(prompt).not.toContain('Write in Italian');
+    });
+
+    it('uses Italian for clinical_note when language is it', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events, 'it');
+      expect(prompt).toContain('Write in Italian');
+    });
+
+    it('falls back to Italian for unsupported language codes', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events, 'fr');
+      expect(prompt).toContain('Write in Italian');
+    });
+
+    it('includes actionability constraint in clinical_note instruction', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events);
+      expect(prompt).toContain('actionable micro-adjustment');
+      expect(prompt).toContain('invisible pattern');
+    });
   });
 
   describe('parseAiResponse', () => {

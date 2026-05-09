@@ -1,6 +1,7 @@
 'use strict';
 
-function buildScoringPrompt(events) {
+function buildScoringPrompt(events, language = 'it') {
+  const outputLanguage = language === 'en' ? 'English' : 'Italian';
   const now = new Date().toISOString();
 
   const eventList = events
@@ -101,7 +102,7 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
   "patterns": [
     "Specific invisible pattern with evidence, e.g.: 3 creative tasks consecutive 14:00-17:30 with no break — decision quality degrades after 2nd"
   ],
-  "clinical_note": "1-3 frasi IN ITALIANO: cosa uno psicologo segnalerebbe di questa agenda — la cosa che la persona non vede ma dovrebbe sapere"
+  "clinical_note": "Write in ${outputLanguage}. 2-3 sentences as an occupational psychologist writing a private note to the person. Focus on ONE specific invisible pattern from this schedule (not a generic warning). Name the concrete mechanism: which events compound, where recovery is missing, what cognitive cost is hidden. End with one actionable micro-adjustment (move X, add a buffer before Y, protect morning for Z). Tone: direct and warm, like a trusted colleague who happens to be a psychologist — never alarmist, never generic, never 'you are doing too much'."
 }`;
 }
 
