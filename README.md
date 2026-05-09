@@ -24,7 +24,7 @@ This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 - Wallpaper generated as a composite PNG spanning all displays, with per-task post-it notes at drag-and-drop positions stored as percentages
 - Urgency engine: exponential decay formula with priority weights and volume amplification above 5 concurrent events
 - AI scoring with provider failover (Groq → Gemini → OpenAI → Anthropic), hash-based cache, configurable refresh interval (default: 6 hours)
-- Google Calendar sync via OAuth2 (read-only scope: `calendar.readonly`)
+- Google Calendar sync via OAuth2 (scope: `calendar` for full read and write access)
 - Jira sync via API token with configurable JQL
 - Multi-monitor support: one strip per display, single spanned wallpaper PNG
 - Config validated with Zod on startup and on every settings save
@@ -38,6 +38,8 @@ This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 - Auto-show sidebar on any display with no visible windows (detected via `wmctrl`)
 - Single-instance lock prevents duplicate widget processes
 - Dynamic lookahead window: events fetched for at least 7 days ahead, extended to the following Sunday; Jira and local tasks are always included regardless of due date
+- Jira favorites: star any Jira task to pin it in a dedicated "Favorites" section between Google Calendar and Jira in the sidebar; favorites persist across restarts
+- Time logging to Google Calendar: clock button on any task opens an inline form to create a calendar event with date, time, duration, and target calendar; events are formatted as `[JIRA-KEY] - Title` for compatibility with Tempo time tracking
 
 ## Setup
 
@@ -119,7 +121,7 @@ nvm use 20
 npm start
 ```
 
-On first run, a browser window opens for Google Calendar authorization. Log in with the Google account whose calendar you want to sync and click Allow. The token is saved automatically to `~/.config/deadlineaura/google-token.json` with permissions `0600`. You will not be asked again unless the token is deleted or revoked.
+On first run, a browser window opens for Google Calendar authorization. The app requests full calendar access (read and write) so it can both read events and create time log entries. Log in with the Google account whose calendar you want to sync and click Allow. The token is saved automatically to `~/.config/deadlineaura/google-token.json` with permissions `0600`. You will not be asked again unless the token is deleted or revoked.
 
 After authorization, the colored strip appears on the right edge of each display. Click it to open the sidebar.
 
@@ -167,21 +169,95 @@ systemctl --user enable --now deadlineaura-sync.timer
 
 ## Usage
 
-The sidebar updates automatically every 60 seconds. To force an immediate sync:
+After starting the app (`npm start`), a colored strip appears on the right edge of each display. The color reflects your current workload: green when calm, yellow at moderate load, red at critical pressure. The strip updates automatically every 60 seconds.
+
+### Sidebar
+
+Click the strip to open the sidebar. It shows your tasks grouped into sections:
+
+1. **Local** - personal tasks you create directly in the app
+2. **Google Calendar** - upcoming events from your synced calendars
+3. **Jira Favorites** - Jira tasks you have starred (appears only if you have favorites)
+4. **Jira** - tasks matching your configured JQL filter
+
+Each task card shows title, countdown to deadline, urgency score, and source badge. Click any Jira or Google Calendar task to open it in the browser.
+
+At the top of the sidebar you will find buttons for manual sync, settings (gear icon), post-it layout (grid icon), and close (X).
+
+### Local tasks
+
+Click the **+** button in the "Local" section header to create a personal task. Fill in the title, due date, and priority (P1-P4). Press Enter or click "Add" to save.
+
+On each local task card you can: edit (pencil icon), complete (checkmark), delete (X), pin to desktop, or log time.
+
+### Jira favorites
+
+Click the star icon on any Jira task card to add it to your favorites. Starred tasks appear in a dedicated "Jira Favorites" section at the top of the sidebar, so you can access your most important tasks without scrolling. Click the star again to remove a task from favorites.
+
+### Post-it notes on the desktop
+
+Pin any task to the desktop by clicking the pin icon on its card. The task appears as a post-it note rendered directly into the wallpaper.
+
+To reposition post-it notes: click the layout icon (grid) in the sidebar header. A transparent overlay opens where you can drag each post-it to the desired position. Click "Save" to apply, or press Escape to cancel. Positions are stored as percentages, so they adapt to any screen resolution.
+
+### Time logging to Google Calendar
+
+Click the clock icon on any task card to open the time log form. The form lets you set:
+
+- **Date and time** (defaults to now, rounded to the nearest 15 minutes)
+- **Duration** in minutes (15-480, in 15-minute steps)
+- **Target calendar** (selected from your writable Google Calendars)
+
+The created event is formatted as `[JIRA-KEY] - Task Title`, compatible with Tempo and other Jira time tracking tools. The calendar you choose is saved as default for future logs.
+
+For local tasks that don't have a Jira key in the title, you can either select an existing Jira task from a dropdown or type a code manually.
+
+After logging, the clock icon briefly shows a green checkmark, then returns to normal so you can log again.
+
+### AI notes and burnout detection
+
+Click the colored urgency bar at the top of the sidebar to expand the AI panel. It shows:
+
+- A clinical note written in natural language, assessing your cognitive and emotional load
+- A 5-day stress forecast chart
+
+The burnout detector runs automatically in the background, analyzing 7 days of AI scoring history. If it detects sustained stress, insufficient recovery, or high emotional load, a desktop notification is sent. No configuration is needed - it works out of the box. You can adjust notification thresholds in the settings.
+
+### Settings
+
+Click the gear icon in the sidebar to open the settings panel. It has 8 tabs:
+
+| Tab           | What you can configure                                          |
+| ------------- | --------------------------------------------------------------- |
+| General       | Sync interval, lookahead window                                 |
+| Sources       | Google Calendar calendars and keywords, Jira instances and JQL  |
+| AI            | Provider priority order, refresh interval, timeout, temperature |
+| Wallpaper     | Enable/disable, background images, post-it settings             |
+| Sidebar       | Position (left/right), width, opacity                           |
+| Notifications | Enable/disable, score threshold, cooldown                       |
+| Interface     | Language (Italian/English), max tasks shown, countdown format   |
+| Advanced      | Urgency engine constants and priority weights                   |
+
+Each tab has a "Reset section" button to restore defaults for that section only.
+
+### Manual sync
+
+To force an immediate sync from the terminal:
 
 ```bash
 npm run sync
 ```
 
-**File locations:**
-| Path | Content |
-|---|---|
-| `~/.config/deadlineaura/config.json` | User configuration |
-| `~/.config/deadlineaura/google-token.json` | Google OAuth token (0600) |
-| `~/.local/share/deadlineaura/db.sqlite` | SQLite database |
-| `~/.local/share/deadlineaura/wallpaper.png` | Generated wallpaper |
+### File locations
 
-Advanced configuration (sync interval, lookahead window, notification thresholds, sidebar width, etc.) is available through the in-app settings panel. The full schema with defaults is in `config/defaults.js`.
+| Path                                        | Content                   |
+| ------------------------------------------- | ------------------------- |
+| `~/.config/deadlineaura/config.json`        | User configuration        |
+| `~/.config/deadlineaura/google-token.json`  | Google OAuth token (0600) |
+| `~/.local/share/deadlineaura/db.sqlite`     | SQLite database           |
+| `~/.local/share/deadlineaura/wallpaper.png` | Generated wallpaper       |
+
+The full configuration schema with defaults is in `config/defaults.js`.
 
 ## Testing
 

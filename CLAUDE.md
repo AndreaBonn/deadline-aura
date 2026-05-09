@@ -44,6 +44,7 @@ integrations/       — Client API esterne (Google Calendar, Jira)
 store/              — SQLite init, migrations, query helpers
 store/pinned-queries.js — CRUD pinned tasks (pin/unpin, posizioni, query per display)
 store/local-queries.js  — CRUD task locali (source='local', no sync esterno)
+store/favorite-queries.js — CRUD Jira favorites (star/unstar, query per sidebar)
 config/             — Defaults e schema Zod
 i18n/               — Internazionalizzazione (modulo CJS + locale JSON)
 i18n/index.js       — t(), setLanguage(), getTranslations() per main process
@@ -83,7 +84,7 @@ systemd/            — Service + timer per sync background
 - Time log su Google Calendar: bottone orologio su task Jira/local nella sidebar → crea evento `[CODICE] - Titolo` su GCal → Tempo lo legge per worklog
 - Time log: calendario di destinazione selezionato una volta e memorizzato in config (`default_log_calendar`)
 - Time log task locali: se il titolo contiene codice Jira (pattern `PROJ-123`) lo usa; altrimenti mostra dropdown task Jira per associazione
-- OAuth scope: `calendar.events` (read+write) - ri-auth necessaria una tantum al primo utilizzo
+- OAuth scope: `calendar` (full read+write) - ri-auth necessaria una tantum al primo utilizzo; se si aggiorna da versione con scope readonly, cancellare google-token.json e riavviare
 - Notifiche desktop via `notify-send`: threshold score + cooldown configurabile, urgency critical per burnout
 - Strip come `_NET_WM_WINDOW_TYPE_DOCK` con `_NET_WM_STRUT_PARTIAL` per riservare spazio schermo
 - Auto-show sidebar su display senza finestre (rilevamento via `wmctrl`)
@@ -91,6 +92,8 @@ systemd/            — Service + timer per sync background
 - Tre preload separati (sidebar, overlay, settings) con `contextIsolation: true`
 - AI clinical note: testo in lingua da psicologo occupazionale + stress forecast 5 giorni
 - AI notes collassabile nella sidebar via click su urgency bar
+- Jira favorites: stella su task Jira per aggiungerli a sezione "Preferiti" dedicata tra GCal e Jira nella sidebar; persistenza in tabella `jira_favorites` con FK cascade
+- Creazione eventi GCal dalla sidebar: bottone orologio su task → form inline con data/ora/durata/calendario → `calendar.events.insert()` → evento formato Tempo-compatible `[JIRA-KEY] - Titolo`
 
 ## Configurazione
 
