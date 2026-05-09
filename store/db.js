@@ -239,7 +239,7 @@ function getLatestAiScore() {
 
 function getLatestAiCacheResponse() {
   const row = getDb()
-    .prepare('SELECT response_json FROM ai_cache ORDER BY computed_at DESC LIMIT 1')
+    .prepare('SELECT response_json FROM ai_cache ORDER BY computed_at DESC, rowid DESC LIMIT 1')
     .get();
   if (!row) {
     return null;
