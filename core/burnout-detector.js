@@ -1,5 +1,7 @@
 'use strict';
 
+const { t } = require('../i18n');
+
 const DEFAULT_STRESS_THRESHOLD = 7;
 const DEFAULT_CONSECUTIVE_DAYS = 3;
 
@@ -112,9 +114,7 @@ function detectBurnoutRisk(aiCacheHistory, options) {
       dailyFactors.reduce((sum, d) => sum + (d.stress || d.global_stress || 0), 0) /
       dailyFactors.length;
     if (avgStress >= stressThreshold) {
-      triggers.push(
-        `Stress medio della settimana elevato (${avgStress.toFixed(1)}/10). Considera di delegare o posticipare.`,
-      );
+      triggers.push(t('burnout.high_avg_stress', { avg: avgStress.toFixed(1) }));
     }
   }
 
@@ -123,9 +123,7 @@ function detectBurnoutRisk(aiCacheHistory, options) {
     (d) => d.cognitive_factors?.recovery_adequacy === 'insufficient',
   );
   if (consecutiveNoRecovery >= consecutiveDays) {
-    triggers.push(
-      `Recupero insufficiente per ${consecutiveNoRecovery} giorni consecutivi. Servono pause reali.`,
-    );
+    triggers.push(t('burnout.insufficient_recovery', { days: consecutiveNoRecovery }));
   }
 
   const consecutiveEmotional = maxConsecutive(
@@ -133,9 +131,7 @@ function detectBurnoutRisk(aiCacheHistory, options) {
     (d) => d.cognitive_factors?.emotional_load === 'high',
   );
   if (consecutiveEmotional >= consecutiveDays) {
-    triggers.push(
-      `Carico emotivo alto per ${consecutiveEmotional} giorni consecutivi. Attenzione al sovraccarico.`,
-    );
+    triggers.push(t('burnout.high_emotional_load', { days: consecutiveEmotional }));
   }
 
   const severity = triggers.length >= 2 ? 'high' : triggers.length === 1 ? 'moderate' : 'none';

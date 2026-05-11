@@ -206,5 +206,10 @@
   "overlay": {
     "page_title": "DeadlineAura — Layout",
     "instruction": "Drag post-its where you want them, then save"
+  },
+  "burnout": {
+    "high_avg_stress": "Weekly average stress is high ({avg}/10). Consider delegating or postponing.",
+    "insufficient_recovery": "Insufficient recovery for {days} consecutive days. Real breaks are needed.",
+    "high_emotional_load": "High emotional load for {days} consecutive days. Watch out for overload."
   }
 }

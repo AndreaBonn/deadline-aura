@@ -206,5 +206,10 @@
   "overlay": {
     "page_title": "DeadlineAura — Layout",
     "instruction": "Sposta i post-it dove vuoi, poi salva"
+  },
+  "burnout": {
+    "high_avg_stress": "Stress medio della settimana elevato ({avg}/10). Considera di delegare o posticipare.",
+    "insufficient_recovery": "Recupero insufficiente per {days} giorni consecutivi. Servono pause reali.",
+    "high_emotional_load": "Carico emotivo alto per {days} giorni consecutivi. Attenzione al sovraccarico."
   }
 }
