@@ -45,6 +45,9 @@ Thumbs.db
 # Claude
 .claude/
 
+# Docs (session reports, local decisions)
+docs/
+
 # Test coverage
 coverage/
 
