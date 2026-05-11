@@ -56,8 +56,24 @@ function urgencyToColor(score) {
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
+/**
+ * Formats elapsed milliseconds from a start ISO timestamp into HH:MM:SS or MM:SS.
+ *
+ * @param {string} startIso - ISO 8601 start timestamp.
+ * @returns {string} Formatted elapsed time string.
+ */
+function formatElapsed(startIso) {
+  const diff = Math.max(0, Date.now() - new Date(startIso).getTime());
+  const totalSeconds = Math.floor(diff / 1000);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+}
+
 // CommonJS export for Node.js / test environment.
 // In the browser the functions are available as globals via <script src>.
 if (typeof module !== 'undefined') {
-  module.exports = { formatCountdown, urgencyToColor };
+  module.exports = { formatCountdown, urgencyToColor, formatElapsed };
 }

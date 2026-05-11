@@ -1,6 +1,6 @@
 'use strict';
 
-/* global t, _i18nReady, initI18n */
+/* global t, _i18nReady, initI18n, formatElapsed, localStorage */
 
 const COLLAPSED_LIMIT = 5;
 const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
@@ -13,6 +13,154 @@ let favoriteTaskIds = new Set();
 let timeLogTaskId = null;
 let temporaryLoggedTaskId = null;
 let cachedCalendars = null;
+
+// --- Live timer state ---
+const TIMER_STORAGE_KEY = 'deadlineaura_active_timer';
+const TIMER_UPDATE_INTERVAL_MS = 60 * 1000;
+const TIMER_DEFAULT_DURATION_MIN = 30;
+
+let activeTimer = null; // { taskId, startTime, calendarId, eventId, summary }
+let timerUiInterval = null;
+let timerSyncInterval = null;
+let timerPickerTaskId = null; // task id showing calendar picker before play
+
+function saveTimerState() {
+  if (activeTimer) {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(activeTimer));
+  } else {
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+  }
+}
+
+function restoreTimerState() {
+  try {
+    const raw = localStorage.getItem(TIMER_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+    const saved = JSON.parse(raw);
+    if (saved && saved.taskId && saved.startTime && saved.eventId) {
+      activeTimer = saved;
+      startTimerIntervals();
+    }
+  } catch (err) {
+    void err;
+    localStorage.removeItem(TIMER_STORAGE_KEY);
+  }
+}
+
+function startTimerIntervals() {
+  clearTimerIntervals();
+  timerUiInterval = setInterval(function () {
+    updateTimerDisplay();
+  }, 1000);
+  timerSyncInterval = setInterval(function () {
+    syncTimerToCalendar();
+  }, TIMER_UPDATE_INTERVAL_MS);
+}
+
+function clearTimerIntervals() {
+  if (timerUiInterval) {
+    clearInterval(timerUiInterval);
+    timerUiInterval = null;
+  }
+  if (timerSyncInterval) {
+    clearInterval(timerSyncInterval);
+    timerSyncInterval = null;
+  }
+}
+
+function updateTimerDisplay() {
+  if (!activeTimer) {
+    return;
+  }
+  const el = document.querySelector('.timer-elapsed[data-task-id="' + activeTimer.taskId + '"]');
+  if (el) {
+    el.textContent = formatElapsed(activeTimer.startTime);
+  }
+}
+
+function syncTimerToCalendar() {
+  if (!activeTimer || !activeTimer.eventId) {
+    return;
+  }
+  window.deadlineAura
+    .updateCalendarEvent({
+      calendarId: activeTimer.calendarId,
+      eventId: activeTimer.eventId,
+      endTime: new Date().toISOString(),
+    })
+    .catch(function (err) {
+      console.error('timer sync failed:', err.message);
+    });
+}
+
+function startTimer(task, calendarId) {
+  const jiraKey = extractJiraKey(task.title);
+  const summary = buildEventSummary(jiraKey, task.title);
+  const startTime = new Date().toISOString();
+
+  activeTimer = {
+    taskId: task.id,
+    startTime: startTime,
+    calendarId: calendarId,
+    eventId: null,
+    summary: summary,
+  };
+  saveTimerState();
+  timerPickerTaskId = null;
+  renderTaskList(lastTasks, lastPalette);
+
+  window.deadlineAura
+    .logTimeToCalendar({
+      summary: summary,
+      startTime: startTime,
+      durationMinutes: TIMER_DEFAULT_DURATION_MIN,
+      calendarId: calendarId,
+    })
+    .then(function (result) {
+      if (result.ok && result.eventId) {
+        activeTimer.eventId = result.eventId;
+        saveTimerState();
+        window.deadlineAura.setDefaultLogCalendar(calendarId);
+        startTimerIntervals();
+      } else {
+        activeTimer = null;
+        saveTimerState();
+        clearTimerIntervals();
+        renderTaskList(lastTasks, lastPalette);
+      }
+    });
+}
+
+function stopTimer() {
+  if (!activeTimer) {
+    return;
+  }
+  const timer = activeTimer;
+  clearTimerIntervals();
+  activeTimer = null;
+  saveTimerState();
+
+  if (timer.eventId) {
+    window.deadlineAura
+      .updateCalendarEvent({
+        calendarId: timer.calendarId,
+        eventId: timer.eventId,
+        endTime: new Date().toISOString(),
+      })
+      .then(function () {
+        temporaryLoggedTaskId = timer.taskId;
+        renderTaskList(lastTasks, lastPalette);
+        setTimeout(function () {
+          temporaryLoggedTaskId = null;
+          renderTaskList(lastTasks, lastPalette);
+        }, 3000);
+      });
+  } else {
+    renderTaskList(lastTasks, lastPalette);
+  }
+}
 
 function updateClock() {
   const now = new Date();
@@ -591,6 +739,45 @@ function createTaskCard(task) {
     meta.appendChild(timeBtn);
   }
 
+  // Live timer play/stop button — per task Jira e local
+  if (task.source === 'jira' || task.source === 'local') {
+    const isTimerActive = activeTimer && activeTimer.taskId === task.id;
+    const isOtherTimerActive = activeTimer && activeTimer.taskId !== task.id;
+
+    if (isTimerActive) {
+      const stopBtn = document.createElement('button');
+      stopBtn.className = 'timer-stop-btn';
+      const elapsed = document.createElement('span');
+      elapsed.className = 'timer-elapsed';
+      elapsed.dataset.taskId = task.id;
+      elapsed.textContent = formatElapsed(activeTimer.startTime);
+      stopBtn.appendChild(document.createTextNode('\u25A0 '));
+      stopBtn.appendChild(elapsed);
+      stopBtn.title = t('sidebar.timer_stop');
+      stopBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        stopTimer();
+      });
+      meta.appendChild(stopBtn);
+    } else {
+      const playBtn = document.createElement('button');
+      playBtn.className = 'timer-play-btn';
+      if (isOtherTimerActive) {
+        playBtn.classList.add('disabled');
+      }
+      playBtn.textContent = '\u25B6';
+      playBtn.title = t('sidebar.timer_start');
+      playBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (isOtherTimerActive) {
+          stopTimer();
+        }
+        handlePlayClick(task);
+      });
+      meta.appendChild(playBtn);
+    }
+  }
+
   card.appendChild(header);
   card.appendChild(meta);
 
@@ -602,7 +789,130 @@ function createTaskCard(task) {
     return wrapper;
   }
 
+  // Append timer calendar picker if needed
+  if (timerPickerTaskId === task.id) {
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(card);
+    wrapper.appendChild(createTimerCalendarPicker(task));
+    return wrapper;
+  }
+
   return card;
+}
+
+function handlePlayClick(task) {
+  const jiraKey = extractJiraKey(task.title);
+  const needsJiraSelect = task.source === 'local' && !jiraKey;
+
+  if (needsJiraSelect) {
+    timerPickerTaskId = timerPickerTaskId === task.id ? null : task.id;
+    renderTaskList(lastTasks, lastPalette);
+    return;
+  }
+
+  window.deadlineAura.getDefaultLogCalendar().then(function (result) {
+    if (result.ok && result.calendarId) {
+      startTimer(task, result.calendarId);
+    } else {
+      timerPickerTaskId = task.id;
+      renderTaskList(lastTasks, lastPalette);
+    }
+  });
+}
+
+function createTimerCalendarPicker(task) {
+  const form = document.createElement('div');
+  form.className = 'timer-picker-form';
+
+  const header = document.createElement('div');
+  header.className = 'time-log-header';
+  header.textContent = t('sidebar.timer_select_calendar');
+  form.appendChild(header);
+
+  const jiraKey = extractJiraKey(task.title);
+  const needsJiraSelect = task.source === 'local' && !jiraKey;
+
+  let jiraSelect = null;
+  let manualKeyInput = null;
+
+  if (needsJiraSelect) {
+    jiraSelect = document.createElement('select');
+    jiraSelect.className = 'time-log-jira-select';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = t('sidebar.select_jira_task');
+    jiraSelect.appendChild(placeholder);
+
+    const jiraTasks = (lastTasks || []).filter(function (item) {
+      return item.source === 'jira';
+    });
+    for (let i = 0; i < jiraTasks.length; i++) {
+      const opt = document.createElement('option');
+      const key = extractJiraKey(jiraTasks[i].title);
+      opt.value = key || '';
+      opt.textContent = jiraTasks[i].title;
+      jiraSelect.appendChild(opt);
+    }
+    form.appendChild(jiraSelect);
+
+    manualKeyInput = document.createElement('input');
+    manualKeyInput.type = 'text';
+    manualKeyInput.className = 'time-log-manual-key';
+    manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
+    form.appendChild(manualKeyInput);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'time-log-row';
+
+  const calendarSelect = document.createElement('select');
+  calendarSelect.className = 'time-log-calendar-select';
+  loadCalendarOptions(calendarSelect);
+  row.appendChild(calendarSelect);
+
+  const startBtn = document.createElement('button');
+  startBtn.className = 'timer-start-btn';
+  startBtn.textContent = '\u25B6 ' + t('sidebar.timer_start');
+  startBtn.addEventListener('click', function () {
+    const calId = calendarSelect.value;
+    if (!calId) {
+      calendarSelect.focus();
+      return;
+    }
+
+    if (needsJiraSelect) {
+      const manualVal = manualKeyInput ? manualKeyInput.value.trim() : '';
+      const selectedKey = jiraSelect ? jiraSelect.value : '';
+      if (!selectedKey && !manualVal) {
+        if (manualKeyInput) {
+          manualKeyInput.focus();
+        }
+        return;
+      }
+      const resolvedKey = manualVal || selectedKey;
+      const modifiedTask = Object.assign({}, task, {
+        title: '[' + resolvedKey + '] - ' + task.title,
+      });
+      startTimer(modifiedTask, calId);
+    } else {
+      startTimer(task, calId);
+    }
+  });
+  row.appendChild(startBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'local-action-btn';
+  cancelBtn.textContent = '\u2715';
+  cancelBtn.title = t('common.cancel');
+  cancelBtn.addEventListener('click', function () {
+    timerPickerTaskId = null;
+    renderTaskList(lastTasks, lastPalette);
+  });
+  row.appendChild(cancelBtn);
+
+  form.appendChild(row);
+  return form;
 }
 
 function renderSection(container, title, tasks, _palette, sectionId) {
@@ -929,6 +1239,9 @@ function renderStressForecast(dailyBreakdown) {
     container.appendChild(col);
   }
 }
+
+// Restore active timer from localStorage (crash recovery)
+restoreTimerState();
 
 // Init i18n before first render
 initI18n(window.deadlineAura);

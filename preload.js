@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   completeLocalTask: (taskId) => ipcRenderer.invoke('local-task:complete', taskId),
   listCalendars: () => ipcRenderer.invoke('calendar:list'),
   logTimeToCalendar: (params) => ipcRenderer.invoke('calendar:log-time', params),
+  updateCalendarEvent: (params) => ipcRenderer.invoke('calendar:update-event', params),
   getDefaultLogCalendar: () => ipcRenderer.invoke('calendar:get-default'),
   setDefaultLogCalendar: (calendarId) => ipcRenderer.invoke('calendar:set-default', calendarId),
 });

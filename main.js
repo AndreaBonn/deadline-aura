@@ -659,6 +659,29 @@ app.whenReady().then(() => {
       }
     },
   );
+
+  ipcMain.handle('calendar:update-event', async (_event, { calendarId, eventId, endTime }) => {
+    if (!calendarId || typeof calendarId !== 'string') {
+      return { ok: false, error: 'INVALID_CALENDAR_ID' };
+    }
+    if (!eventId || typeof eventId !== 'string') {
+      return { ok: false, error: 'INVALID_EVENT_ID' };
+    }
+    if (!endTime) {
+      return { ok: false, error: 'INVALID_END_TIME' };
+    }
+    try {
+      const result = await gcal.updateEvent(config, {
+        calendarId,
+        eventId,
+        endTime,
+      });
+      return { ok: true, eventId: result.id, htmlLink: result.htmlLink };
+    } catch (err) {
+      console.error('calendar:update-event error:', err.message);
+      return { ok: false, error: err.message };
+    }
+  });
 });
 
 app.on('window-all-closed', () => {

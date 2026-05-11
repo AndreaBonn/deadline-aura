@@ -1,6 +1,6 @@
 'use strict';
 
-const { createEvent, listCalendars } = require('../../integrations/google-calendar');
+const { createEvent, updateEvent, listCalendars } = require('../../integrations/google-calendar');
 
 describe('google-calendar — write operations', () => {
   const originalEnv = { ...process.env };
@@ -41,6 +41,38 @@ describe('google-calendar — write operations', () => {
           durationMinutes: 30,
         }),
       ).rejects.toThrow('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    });
+  });
+
+  describe('updateEvent', () => {
+    it('throws when GOOGLE_CLIENT_ID is missing', async () => {
+      delete process.env.GOOGLE_CLIENT_ID;
+      delete process.env.GOOGLE_CLIENT_SECRET;
+
+      const config = { sources: { google_calendar: { enabled: true } } };
+
+      await expect(
+        updateEvent(config, {
+          calendarId: 'primary',
+          eventId: 'evt123',
+          endTime: new Date().toISOString(),
+        }),
+      ).rejects.toThrow('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    });
+
+    it('throws when endTime is invalid', async () => {
+      process.env.GOOGLE_CLIENT_ID = 'test-id';
+      process.env.GOOGLE_CLIENT_SECRET = 'test-secret';
+
+      const config = { sources: { google_calendar: { enabled: true } } };
+
+      await expect(
+        updateEvent(config, {
+          calendarId: 'primary',
+          eventId: 'evt123',
+          endTime: 'not-a-date',
+        }),
+      ).rejects.toThrow('Invalid endTime');
     });
   });
 

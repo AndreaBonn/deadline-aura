@@ -285,6 +285,32 @@ async function createEvent(config, { calendarId, summary, startTime, durationMin
   return { id: response.data.id, htmlLink: response.data.htmlLink };
 }
 
+async function updateEvent(config, { calendarId, eventId, endTime }) {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+  }
+
+  const end = new Date(endTime);
+  if (isNaN(end.getTime())) {
+    throw new Error('Invalid endTime');
+  }
+
+  const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+  const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+
+  const response = await calendar.events.patch({
+    calendarId,
+    eventId,
+    requestBody: {
+      end: { dateTime: end.toISOString() },
+    },
+  });
+
+  return { id: response.data.id, htmlLink: response.data.htmlLink };
+}
+
 module.exports = {
   fetchEvents,
   normalizeEvent,
@@ -292,5 +318,6 @@ module.exports = {
   getAuthenticatedClient,
   listCalendars,
   createEvent,
+  updateEvent,
   TOKEN_PATH,
 };

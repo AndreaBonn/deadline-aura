@@ -84,6 +84,7 @@ systemd/            — Service + timer per sync background
 - Time log su Google Calendar: bottone orologio su task Jira/local nella sidebar → crea evento `[CODICE] - Titolo` su GCal → Tempo lo legge per worklog
 - Time log: calendario di destinazione selezionato una volta e memorizzato in config (`default_log_calendar`)
 - Time log task locali: se il titolo contiene codice Jira (pattern `PROJ-123`) lo usa; altrimenti mostra dropdown task Jira per associazione
+- Live timer: pulsante play/stop su task Jira/local, crea evento GCal immediato (30 min default), aggiorna end time ogni 60s, stop finalizza. Stato persistito in localStorage per crash recovery. Un solo timer attivo alla volta
 - OAuth scope: `calendar` (full read+write) - ri-auth necessaria una tantum al primo utilizzo; se si aggiorna da versione con scope readonly, cancellare google-token.json e riavviare
 - Notifiche desktop via `notify-send`: threshold score + cooldown configurabile, urgency critical per burnout
 - Strip come `_NET_WM_WINDOW_TYPE_DOCK` con `_NET_WM_STRUT_PARTIAL` per riservare spazio schermo
