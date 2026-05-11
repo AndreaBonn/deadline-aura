@@ -54,6 +54,33 @@ const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 10;
 const DESKTOP_CHECK_MS = 1000;
+const TOKEN_MASK = '••••••••';
+
+function maskConfigForRenderer(cfg) {
+  const masked = JSON.parse(JSON.stringify(cfg));
+  const instances = masked.sources?.jira?.instances;
+  if (Array.isArray(instances)) {
+    for (const inst of instances) {
+      if (inst.api_token) {
+        inst.api_token = TOKEN_MASK;
+      }
+    }
+  }
+  return masked;
+}
+
+function restoreTokens(newConfig, originalConfig) {
+  const newInstances = newConfig.sources?.jira?.instances;
+  const origInstances = originalConfig.sources?.jira?.instances;
+  if (!Array.isArray(newInstances) || !Array.isArray(origInstances)) {
+    return;
+  }
+  for (let i = 0; i < newInstances.length; i++) {
+    if (newInstances[i].api_token === TOKEN_MASK && origInstances[i]?.api_token) {
+      newInstances[i].api_token = origInstances[i].api_token;
+    }
+  }
+}
 
 let sidebarWindow = null;
 let sidebarReady = false;
@@ -540,9 +567,10 @@ app.whenReady().then(() => {
   ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
 
   ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
-  ipcMain.handle('settings:get-config', () => config);
+  ipcMain.handle('settings:get-config', () => maskConfigForRenderer(config));
   ipcMain.handle('settings:get-defaults', () => DEFAULTS);
   ipcMain.handle('settings:save-config', (_event, newConfig) => {
+    restoreTokens(newConfig, config);
     const result = configSchema.safeParse(newConfig);
     if (!result.success) {
       return { ok: false, errors: result.error.flatten().fieldErrors };
