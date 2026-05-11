@@ -11,6 +11,7 @@ const { URL } = require('url');
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'deadlineaura');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'google-token.json');
 const OAUTH_PORT = 34567;
+const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
@@ -108,22 +109,32 @@ function startAuthFlow(oAuth2Client) {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end('<h1>DeadlineAura authorized</h1><p>You can close this window.</p>');
 
+        clearTimeout(authTimeout);
         server.close();
         resolve(tokens);
       } catch (err) {
         res.writeHead(500);
         res.end('Authorization failed');
+        clearTimeout(authTimeout);
         server.close();
         reject(err);
       }
     });
+
+    const authTimeout = setTimeout(() => {
+      server.close();
+      reject(new Error('OAuth timeout: flow not completed within 5 minutes'));
+    }, OAUTH_TIMEOUT_MS);
 
     server.listen(OAUTH_PORT, () => {
       const { spawn } = require('child_process');
       spawn('xdg-open', [authUrl], { detached: true, stdio: 'ignore' }).unref();
     });
 
-    server.on('error', reject);
+    server.on('error', (err) => {
+      clearTimeout(authTimeout);
+      reject(err);
+    });
   });
 }
 
