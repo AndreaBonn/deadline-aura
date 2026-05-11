@@ -97,6 +97,8 @@ jobs:
 
       - name: Commit badges
         if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          HUSKY: '0'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
