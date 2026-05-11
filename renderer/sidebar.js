@@ -1241,7 +1241,7 @@ function renderStressForecast(dailyBreakdown) {
 
     const value = document.createElement('div');
     value.className = 'forecast-value';
-    value.textContent = day.stress;
+    value.textContent = `${day.stress * 10}%`;
     value.style.color = stressToColor(day.stress);
 
     const labelEl = document.createElement('div');
