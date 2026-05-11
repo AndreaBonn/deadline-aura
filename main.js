@@ -522,11 +522,11 @@ app.whenReady().then(() => {
     }
   }
 
-  ipcMain.on('toggle-sidebar', () => {
+  ipcMain.on('sidebar:toggle', () => {
     toggleSidebar();
   });
 
-  ipcMain.on('sync-now', async () => {
+  ipcMain.on('sync:run', async () => {
     try {
       const syncDaemon = require('./core/sync-daemon');
       const syncResult = await syncDaemon.sync(config);
@@ -539,7 +539,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.on('open-link', (_event, url) => {
+  ipcMain.on('shell:open-link', (_event, url) => {
     if (typeof url === 'string' && isSafeExternalUrl(url)) {
       const { spawn, execFileSync } = require('child_process');
       const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
@@ -560,7 +560,7 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.on('open-config', () => {
+  ipcMain.on('settings:open', () => {
     openSettingsWindow();
   });
 
@@ -589,12 +589,12 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.on('favorite-task', (_event, taskId) => {
+  ipcMain.on('task:favorite', (_event, taskId) => {
     favoriteQueries.favoriteTask(taskId);
     runUpdateCycle({ force: true });
   });
 
-  ipcMain.on('unfavorite-task', (_event, taskId) => {
+  ipcMain.on('task:unfavorite', (_event, taskId) => {
     favoriteQueries.unfavoriteTask(taskId);
     runUpdateCycle({ force: true });
   });
