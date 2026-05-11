@@ -2,6 +2,9 @@
 
 /* global t, initI18n */
 
+const POSTIT_WIDTH = 220;
+const POSTIT_HEIGHT = 80;
+
 let pinnedTasks = [];
 let currentDisplayId = 'default';
 let dragState = null;
@@ -98,8 +101,8 @@ function onDragMove(e) {
   let newY = e.clientY - dragState.offsetY;
 
   // Clamp within canvas
-  newX = Math.max(canvasRect.left, Math.min(newX, canvasRect.right - 220));
-  newY = Math.max(canvasRect.top, Math.min(newY, canvasRect.bottom - 80));
+  newX = Math.max(canvasRect.left, Math.min(newX, canvasRect.right - POSTIT_WIDTH));
+  newY = Math.max(canvasRect.top, Math.min(newY, canvasRect.bottom - POSTIT_HEIGHT));
 
   const xPct = ((newX - canvasRect.left) / canvasRect.width) * 100;
   const yPct = ((newY - canvasRect.top) / canvasRect.height) * 100;

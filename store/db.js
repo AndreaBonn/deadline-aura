@@ -8,6 +8,11 @@ const os = require('os');
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const DB_PATH = path.join(DATA_DIR, 'db.sqlite');
 
+const MS_PER_HOUR = 3600000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+const SCORE_RETENTION_DAYS = 7;
+const STALE_TASK_TTL_HOURS = 48;
+
 let db = null;
 
 function getDb() {
@@ -252,7 +257,7 @@ function getLatestAiCacheResponse() {
 }
 
 function getScoreHistory(days) {
-  const since = Date.now() - days * 24 * 3600000;
+  const since = Date.now() - days * MS_PER_DAY;
   return getDb()
     .prepare(
       'SELECT global_score, computed_at FROM scores WHERE computed_at >= ? ORDER BY computed_at ASC',
@@ -261,7 +266,7 @@ function getScoreHistory(days) {
 }
 
 function getAiCacheHistory(days) {
-  const since = Date.now() - days * 24 * 3600000;
+  const since = Date.now() - days * MS_PER_DAY;
   return getDb()
     .prepare(
       'SELECT response_json, computed_at FROM ai_cache WHERE computed_at >= ? ORDER BY computed_at ASC',
@@ -291,8 +296,8 @@ function markTaskDone(taskId) {
 }
 
 function cleanupOldRecords() {
-  const sevenDaysAgo = Date.now() - 7 * 24 * 3600000;
-  const fortyEightHoursAgo = Date.now() - 48 * 3600000;
+  const sevenDaysAgo = Date.now() - SCORE_RETENTION_DAYS * MS_PER_DAY;
+  const fortyEightHoursAgo = Date.now() - STALE_TASK_TTL_HOURS * MS_PER_HOUR;
 
   getDb().prepare('DELETE FROM scores WHERE computed_at < ?').run(sevenDaysAgo);
   getDb().prepare('DELETE FROM tasks WHERE is_stale = 1 AND synced_at < ?').run(fortyEightHoursAgo);
