@@ -52,7 +52,7 @@ let overlayWindow = null;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
-const STRIP_WIDTH = 20;
+const STRIP_WIDTH = 10;
 const DESKTOP_CHECK_MS = 1000;
 
 let sidebarWindow = null;
