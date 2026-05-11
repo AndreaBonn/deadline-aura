@@ -1,6 +1,7 @@
 'use strict';
 
 const { google } = require('googleapis');
+const crypto = require('crypto');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -66,10 +67,12 @@ function loadSavedToken(oAuth2Client) {
 
 function startAuthFlow(oAuth2Client) {
   return new Promise((resolve, reject) => {
+    const oauthState = crypto.randomBytes(16).toString('hex');
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
       prompt: 'consent',
+      state: oauthState,
     });
 
     const server = http.createServer(async (req, res) => {
@@ -78,6 +81,13 @@ function startAuthFlow(oAuth2Client) {
         if (url.pathname !== '/oauth/callback') {
           res.writeHead(404);
           res.end();
+          return;
+        }
+
+        const returnedState = url.searchParams.get('state');
+        if (returnedState !== oauthState) {
+          res.writeHead(403);
+          res.end('Invalid OAuth state — possible CSRF attempt');
           return;
         }
 
