@@ -48,6 +48,7 @@ This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 - Dynamic lookahead window: events fetched for at least 7 days ahead, extended to the following Sunday; Jira and local tasks are always included regardless of due date
 - Jira favorites: star any Jira task to pin it in a dedicated "Favorites" section between Google Calendar and Jira in the sidebar; favorites persist across restarts
 - Time logging to Google Calendar: clock button on any task opens an inline form to create a calendar event with date, time, duration, and target calendar; events are formatted as `[JIRA-KEY] - Title` for compatibility with Tempo time tracking
+- Live timer: play/stop button on any Jira or local task starts a real-time timer that creates a Google Calendar event immediately and updates its end time every 60 seconds; pressing stop finalizes the event with the exact duration. Timer state persists in localStorage for crash recovery. An "In Progress" section at the top of the sidebar highlights the currently timed task
 
 ## Setup
 
@@ -221,6 +222,18 @@ The created event is formatted as `[JIRA-KEY] - Task Title`, compatible with Tem
 For local tasks that don't have a Jira key in the title, you can either select an existing Jira task from a dropdown or type a code manually.
 
 After logging, the clock icon briefly shows a green checkmark, then returns to normal so you can log again.
+
+### Live timer
+
+Next to the clock icon, each Jira and local task has a green play button. Click it to start a live timer:
+
+1. **Starting**: press the play button (▶). If no default calendar is set, a small picker appears to select one. For local tasks without a Jira key, you are prompted to associate one first.
+2. **Running**: the play button is replaced by a red stop button showing elapsed time (e.g. ■ 00:12:34). A Google Calendar event is created immediately with a default duration of 30 minutes and updated every 60 seconds.
+3. **Stopping**: press the stop button. The calendar event is finalized with the exact duration. A green checkmark confirms success.
+
+While a timer is running, the task appears in a dedicated **In Progress** section at the top of the sidebar, before all other sections. Only one timer can be active at a time - starting a new one automatically stops the previous.
+
+If the app closes while a timer is running, it resumes automatically on next launch (timer state is persisted in localStorage).
 
 ### AI notes and burnout detection
 

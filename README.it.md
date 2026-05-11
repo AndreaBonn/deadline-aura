@@ -48,6 +48,7 @@ Questa è una release iniziale (v0.1.0). Esistono difetti noti. Solo Linux/X11/G
 - Finestra di lookahead dinamica: eventi raccolti per almeno 7 giorni in avanti, estesi alla domenica successiva; task Jira e locali sempre inclusi indipendentemente dalla scadenza
 - Preferiti Jira: stella su qualsiasi task Jira per fissarlo in una sezione "Preferiti" dedicata tra Google Calendar e Jira nella sidebar; i preferiti persistono tra i riavvii
 - Time logging su Google Calendar: bottone orologio su qualsiasi task apre un form inline per creare un evento con data, ora, durata e calendario di destinazione; gli eventi sono formattati come `[CODICE-JIRA] - Titolo` per compatibilità con il tracciamento tempo di Tempo
+- Timer live: pulsante play/stop su qualsiasi task Jira o locale avvia un timer in tempo reale che crea un evento Google Calendar immediato e ne aggiorna l'orario di fine ogni 60 secondi; premendo stop l'evento viene finalizzato con la durata esatta. Lo stato del timer persiste in localStorage per il recupero da crash. Una sezione "In Corso" in cima alla sidebar evidenzia il task attualmente cronometrato
 
 ## Installazione
 
@@ -221,6 +222,18 @@ L'evento creato è formattato come `[CODICE-JIRA] - Titolo Task`, compatibile co
 Per task locali senza codice Jira nel titolo, puoi selezionare un task Jira esistente da un dropdown o digitare un codice manualmente.
 
 Dopo il log, l'icona orologio mostra brevemente una spunta verde, poi torna normale per permettere un nuovo log.
+
+### Timer live
+
+Accanto all'icona orologio, ogni task Jira e locale ha un pulsante play verde. Cliccalo per avviare un timer live:
+
+1. **Avvio**: premi il pulsante play (▶). Se non c'è un calendario di default, compare un piccolo selettore. Per task locali senza codice Jira, viene chiesto di associarne uno prima.
+2. **In corso**: il pulsante play viene sostituito da un pulsante stop rosso che mostra il tempo trascorso (es. ■ 00:12:34). Un evento Google Calendar viene creato subito con durata di default 30 minuti e aggiornato ogni 60 secondi.
+3. **Fine**: premi il pulsante stop. L'evento sul calendario viene finalizzato con la durata esatta. Una spunta verde conferma il successo.
+
+Mentre un timer è attivo, il task compare in una sezione dedicata **In Corso** in cima alla sidebar, prima di tutte le altre sezioni. Un solo timer alla volta può essere attivo - avviarne uno nuovo ferma automaticamente il precedente.
+
+Se l'app si chiude durante un timer attivo, alla riapertura il timer riprende automaticamente (lo stato è salvato in localStorage).
 
 ### Note AI e rilevamento burnout
 
