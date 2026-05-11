@@ -4,7 +4,7 @@
   "description": "Desktop widget that creates ambient visual pressure based on upcoming deadlines",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron-rebuild && electron .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -14,7 +14,6 @@
     "format:check": "prettier --check .",
     "sync": "node core/sync-daemon.js",
     "rebuild": "electron-rebuild",
-    "postinstall": "electron-rebuild",
     "prepare": "husky"
   },
   "engines": {
@@ -32,8 +31,8 @@
     "url": "https://github.com/AndreaBonn/deadline-aura/issues"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
-    "canvas": "^2.11.2",
+    "better-sqlite3": "^11.10.0",
+    "canvas": "^3.2.3",
     "dotenv": "^17.4.2",
     "electron": "^36.9.5",
     "googleapis": "^144.0.0",
