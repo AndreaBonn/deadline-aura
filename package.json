@@ -35,7 +35,7 @@
     "better-sqlite3": "^11.0.0",
     "canvas": "^2.11.2",
     "dotenv": "^17.4.2",
-    "electron": "^30.0.0",
+    "electron": "^36.9.5",
     "googleapis": "^144.0.0",
     "zod": "^3.23.0"
   },
