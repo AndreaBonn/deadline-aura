@@ -470,6 +470,31 @@ app.whenReady().then(() => {
     }
   }, burnoutIntervalMs);
 
+  function isSafeExternalUrl(url) {
+    try {
+      const parsed = new URL(url);
+      if (!['https:', 'http:'].includes(parsed.protocol)) {
+        return false;
+      }
+      if (parsed.username || parsed.password) {
+        return false;
+      }
+      const host = parsed.hostname.toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+        return false;
+      }
+      if (host.startsWith('10.') || host.startsWith('192.168.')) {
+        return false;
+      }
+      if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   ipcMain.on('toggle-sidebar', () => {
     toggleSidebar();
   });
@@ -488,7 +513,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('open-link', (_event, url) => {
-    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+    if (typeof url === 'string' && isSafeExternalUrl(url)) {
       const { spawn, execFileSync } = require('child_process');
       const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
       let opened = false;
