@@ -20,8 +20,25 @@ const ENV_KEY_MAP = {
   anthropic: 'ANTHROPIC_API_KEYS',
 };
 
+let cachedProviders = null;
+let cachedCacheKey = null;
+
+function buildCacheKey(priority) {
+  const envParts = priority.map((name) => {
+    const envVar = ENV_KEY_MAP[name];
+    return `${name}:${process.env[envVar] || ''}`;
+  });
+  return priority.join(',') + '|' + envParts.join('|');
+}
+
 function loadProviders(config) {
   const priority = config.ai?.provider_priority || ['groq', 'gemini', 'openai', 'anthropic'];
+  const cacheKey = buildCacheKey(priority);
+
+  if (cachedProviders && cachedCacheKey === cacheKey) {
+    return cachedProviders;
+  }
+
   const providers = [];
 
   for (const name of priority) {
@@ -46,6 +63,8 @@ function loadProviders(config) {
     }
   }
 
+  cachedProviders = providers;
+  cachedCacheKey = cacheKey;
   return providers;
 }
 
