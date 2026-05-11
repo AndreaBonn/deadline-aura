@@ -12,7 +12,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "sync": "node core/sync-daemon.js"
+    "sync": "node core/sync-daemon.js",
+    "rebuild": "electron-rebuild",
+    "postinstall": "electron-rebuild"
   },
   "engines": {
     "node": ">=20.0.0 <24.0.0"
