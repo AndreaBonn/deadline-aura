@@ -1,12 +1,27 @@
 'use strict';
 
+const MAX_TITLE_LENGTH = 150;
+const MAX_DESCRIPTION_LENGTH = 200;
+const MAX_FIELD_LENGTH = 100;
+
+function sanitizeField(value, maxLength) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
 function buildScoringPrompt(events, language = 'it') {
   const outputLanguage = language === 'en' ? 'English' : 'Italian';
   const now = new Date().toISOString();
 
   const eventList = events
     .map((e, i) => {
-      const parts = [`${i + 1}. "${e.title}"`];
+      const title = sanitizeField(e.title, MAX_TITLE_LENGTH);
+      const parts = [`${i + 1}. "${title}"`];
       if (e.due_at) {
         parts.push(`due: ${new Date(e.due_at).toISOString()}`);
       }
@@ -17,10 +32,10 @@ function buildScoringPrompt(events, language = 'it') {
         try {
           const raw = JSON.parse(e.raw_json);
           if (raw.description) {
-            parts.push(`desc: ${raw.description.slice(0, 200)}`);
+            parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
           }
           if (raw.location) {
-            parts.push(`location: ${raw.location}`);
+            parts.push(`location: ${sanitizeField(raw.location, MAX_FIELD_LENGTH)}`);
           }
           if (raw.start) {
             parts.push(`start: ${raw.start.dateTime || raw.start.date}`);
@@ -29,7 +44,8 @@ function buildScoringPrompt(events, language = 'it') {
             parts.push(`end: ${raw.end.dateTime || raw.end.date}`);
           }
           if (raw.organizer) {
-            parts.push(`organizer: ${raw.organizer.email || raw.organizer.displayName}`);
+            const org = raw.organizer.email || raw.organizer.displayName;
+            parts.push(`organizer: ${sanitizeField(org, MAX_FIELD_LENGTH)}`);
           }
           if (raw.attendees) {
             parts.push(`attendees: ${raw.attendees.length}`);
