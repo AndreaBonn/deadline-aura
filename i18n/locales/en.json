@@ -57,7 +57,10 @@
     "manual_code_placeholder": "e.g. PROJ-123",
     "jira_favorites": "Jira Favorites",
     "add_to_favorites": "Add to favorites",
-    "remove_from_favorites": "Remove from favorites"
+    "remove_from_favorites": "Remove from favorites",
+    "shift_ends": "Shift ends in",
+    "shift_starts": "Shift starts in",
+    "shift_off": "Off shift"
   },
   "priorities": {
     "p1_full": "P1 - Critical",
@@ -80,7 +83,8 @@
       "sidebar": "Sidebar",
       "notifications": "Notifications",
       "ui": "Interface",
-      "advanced": "Advanced"
+      "advanced": "Advanced",
+      "work_shift": "Shift"
     },
     "reset_section": "Reset section",
     "saved": "Saved",
@@ -145,7 +149,34 @@
     "tag_add_placeholder": "Add...",
     "jira_domain": "Domain",
     "jira_email": "Email",
-    "jira_api_token": "API Token"
+    "jira_api_token": "API Token",
+    "work_shift_group": "Work shift",
+    "work_shift_enabled": "Shift countdown",
+    "work_shift_enabled_hint": "Show countdown in sidebar",
+    "work_shift_mode": "Mode",
+    "work_shift_mode_regular": "Regular",
+    "work_shift_mode_variable": "Variable shifts",
+    "work_shift_work_days": "Work days",
+    "work_shift_slots": "Time slots",
+    "work_shift_slot_n": "Slot {n}",
+    "work_shift_start": "Start",
+    "work_shift_end": "End",
+    "work_shift_add_slot": "+ Add slot",
+    "work_shift_remove_slot": "Remove",
+    "work_shift_holidays": "Holidays and leave",
+    "work_shift_holidays_hint": "Past dates are automatically removed",
+    "work_shift_add_holiday": "+ Add date",
+    "work_shift_variable_hint": "Set shifts for current and next month",
+    "work_shift_copy_week": "Copy week",
+    "work_shift_clear_month": "Clear month",
+    "work_shift_no_shift": "Off",
+    "work_shift_day_short_0": "Sun",
+    "work_shift_day_short_1": "Mon",
+    "work_shift_day_short_2": "Tue",
+    "work_shift_day_short_3": "Wed",
+    "work_shift_day_short_4": "Thu",
+    "work_shift_day_short_5": "Fri",
+    "work_shift_day_short_6": "Sat"
   },
   "wallpaper": {
     "next_24h": "NEXT 24H",

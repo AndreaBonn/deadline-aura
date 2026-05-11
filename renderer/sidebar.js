@@ -1,6 +1,7 @@
 'use strict';
 
-/* global t, _i18nReady, initI18n, formatElapsed, localStorage */
+/* global t, _i18nReady, initI18n, formatElapsed, localStorage,
+   updateShiftCountdown, setShiftConfig */
 
 const COLLAPSED_LIMIT = 5;
 const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
@@ -172,6 +173,7 @@ function updateClock() {
   const locale = rawLocale.includes('-') ? rawLocale : 'it-IT';
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
   document.getElementById('clockDate').textContent = now.toLocaleDateString(locale, options);
+  updateShiftCountdown();
 }
 
 function renderUrgencyBar(globalScore, palette) {
@@ -1266,6 +1268,16 @@ restoreTimerState();
 
 // Init i18n before first render
 initI18n(window.deadlineAura);
+
+// Load work shift config and listen for changes
+window.deadlineAura.getWorkShiftConfig().then((cfg) => {
+  setShiftConfig(cfg);
+  updateShiftCountdown();
+});
+window.deadlineAura.onConfigChanged((cfg) => {
+  setShiftConfig(cfg.work_shift || null);
+  updateShiftCountdown();
+});
 
 window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);

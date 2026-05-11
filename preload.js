@@ -24,4 +24,6 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   updateCalendarEvent: (params) => ipcRenderer.invoke('calendar:update-event', params),
   getDefaultLogCalendar: () => ipcRenderer.invoke('calendar:get-default'),
   setDefaultLogCalendar: (calendarId) => ipcRenderer.invoke('calendar:set-default', calendarId),
+  getWorkShiftConfig: () => ipcRenderer.invoke('config:get-work-shift'),
+  onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, cfg) => callback(cfg)),
 });

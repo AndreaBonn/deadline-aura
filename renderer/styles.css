@@ -42,6 +42,41 @@ body {
   text-transform: capitalize;
 }
 
+/* --- Work shift countdown --- */
+
+.shift-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 20px 12px;
+  user-select: none;
+}
+
+.shift-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.6;
+}
+
+.shift-time {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.shift-countdown.working .shift-label,
+.shift-countdown.working .shift-time {
+  color: rgba(34, 197, 94, 0.85);
+}
+
+.shift-countdown.off .shift-label,
+.shift-countdown.off .shift-time {
+  color: rgba(239, 68, 68, 0.7);
+}
+
 .urgency-section {
   padding: 0 20px 16px;
   cursor: pointer;

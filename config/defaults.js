@@ -64,6 +64,21 @@ const DEFAULTS = {
     show_source_badge: true,
     countdown_format: 'relative',
   },
+  work_shift: {
+    enabled: true,
+    mode: 'regular',
+    regular: {
+      work_days: [1, 2, 3, 4, 5],
+      slots: [
+        { start: '09:00', end: '13:00' },
+        { start: '14:00', end: '18:00' },
+      ],
+      holidays: [],
+    },
+    variable: {
+      months: {},
+    },
+  },
 };
 
 module.exports = { DEFAULTS };

@@ -20,8 +20,31 @@ const { loadConfig, saveConfig } = require('./config/loader');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
 const i18n = require('./i18n');
+const { cleanupPastHolidays, cleanupExpiredMonths } = require('./core/work-shift');
 let config = loadConfig();
 i18n.setLanguage(config.language || 'it');
+
+// Auto-cleanup past holidays and expired variable months at startup
+if (config.work_shift) {
+  let changed = false;
+  if (config.work_shift.regular?.holidays?.length) {
+    const cleaned = cleanupPastHolidays(config.work_shift.regular.holidays);
+    if (cleaned.length !== config.work_shift.regular.holidays.length) {
+      config.work_shift.regular.holidays = cleaned;
+      changed = true;
+    }
+  }
+  if (config.work_shift.variable?.months && Object.keys(config.work_shift.variable.months).length) {
+    const cleaned = cleanupExpiredMonths(config.work_shift.variable.months);
+    if (Object.keys(cleaned).length !== Object.keys(config.work_shift.variable.months).length) {
+      config.work_shift.variable.months = cleaned;
+      changed = true;
+    }
+  }
+  if (changed) {
+    saveConfig(config);
+  }
+}
 
 let settingsWindow = null;
 let overlayWindow = null;
@@ -491,6 +514,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
 
+  ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
   ipcMain.handle('settings:get-config', () => config);
   ipcMain.handle('settings:get-defaults', () => DEFAULTS);
   ipcMain.handle('settings:save-config', (_event, newConfig) => {

@@ -79,6 +79,38 @@ const configSchema = z.object({
     show_source_badge: z.boolean(),
     countdown_format: z.enum(['relative', 'absolute', 'both']),
   }),
+  work_shift: z
+    .object({
+      enabled: z.boolean(),
+      mode: z.enum(['regular', 'variable']),
+      regular: z.object({
+        work_days: z.array(z.number().int().min(0).max(6)),
+        slots: z
+          .array(
+            z.object({
+              start: z.string().regex(/^\d{2}:\d{2}$/),
+              end: z.string().regex(/^\d{2}:\d{2}$/),
+            }),
+          )
+          .max(4),
+        holidays: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+      }),
+      variable: z.object({
+        months: z.record(
+          z.string().regex(/^\d{4}-\d{2}$/),
+          z.record(
+            z.string().regex(/^\d{1,2}$/),
+            z.array(
+              z.object({
+                start: z.string().regex(/^\d{2}:\d{2}$/),
+                end: z.string().regex(/^\d{2}:\d{2}$/),
+              }),
+            ),
+          ),
+        ),
+      }),
+    })
+    .optional(),
 });
 
 function validateConfig(config) {

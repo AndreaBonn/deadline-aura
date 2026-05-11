@@ -2,7 +2,8 @@
 
 /* global settingsApi, createToggle, createNumberInput, createRangeWithValue,
    createSelect, createTextInput, createTagInput, createPriorityList,
-   createField, createFieldGroup, initI18n, t */
+   createField, createFieldGroup, createCheckboxGroup, createDateList,
+   createTimeSlotList, createVariableMonthGrid, initI18n, t */
 
 let config = {};
 let defaults = {};
@@ -51,6 +52,7 @@ document.getElementById('btnReset').addEventListener('click', () => {
     sidebar: ['sidebar'],
     notifiche: ['notifications'],
     ui: ['ui', 'language'],
+    turno: ['work_shift'],
     avanzate: ['engine'],
   };
   const sections = sectionMap[activeTab] || [];
@@ -460,6 +462,112 @@ function renderAvanzate() {
   return [group];
 }
 
+function ensureWorkShift() {
+  if (!config.work_shift) {
+    config.work_shift = JSON.parse(JSON.stringify(defaults.work_shift));
+  }
+  return config.work_shift;
+}
+
+function renderTurno() {
+  const ws = ensureWorkShift();
+
+  const mainGroup = createFieldGroup(t('settings.work_shift_group'));
+  mainGroup.append(
+    createField(
+      t('settings.work_shift_enabled'),
+      createToggle(ws.enabled, (v) => {
+        ws.enabled = v;
+        renderTab();
+      }),
+      t('settings.work_shift_enabled_hint'),
+    ),
+  );
+
+  if (!ws.enabled) {
+    return [mainGroup];
+  }
+
+  mainGroup.append(
+    createField(
+      t('settings.work_shift_mode'),
+      createSelect(
+        ws.mode,
+        [
+          { value: 'regular', label: t('settings.work_shift_mode_regular') },
+          { value: 'variable', label: t('settings.work_shift_mode_variable') },
+        ],
+        (v) => {
+          ws.mode = v;
+          renderTab();
+        },
+      ),
+    ),
+  );
+
+  if (ws.mode === 'regular') {
+    const regularGroup = createFieldGroup(t('settings.work_shift_work_days'));
+    regularGroup.appendChild(
+      createCheckboxGroup(
+        ws.regular.work_days,
+        [0, 1, 2, 3, 4, 5, 6].map((d) => ({
+          value: d,
+          label: t(`settings.work_shift_day_short_${d}`),
+        })),
+        (v) => {
+          ws.regular.work_days = v;
+        },
+      ),
+    );
+
+    const slotsGroup = createFieldGroup(t('settings.work_shift_slots'));
+    slotsGroup.appendChild(
+      createTimeSlotList(ws.regular.slots, (v) => {
+        ws.regular.slots = v;
+      }),
+    );
+
+    const holidaysGroup = createFieldGroup(t('settings.work_shift_holidays'));
+    holidaysGroup.appendChild(
+      createDateList(ws.regular.holidays, (v) => {
+        ws.regular.holidays = v;
+      }),
+    );
+
+    return [mainGroup, regularGroup, slotsGroup, holidaysGroup];
+  }
+
+  // Variable mode
+  const variableGroup = createFieldGroup(t('settings.work_shift_mode_variable'));
+  const hint = document.createElement('div');
+  hint.className = 'field-hint';
+  hint.style.marginBottom = '12px';
+  hint.textContent = t('settings.work_shift_variable_hint');
+  variableGroup.appendChild(hint);
+
+  if (!ws.variable) {
+    ws.variable = { months: {} };
+  }
+
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const nextDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+
+  for (const monthKey of [currentMonth, nextMonth]) {
+    if (!ws.variable.months[monthKey]) {
+      ws.variable.months[monthKey] = {};
+    }
+    variableGroup.appendChild(
+      createVariableMonthGrid(monthKey, ws.variable.months[monthKey], (updated) => {
+        ws.variable.months[monthKey] = updated;
+      }),
+    );
+  }
+
+  return [mainGroup, variableGroup];
+}
+
 const renderers = {
   generale: renderGenerale,
   sorgenti: renderSorgenti,
@@ -468,6 +576,7 @@ const renderers = {
   sidebar: renderSidebar,
   notifiche: renderNotifiche,
   ui: renderUI,
+  turno: renderTurno,
   avanzate: renderAvanzate,
 };
 
