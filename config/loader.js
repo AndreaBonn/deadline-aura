@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { DEFAULTS } = require('./defaults');
+const { configSchema } = require('./schema');
 
 const CONFIG_PATH = path.join(os.homedir(), '.config', 'deadlineaura', 'config.json');
 
@@ -38,7 +39,14 @@ function loadConfig() {
     return { ...DEFAULTS };
   }
 
-  return deepMerge(DEFAULTS, userConfig);
+  const merged = deepMerge(DEFAULTS, userConfig);
+  const result = configSchema.safeParse(merged);
+  if (!result.success) {
+    const fields = result.error.flatten().fieldErrors;
+    console.error('Config: invalid fields after merge, falling back to defaults:', fields);
+    return { ...DEFAULTS };
+  }
+  return result.data;
 }
 
 function saveConfig(newConfig) {
