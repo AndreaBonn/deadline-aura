@@ -193,6 +193,26 @@ function filterJiraTasks(tasks) {
   });
 }
 
+function renderActiveTimerSection(container, tasks, palette) {
+  if (!activeTimer) {
+    return;
+  }
+  const timerTask = tasks.find(function (task) {
+    return task.id === activeTimer.taskId;
+  });
+  if (!timerTask) {
+    return;
+  }
+
+  const label = document.createElement('div');
+  label.className = 'section-label active-timer-label';
+  label.textContent = t('sidebar.in_progress');
+  container.appendChild(label);
+
+  const card = createTaskCard(timerTask, palette);
+  container.appendChild(card);
+}
+
 function renderTaskList(tasks, palette) {
   const container = document.getElementById('tasksContainer');
 
@@ -230,6 +250,7 @@ function renderTaskList(tasks, palette) {
     return task.source === 'jira' && favoriteTaskIds.has(task.id);
   });
 
+  renderActiveTimerSection(container, tasks, palette);
   renderLocalSection(container, localTasks, palette);
   if (gcalTasks.length > 0) {
     renderSection(container, t('sidebar.google_calendar'), gcalTasks, palette, 'gcal');

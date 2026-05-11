@@ -47,6 +47,7 @@
     "duration_minutes": "Durata (min)",
     "time_logged": "Tempo loggato",
     "logging": "Invio...",
+    "in_progress": "In Corso",
     "timer_start": "Avvia timer",
     "timer_stop": "Ferma timer",
     "timer_select_calendar": "Seleziona calendario per il timer",

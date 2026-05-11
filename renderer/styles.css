@@ -184,6 +184,10 @@ body {
   padding: 16px 20px 8px;
 }
 
+.active-timer-label {
+  color: rgba(239, 68, 68, 0.7);
+}
+
 .task-card {
   margin: 0 12px 6px;
   padding: 10px 12px;
