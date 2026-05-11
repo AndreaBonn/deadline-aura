@@ -1,6 +1,6 @@
 [English](./README.md) | **Italiano**
 
-# DeadlineAura
+# Deadline Aura by Bonn
 
 Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo ambientale — una striscia colorata, uno sfondo cromatico e task su post-it che si aggiornano man mano che le scadenze si avvicinano.
 
@@ -19,7 +19,7 @@ Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo am
 
 ## Cosa fa
 
-DeadlineAura recupera task da Google Calendar e Jira, calcola uno score di urgenza per ciascuno e riflette il carico complessivo come colore: verde calmo a bassa pressione, giallo in zona di attenzione, rosso intenso allo stato critico. Il colore appare su una striscia laterale persistente su ogni display, come tinta del wallpaper e, opzionalmente, come post-it renderizzati direttamente nello sfondo del desktop.
+Deadline Aura recupera task da Google Calendar e Jira, calcola uno score di urgenza per ciascuno e riflette il carico complessivo come colore: verde calmo a bassa pressione, giallo in zona di attenzione, rosso intenso allo stato critico. Il colore appare su una striscia laterale persistente su ogni display, come tinta del wallpaper e, opzionalmente, come post-it renderizzati direttamente nello sfondo del desktop.
 
 Un layer opzionale di AI scoring (Groq, Gemini, OpenAI o Anthropic) valuta il carico cognitivo ed emotivo sull'intera finestra di eventi e fonde quella valutazione (70%) con lo score meccanico basato sul tempo (30%). Se nessun provider AI è configurato, la formula meccanica viene usata da sola.
 
@@ -95,7 +95,7 @@ npx electron-rebuild   # ricompila better-sqlite3 e canvas contro il Node ABI di
 
 ### Passo 4 — Crea le credenziali Google Cloud
 
-DeadlineAura ha bisogno di credenziali OAuth 2.0 per leggere Google Calendar.
+Deadline Aura ha bisogno di credenziali OAuth 2.0 per leggere Google Calendar.
 
 1. Vai su [Google Cloud Console](https://console.cloud.google.com) e crea un nuovo progetto (o usa uno esistente)
 2. Nel menu a sinistra: **API e servizi → Libreria** → cerca "Google Calendar API" → Abilita
@@ -302,7 +302,7 @@ Per segnalare una vulnerabilità, consulta [SECURITY.it.md](./SECURITY.it.md).
 
 Rilasciato sotto [Apache License 2.0](./LICENSE).
 
-L'uso commerciale è consentito. Se usi DeadlineAura in un prodotto o servizio commerciale, è richiesta l'attribuzione all'autore originale come previsto dalla licenza.
+L'uso commerciale è consentito. Se usi Deadline Aura in un prodotto o servizio commerciale, è richiesta l'attribuzione all'autore originale come previsto dalla licenza.
 
 ## Autore
 

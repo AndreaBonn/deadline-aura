@@ -1,6 +1,6 @@
 **English** | [Italiano](./README.it.md)
 
-# DeadlineAura
+# Deadline Aura by Bonn
 
 Desktop widget for Linux that maps your workload into an ambient visual signal — a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
 
@@ -19,7 +19,7 @@ Desktop widget for Linux that maps your workload into an ambient visual signal �
 
 ## What it does
 
-DeadlineAura pulls tasks from Google Calendar and Jira, computes an urgency score for each one, and reflects the aggregate load as color: calm green at low pressure, through yellow, to deep red at critical. The color appears on a persistent sidebar strip on each display, as a wallpaper tint, and optionally as post-it notes rendered directly into the desktop background.
+Deadline Aura pulls tasks from Google Calendar and Jira, computes an urgency score for each one, and reflects the aggregate load as color: calm green at low pressure, through yellow, to deep red at critical. The color appears on a persistent sidebar strip on each display, as a wallpaper tint, and optionally as post-it notes rendered directly into the desktop background.
 
 An optional AI scoring layer (Groq, Gemini, OpenAI, or Anthropic) evaluates cognitive and emotional load across the full event window and blends that assessment (70%) with the time-based mechanical score (30%). If no AI provider is configured, the mechanical formula runs alone.
 
@@ -95,7 +95,7 @@ npx electron-rebuild   # rebuilds better-sqlite3 and canvas against Electron's N
 
 ### Step 4 — Create Google Cloud credentials
 
-DeadlineAura needs OAuth 2.0 credentials to read your Google Calendar.
+Deadline Aura needs OAuth 2.0 credentials to read your Google Calendar.
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com) and create a new project (or use an existing one)
 2. In the left menu: **APIs & Services → Library** → search for "Google Calendar API" → Enable it
@@ -325,7 +325,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 Released under the [Apache License 2.0](./LICENSE).
 
-Commercial use is permitted. If you use DeadlineAura in a commercial product or service, attribution to the original author is required per the license terms.
+Commercial use is permitted. If you use Deadline Aura in a commercial product or service, attribution to the original author is required per the license terms.
 
 ## Author
 
