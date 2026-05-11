@@ -14,20 +14,10 @@ const OAUTH_PORT = 34567;
 const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 
+const { getLookaheadEnd } = require('../core/deadline-engine');
+
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
-
-function getLookaheadEnd() {
-  const now = new Date();
-  const minEnd = new Date(now);
-  minEnd.setDate(now.getDate() + 7);
-  const dayOfWeek = minEnd.getDay();
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-  const endDate = new Date(minEnd);
-  endDate.setDate(minEnd.getDate() + daysUntilSunday);
-  endDate.setHours(23, 59, 59, 999);
-  return endDate;
-}
 
 function createOAuthClient(clientId, clientSecret) {
   return new google.auth.OAuth2(

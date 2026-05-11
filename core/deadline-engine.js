@@ -141,7 +141,7 @@ function computeGlobalScore(tasks, options = {}) {
   };
 }
 
-function getLookaheadMs() {
+function getLookaheadEnd() {
   const now = new Date();
   const minEnd = new Date(now);
   minEnd.setDate(now.getDate() + 7);
@@ -150,7 +150,11 @@ function getLookaheadMs() {
   const endDate = new Date(minEnd);
   endDate.setDate(minEnd.getDate() + daysUntilSunday);
   endDate.setHours(23, 59, 59, 999);
-  return endDate.getTime() - Date.now();
+  return endDate;
+}
+
+function getLookaheadMs() {
+  return getLookaheadEnd().getTime() - Date.now();
 }
 
 function run(options = {}) {
@@ -172,4 +176,5 @@ module.exports = {
   AI_SCORE_MAX_AGE_MS,
   VOLUME_THRESHOLD,
   VOLUME_AMPLIFIER,
+  getLookaheadEnd,
 };
