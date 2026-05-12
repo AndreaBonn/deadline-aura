@@ -85,6 +85,7 @@ function restoreTokens(newConfig, originalConfig) {
 let sidebarWindow = null;
 let sidebarReady = false;
 let sidebarManualOpen = false;
+let sidebarManualClose = false;
 let stripWindows = new Map(); // displayId → BrowserWindow
 let desktopCheckInterval = null;
 let currentPaletteHex = '#334155';
@@ -202,9 +203,11 @@ function toggleSidebar() {
   }
   if (sidebarWindow.isVisible()) {
     sidebarManualOpen = false;
+    sidebarManualClose = true;
     hideSidebar();
   } else {
     sidebarManualOpen = true;
+    sidebarManualClose = false;
     const cursor = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(cursor);
     showSidebarOnDisplay(display);
@@ -334,10 +337,12 @@ function checkDesktopState() {
 
     const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
 
-    if (freeDisplay && !sidebarWindow.isVisible()) {
+    if (freeDisplay && !sidebarWindow.isVisible() && !sidebarManualClose) {
       showSidebarOnDisplay(freeDisplay);
     } else if (!freeDisplay && sidebarWindow.isVisible() && !sidebarManualOpen) {
       hideSidebar();
+    } else if (!freeDisplay) {
+      sidebarManualClose = false;
     }
   });
 }
