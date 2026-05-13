@@ -23,7 +23,12 @@ Deadline Aura recupera task da Google Calendar e Jira, calcola uno score di urge
 
 Un layer opzionale di AI scoring (Groq, Gemini, OpenAI o Anthropic) valuta il carico cognitivo ed emotivo sull'intera finestra di eventi e fonde quella valutazione (70%) con lo score meccanico basato sul tempo (30%). Se nessun provider AI è configurato, la formula meccanica viene usata da sola.
 
-Questa è una release iniziale (v0.1.0). Esistono difetti noti. Solo Linux/X11/GNOME.
+Solo Linux/X11/GNOME.
+
+<div align="center">
+<img src="assets/img-readme/desktop.png" alt="Desktop Deadline Aura con wallpaper e post-it" width="800">
+<br><em>Vista desktop: wallpaper con tinta cromatica, post-it dei task e striscia di urgenza sul bordo destro</em>
+</div>
 
 ## Funzionalità
 
@@ -42,7 +47,7 @@ Questa è una release iniziale (v0.1.0). Esistono difetti noti. Solo Linux/X11/G
 - Clinical note AI: valutazione in linguaggio naturale da psicologo occupazionale simulato, con grafico di previsione stress a 5 giorni — visibili in pannello collassabile attivato cliccando la barra di urgenza
 - Notifiche desktop via `notify-send` con soglia di score e cooldown configurabili; urgenza critica per alert burnout
 - Interfaccia bilingue (italiano/inglese) selezionabile dalle impostazioni; traduzioni caricate via IPC con chiavi dot-notation e interpolazione placeholder
-- Pannello impostazioni con 8 tab di configurazione (Generale, Sorgenti, AI, Wallpaper, Sidebar, Notifiche, Interfaccia, Avanzate) e reset per sezione
+- Pannello impostazioni con 9 tab di configurazione (Generale, Sorgenti, AI, Wallpaper, Sidebar, Notifiche, Interfaccia, Turno, Avanzate) e reset per sezione
 - Auto-show sidebar su display senza finestre visibili (rilevamento via `wmctrl`)
 - Lock singola istanza per impedire processi widget duplicati
 - Finestra di lookahead dinamica: eventi raccolti per almeno 7 giorni in avanti, estesi alla domenica successiva; task Jira e locali sempre inclusi indipendentemente dalla scadenza
@@ -184,6 +189,11 @@ Dopo aver avviato l'app (`npm start`), una striscia colorata appare sul bordo de
 
 Clicca la striscia per aprire la sidebar. I task sono raggruppati in sezioni:
 
+<div align="center">
+<img src="assets/img-readme/sidebar.png" alt="Sidebar con sezioni task" width="700">
+<br><em>Sidebar: nota clinica AI, previsione stress, sezioni task con score di urgenza e pulsanti azione</em>
+</div>
+
 1. **Locale** - task personali creati direttamente nell'app
 2. **Google Calendar** - eventi dai calendari sincronizzati
 3. **Preferiti Jira** - task Jira che hai stellato (visibile solo se hai preferiti)
@@ -219,6 +229,11 @@ Clicca l'icona orologio su qualsiasi card per aprire il form di time log. Il for
 
 L'evento creato è formattato come `[CODICE-JIRA] - Titolo Task`, compatibile con Tempo e altri strumenti di tracciamento tempo Jira. Il calendario scelto viene salvato come default per i log futuri.
 
+<div align="center">
+<img src="assets/img-readme/log-ore.png" alt="Form di time logging" width="350">
+<br><em>Form inline di time log: data, ora, durata e calendario di destinazione</em>
+</div>
+
 Per task locali senza codice Jira nel titolo, puoi selezionare un task Jira esistente da un dropdown o digitare un codice manualmente.
 
 Dopo il log, l'icona orologio mostra brevemente una spunta verde, poi torna normale per permettere un nuovo log.
@@ -246,18 +261,24 @@ Il rilevatore di burnout funziona automaticamente in background, analizzando 7 g
 
 ### Impostazioni
 
-Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ha 8 tab:
+Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ha 9 tab:
 
-| Tab         | Cosa puoi configurare                                                |
-| ----------- | -------------------------------------------------------------------- |
-| Generale    | Intervallo sync, finestra lookahead                                  |
-| Sorgenti    | Calendari e keyword Google Calendar, istanze Jira e JQL              |
-| AI          | Ordine priorità provider, intervallo ricalcolo, timeout, temperatura |
-| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it            |
-| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                      |
-| Notifiche   | Abilita/disabilita, soglia score, cooldown                           |
-| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown      |
-| Avanzate    | Costanti urgency engine e pesi per priorità                          |
+<div align="center">
+<img src="assets/img-readme/settings.png" alt="Pannello impostazioni" width="600">
+<br><em>Pannello impostazioni: 9 tab di configurazione con reset per sezione</em>
+</div>
+
+| Tab         | Cosa puoi configurare                                                  |
+| ----------- | ---------------------------------------------------------------------- |
+| Generale    | Intervallo sync, finestra lookahead                                    |
+| Sorgenti    | Calendari e keyword Google Calendar, istanze Jira e JQL                |
+| AI          | Ordine priorità provider, intervallo ricalcolo, timeout, temperatura   |
+| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it              |
+| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                        |
+| Notifiche   | Abilita/disabilita, soglia score, cooldown                             |
+| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown        |
+| Turno       | Giorni lavorativi, fasce orarie, ferie, modalità turno fisso/variabile |
+| Avanzate    | Costanti urgency engine e pesi per priorità                            |
 
 Ogni tab ha un pulsante "Reset sezione" per ripristinare i default solo per quella sezione.
 

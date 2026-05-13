@@ -53,7 +53,7 @@ renderer/i18n-renderer.js — t() globale per renderer (browser context)
 renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
 renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
 renderer/strip.*    — Striscia 20px bordo destro, click toggle sidebar, DOCK X11
-renderer/settings.* — Pannello impostazioni (8 tab, validazione Zod)
+renderer/settings.* — Pannello impostazioni (9 tab, validazione Zod)
 assets/backgrounds/ — 5 immagini sfondo mappate su bande urgenza
 test/               — Mirror struttura src/
 scripts/            — Utility (seed-demo.js)

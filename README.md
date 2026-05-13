@@ -23,7 +23,12 @@ Deadline Aura pulls tasks from Google Calendar and Jira, computes an urgency sco
 
 An optional AI scoring layer (Groq, Gemini, OpenAI, or Anthropic) evaluates cognitive and emotional load across the full event window and blends that assessment (70%) with the time-based mechanical score (30%). If no AI provider is configured, the mechanical formula runs alone.
 
-This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
+Linux/X11/GNOME only.
+
+<div align="center">
+<img src="assets/img-readme/desktop.png" alt="Deadline Aura desktop with wallpaper tint and post-it notes" width="800">
+<br><em>Desktop view: colored wallpaper tint, post-it task notes, and the urgency strip on the right edge</em>
+</div>
 
 ## Features
 
@@ -42,7 +47,7 @@ This is an early release (v0.1.0). Rough edges exist. Linux/X11/GNOME only.
 - AI clinical note: natural-language assessment from a simulated occupational psychologist, plus a 5-day stress forecast chart — both visible in a collapsible panel toggled by clicking the urgency bar
 - Desktop notifications via `notify-send` with configurable score threshold and cooldown; critical urgency for burnout alerts
 - Bilingual interface (Italian/English) switchable from settings; translations loaded via IPC with dot-notation keys and placeholder interpolation
-- Settings panel with 8 configuration tabs (General, Sources, AI, Wallpaper, Sidebar, Notifications, Interface, Advanced) and per-section reset
+- Settings panel with 9 configuration tabs (General, Sources, AI, Wallpaper, Sidebar, Notifications, Interface, Shift, Advanced) and per-section reset
 - Auto-show sidebar on any display with no visible windows (detected via `wmctrl`)
 - Single-instance lock prevents duplicate widget processes
 - Dynamic lookahead window: events fetched for at least 7 days ahead, extended to the following Sunday; Jira and local tasks are always included regardless of due date
@@ -184,6 +189,11 @@ After starting the app (`npm start`), a colored strip appears on the right edge 
 
 Click the strip to open the sidebar. It shows your tasks grouped into sections:
 
+<div align="center">
+<img src="assets/img-readme/sidebar.png" alt="Sidebar with task sections" width="700">
+<br><em>Sidebar: AI clinical note, stress forecast, task sections with urgency scores, and action buttons</em>
+</div>
+
 1. **Local** - personal tasks you create directly in the app
 2. **Google Calendar** - upcoming events from your synced calendars
 3. **Jira Favorites** - Jira tasks you have starred (appears only if you have favorites)
@@ -219,6 +229,11 @@ Click the clock icon on any task card to open the time log form. The form lets y
 
 The created event is formatted as `[JIRA-KEY] - Task Title`, compatible with Tempo and other Jira time tracking tools. The calendar you choose is saved as default for future logs.
 
+<div align="center">
+<img src="assets/img-readme/log-ore.png" alt="Time logging form" width="350">
+<br><em>Inline time log form: date, time, duration, and target calendar</em>
+</div>
+
 For local tasks that don't have a Jira key in the title, you can either select an existing Jira task from a dropdown or type a code manually.
 
 After logging, the clock icon briefly shows a green checkmark, then returns to normal so you can log again.
@@ -246,7 +261,12 @@ The burnout detector runs automatically in the background, analyzing 7 days of A
 
 ### Settings
 
-Click the gear icon in the sidebar to open the settings panel. It has 8 tabs:
+Click the gear icon in the sidebar to open the settings panel. It has 9 tabs:
+
+<div align="center">
+<img src="assets/img-readme/settings.png" alt="Settings panel" width="600">
+<br><em>Settings panel: 9 configuration tabs with per-section reset</em>
+</div>
 
 | Tab           | What you can configure                                          |
 | ------------- | --------------------------------------------------------------- |
@@ -257,6 +277,7 @@ Click the gear icon in the sidebar to open the settings panel. It has 8 tabs:
 | Sidebar       | Position (left/right), width, opacity                           |
 | Notifications | Enable/disable, score threshold, cooldown                       |
 | Interface     | Language (Italian/English), max tasks shown, countdown format   |
+| Shift         | Work days, time slots, holidays, regular/variable shift modes   |
 | Advanced      | Urgency engine constants and priority weights                   |
 
 Each tab has a "Reset section" button to restore defaults for that section only.
