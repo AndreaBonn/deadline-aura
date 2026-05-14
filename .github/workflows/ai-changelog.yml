@@ -8,8 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  changelog:
-    name: AI Changelog Generator
+  changelog-it:
+    name: AI Changelog (Italian)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,3 +20,17 @@ jobs:
           llm_api_key: '${{ secrets.GROQ_API_KEY }},${{ secrets.GEMINI_API_KEY }},${{ secrets.OPENAI_API_KEY }}'
           language: 'italian'
           update_changelog_file: 'true'
+
+  changelog-en:
+    name: AI Changelog (English)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: AndreaBonn/ai-changelog-generator@v1
+        with:
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
+          llm_provider: 'groq,gemini,openai'
+          llm_api_key: '${{ secrets.GROQ_API_KEY }},${{ secrets.GEMINI_API_KEY }},${{ secrets.OPENAI_API_KEY }}'
+          language: 'english'
+          update_changelog_file: 'true'
+          changelog_file_path: 'CHANGELOG.en.md'
