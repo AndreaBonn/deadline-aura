@@ -342,12 +342,12 @@ function createMeetingDocks() {
       y: wy + height - MEETING_DOCK_HEIGHT,
       show: false,
       frame: false,
-      transparent: true,
+      transparent: false,
       alwaysOnTop: true,
       skipTaskbar: true,
-      focusable: false,
+      focusable: true,
       resizable: false,
-      backgroundColor: '#00000000',
+      backgroundColor: '#1e1e2e',
       webPreferences: {
         preload: path.join(__dirname, 'preload-meeting-dock.js'),
         contextIsolation: true,
@@ -471,7 +471,7 @@ function initSidebar() {
 
   createSidebar();
   createStrips();
-  // createMeetingDocks(); // temporarily disabled for debugging
+  createMeetingDocks();
 
   checkDesktopState();
   desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
