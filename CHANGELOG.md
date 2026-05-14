@@ -1,5 +1,31 @@
 ## What's Changed in v1.1.0
 
+> Aggiornamento dell'interfaccia utente e correzione di bug per migliorare l'esperienza utente.
+
+### ✨ New Features
+- Aggiunta della dock delle riunioni imminenti con collegamenti Meet cliccabili (aa37351)
+- Aggiunta della funzione di auto-rimozione dei task obsoleti e del pulsante di rimozione nella sovrapposizione (9abd296)
+
+### 🐛 Bug Fixes
+- Prevenzione dell'apertura automatica della sidebar dopo la chiusura manuale (af1c2e2)
+- Prevenzione della marcatura come obsoleto in caso di errore di fetch e aggiunta della sincronizzazione all'avvio (fb6f87c)
+- Sostituzione della finestra trasparente con sfondo opaco nella dock delle riunioni (7d8b023)
+- Aggiornamento della procedura di aggiornamento dei badge per evitare conflitti (6d42acc)
+
+### 📚 Documentation
+- Rinomina di DeadlineAura in Deadline Aura by Bonn (f44d202)
+- Aggiunta di screenshot e correzione del conteggio delle tab delle impostazioni (f6a845e)
+
+### 🔧 Maintenance
+- Aggiornamento dei badge [skip ci] (05dbc93, e7380b7)
+- Aggiornamento del file CHANGELOG.md per v1.0.0 e v1.1.0 [skip ci] (b0fc3aa, 226e598)
+- Abilitazione della generazione del changelog in inglese (db5aa2a)
+
+### Other changes
+- Visualizzazione della previsione dello stress come percentuale (8ee85ed)
+
+## What's Changed in v1.1.0
+
 > Aggiunta della dock delle riunioni imminenti con collegamenti Meet cliccabili e correzioni di bug per migliorare l'esperienza utente.
 
 ### ✨ New Features
