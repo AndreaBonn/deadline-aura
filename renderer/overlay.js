@@ -8,6 +8,7 @@ const POSTIT_HEIGHT = 80;
 let pinnedTasks = [];
 let currentDisplayId = 'default';
 let dragState = null;
+const removedTaskIds = [];
 
 function formatCountdown(dueAt) {
   if (!dueAt) {
@@ -43,6 +44,9 @@ function createPostitGhost(task) {
   const countdown = formatCountdown(task.due_at);
 
   el.innerHTML =
+    '<button class="postit-remove" title="' +
+    escapeHtml(t('sidebar.unpin_from_desktop')) +
+    '">&times;</button>' +
     '<div class="postit-header ' +
     pClass +
     '">' +
@@ -62,6 +66,7 @@ function createPostitGhost(task) {
     pClass +
     '"></div>';
 
+  el.querySelector('.postit-remove').addEventListener('click', onRemovePostit);
   el.addEventListener('mousedown', onDragStart);
 
   return el;
@@ -73,8 +78,18 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function onRemovePostit(e) {
+  e.stopPropagation();
+  const ghost = e.target.closest('.postit-ghost');
+  if (!ghost) {
+    return;
+  }
+  removedTaskIds.push(ghost.dataset.taskId);
+  ghost.remove();
+}
+
 function onDragStart(e) {
-  if (e.button !== 0) {
+  if (e.button !== 0 || e.target.closest('.postit-remove')) {
     return;
   }
   const el = e.currentTarget;
@@ -155,6 +170,9 @@ document.addEventListener('keydown', function (e) {
 });
 
 document.getElementById('btnSave').addEventListener('click', function () {
+  if (removedTaskIds.length > 0) {
+    window.overlayApi.unpinTasks(removedTaskIds);
+  }
   const positions = collectPositions();
   window.overlayApi.savePositions(positions);
 });

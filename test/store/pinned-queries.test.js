@@ -167,8 +167,14 @@ describe('pinned-queries', () => {
         { taskId: 't2', displayId: 'eDP-1', xPct: 80, yPct: 60 },
       ]);
 
-      const r1 = db.getDb().prepare('SELECT x_pct, y_pct FROM pinned_tasks WHERE task_id = ?').get('t1');
-      const r2 = db.getDb().prepare('SELECT x_pct, y_pct FROM pinned_tasks WHERE task_id = ?').get('t2');
+      const r1 = db
+        .getDb()
+        .prepare('SELECT x_pct, y_pct FROM pinned_tasks WHERE task_id = ?')
+        .get('t1');
+      const r2 = db
+        .getDb()
+        .prepare('SELECT x_pct, y_pct FROM pinned_tasks WHERE task_id = ?')
+        .get('t2');
 
       expect(r1.x_pct).toBeCloseTo(20);
       expect(r1.y_pct).toBeCloseTo(30);
@@ -265,6 +271,76 @@ describe('pinned-queries', () => {
       expect(result).toHaveProperty('source');
       expect(result).toHaveProperty('due_at');
       expect(result).toHaveProperty('priority');
+    });
+
+    it('excludes stale tasks', () => {
+      insertBaseTask('t1');
+      insertBaseTask('t2');
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'eDP-1' });
+      pinnedQueries.pinTask({ taskId: 't2', displayId: 'eDP-1' });
+
+      db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('t1');
+
+      const results = pinnedQueries.getAllPinned();
+      expect(results).toHaveLength(1);
+      expect(results[0].task_id).toBe('t2');
+    });
+  });
+
+  describe('getByDisplay — stale filtering', () => {
+    it('excludes stale tasks from display results', () => {
+      insertBaseTask('t1');
+      insertBaseTask('t2');
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'eDP-1' });
+      pinnedQueries.pinTask({ taskId: 't2', displayId: 'eDP-1' });
+
+      db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('t1');
+
+      const results = pinnedQueries.getByDisplay('eDP-1');
+      expect(results).toHaveLength(1);
+      expect(results[0].task_id).toBe('t2');
+    });
+  });
+
+  describe('unpinStaleTasks', () => {
+    it('removes pinned_tasks entries for stale tasks', () => {
+      insertBaseTask('t1');
+      insertBaseTask('t2');
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'eDP-1' });
+      pinnedQueries.pinTask({ taskId: 't2', displayId: 'eDP-1' });
+
+      db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('t1');
+
+      const result = pinnedQueries.unpinStaleTasks();
+      expect(result.changes).toBe(1);
+
+      const remaining = db.getDb().prepare('SELECT * FROM pinned_tasks').all();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].task_id).toBe('t2');
+    });
+
+    it('is a no-op when no stale tasks are pinned', () => {
+      insertBaseTask('t1');
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'eDP-1' });
+
+      const result = pinnedQueries.unpinStaleTasks();
+      expect(result.changes).toBe(0);
+
+      const remaining = db.getDb().prepare('SELECT * FROM pinned_tasks').all();
+      expect(remaining).toHaveLength(1);
+    });
+
+    it('removes pins from all displays for stale task', () => {
+      insertBaseTask('t1');
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'eDP-1' });
+      pinnedQueries.pinTask({ taskId: 't1', displayId: 'HDMI-1' });
+
+      db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('t1');
+
+      pinnedQueries.unpinStaleTasks();
+
+      const remaining = db.getDb().prepare('SELECT * FROM pinned_tasks').all();
+      expect(remaining).toHaveLength(0);
     });
   });
 });

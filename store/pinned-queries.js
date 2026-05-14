@@ -46,7 +46,7 @@ function getByDisplay(displayId) {
               t.title, t.source, t.due_at, t.priority, t.web_url
        FROM pinned_tasks pt
        JOIN tasks t ON t.id = pt.task_id
-       WHERE pt.display_id = ?
+       WHERE pt.display_id = ? AND t.is_stale = 0
        ORDER BY pt.pinned_at ASC`,
     )
     .all(displayId);
@@ -59,15 +59,24 @@ function getAllPinned() {
               t.title, t.source, t.due_at, t.priority, t.web_url
        FROM pinned_tasks pt
        JOIN tasks t ON t.id = pt.task_id
+       WHERE t.is_stale = 0
        ORDER BY pt.pinned_at ASC`,
     )
     .all();
 }
 
+function unpinStaleTasks() {
+  return getDb()
+    .prepare(
+      `DELETE FROM pinned_tasks WHERE task_id IN (
+         SELECT id FROM tasks WHERE is_stale = 1
+       )`,
+    )
+    .run();
+}
+
 function isPinned(taskId) {
-  const row = getDb()
-    .prepare('SELECT 1 FROM pinned_tasks WHERE task_id = ? LIMIT 1')
-    .get(taskId);
+  const row = getDb().prepare('SELECT 1 FROM pinned_tasks WHERE task_id = ? LIMIT 1').get(taskId);
   return !!row;
 }
 
@@ -75,6 +84,7 @@ module.exports = {
   pinTask,
   unpinTask,
   unpinTaskFromAll,
+  unpinStaleTasks,
   updatePosition,
   updatePositions,
   getByDisplay,

@@ -42,7 +42,9 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition:
+    background 0.2s,
+    transform 0.1s;
 }
 
 .toolbar-btn:active {
@@ -91,6 +93,38 @@ body {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
 }
 
+.postit-remove {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: 0;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.postit-ghost:hover .postit-remove {
+  display: flex;
+}
+
+.postit-remove:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
 .postit-ghost.dragging {
   cursor: grabbing;
   opacity: 0.9;
@@ -106,10 +140,18 @@ body {
   align-items: center;
 }
 
-.postit-header.p1 { background: #ef4444; }
-.postit-header.p2 { background: #f97316; }
-.postit-header.p3 { background: #3b82f6; }
-.postit-header.p4 { background: #6b7280; }
+.postit-header.p1 {
+  background: #ef4444;
+}
+.postit-header.p2 {
+  background: #f97316;
+}
+.postit-header.p3 {
+  background: #3b82f6;
+}
+.postit-header.p4 {
+  background: #6b7280;
+}
 
 .postit-code {
   font-family: 'Ubuntu Mono', 'Consolas', monospace;
@@ -146,7 +188,15 @@ body {
   width: 3px;
 }
 
-.postit-accent.p1 { background: #ef4444; }
-.postit-accent.p2 { background: #f97316; }
-.postit-accent.p3 { background: #3b82f6; }
-.postit-accent.p4 { background: #6b7280; }
+.postit-accent.p1 {
+  background: #ef4444;
+}
+.postit-accent.p2 {
+  background: #f97316;
+}
+.postit-accent.p3 {
+  background: #3b82f6;
+}
+.postit-accent.p4 {
+  background: #6b7280;
+}

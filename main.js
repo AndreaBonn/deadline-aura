@@ -775,6 +775,12 @@ app.whenReady().then(() => {
     openOverlay(displayId || 'default');
   });
 
+  ipcMain.on('overlay-unpin-tasks', (_event, taskIds) => {
+    for (const taskId of taskIds) {
+      pinnedQueries.unpinTaskFromAll(taskId);
+    }
+  });
+
   ipcMain.on('save-positions', (_event, positions) => {
     pinnedQueries.updatePositions(positions);
     wallpaperChanger.setOverlayOpen(false);
