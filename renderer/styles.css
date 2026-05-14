@@ -108,7 +108,7 @@ body {
 }
 
 .ai-notes-panel.expanded {
-  max-height: 300px;
+  max-height: 600px;
 }
 
 .urgency-bar-container {

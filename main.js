@@ -764,6 +764,20 @@ app.whenReady().then(() => {
       return { ok: false, error: err.message };
     }
   });
+
+  const syncDaemon = require('./core/sync-daemon');
+  syncDaemon
+    .sync(config)
+    .then((syncResult) => {
+      console.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
+      if (syncResult.errors && syncResult.errors.length > 0) {
+        console.error('[startup-sync] errors:', JSON.stringify(syncResult.errors));
+      }
+      runUpdateCycle({ force: true });
+    })
+    .catch((err) => {
+      console.error('[startup-sync] failed:', err.message);
+    });
 });
 
 app.on('window-all-closed', () => {

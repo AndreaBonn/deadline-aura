@@ -57,11 +57,16 @@ async function sync(config) {
     return tasks.length;
   });
 
-  if (gcalEvents.length > 0 || config.sources.google_calendar.enabled) {
+  const failedSources = new Set(errors.map((e) => e.source));
+
+  if (
+    !failedSources.has('google_calendar') &&
+    (gcalEvents.length > 0 || config.sources.google_calendar.enabled)
+  ) {
     gcalCount = upsertMany(gcalEvents, 'gcal');
   }
 
-  if (jiraIssues.length > 0 || config.sources.jira.enabled) {
+  if (!failedSources.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
     jiraCount = upsertMany(jiraIssues, 'jira');
   }
 
