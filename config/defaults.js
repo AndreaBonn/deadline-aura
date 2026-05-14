@@ -12,6 +12,7 @@ const DEFAULTS = {
       calendars: ['primary'],
       priority_keywords: ['urgent', 'deadline', 'release', 'deploy', 'critico'],
       default_log_calendar: '',
+      google_account: '',
     },
     jira: {
       enabled: true,
@@ -58,6 +59,10 @@ const DEFAULTS = {
     cooldown_hours: 24,
     stress_threshold: 7,
     consecutive_days: 3,
+  },
+  meeting_dock: {
+    enabled: true,
+    lookahead_minutes: 10,
   },
   ui: {
     max_tasks_shown: 8,

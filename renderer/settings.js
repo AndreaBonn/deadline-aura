@@ -50,7 +50,7 @@ document.getElementById('btnReset').addEventListener('click', () => {
     ai: ['ai'],
     wallpaper: ['wallpaper'],
     sidebar: ['sidebar'],
-    notifiche: ['notifications'],
+    notifiche: ['notifications', 'meeting_dock'],
     ui: ['ui', 'language'],
     turno: ['work_shift'],
     avanzate: ['engine'],
@@ -116,6 +116,17 @@ function renderSorgenti() {
           config.sources.google_calendar.priority_keywords = v;
         },
       ),
+    ),
+    createField(
+      t('settings.google_account'),
+      createTextInput(
+        config.sources.google_calendar.google_account || '',
+        { placeholder: t('settings.google_account_placeholder') },
+        (v) => {
+          config.sources.google_calendar.google_account = v;
+        },
+      ),
+      t('settings.google_account_hint'),
     ),
   );
 
@@ -379,7 +390,27 @@ function renderNotifiche() {
       t('settings.cooldown_hint'),
     ),
   );
-  return [group];
+
+  if (!config.meeting_dock) {
+    config.meeting_dock = { enabled: true, lookahead_minutes: 10 };
+  }
+  const dockGroup = createFieldGroup(t('settings.meeting_dock_group'));
+  dockGroup.append(
+    createField(
+      t('common.enabled'),
+      createToggle(config.meeting_dock.enabled, (v) => {
+        config.meeting_dock.enabled = v;
+      }),
+    ),
+    createField(
+      t('settings.meeting_dock_lookahead'),
+      createNumberInput(config.meeting_dock.lookahead_minutes, { min: 1, max: 30 }, (v) => {
+        config.meeting_dock.lookahead_minutes = v;
+      }),
+      t('settings.meeting_dock_lookahead_hint'),
+    ),
+  );
+  return [group, dockGroup];
 }
 
 function renderUI() {

@@ -37,6 +37,7 @@ core/wallpaper-renderer.js  — Rendering wallpaper: sfondo immagine + tint + po
 core/postit-renderer.js     — Disegno singolo post-it su canvas
 core/display-manager.js     — Detect multi-monitor, geometria canvas composito
 core/display-controller.js  — Gestione strip + sidebar + auto-show su display libero
+core/meet-url-builder.js    — Costruzione URL Meet con authuser parametrico
 core/burnout-detector.js    — Early warning burnout da storico AI (7 giorni, 3 trigger)
 ai/                 — AI scoring (multi-provider con failover e key rotation)
 ai/providers/       — Provider implementations (groq, gemini, openai, anthropic)
@@ -53,6 +54,7 @@ renderer/i18n-renderer.js — t() globale per renderer (browser context)
 renderer/           — Sidebar + overlay UI (HTML/CSS/JS)
 renderer/overlay.*  — Overlay trasparente per drag & drop posizionamento post-it
 renderer/strip.*    — Striscia 20px bordo destro, click toggle sidebar, DOCK X11
+renderer/meeting-dock.* — Dock riunioni imminenti, click apre Meet con authuser
 renderer/settings.* — Pannello impostazioni (9 tab, validazione Zod)
 assets/backgrounds/ — 5 immagini sfondo mappate su bande urgenza
 test/               — Mirror struttura src/
@@ -90,11 +92,15 @@ systemd/            — Service + timer per sync background
 - Strip come `_NET_WM_WINDOW_TYPE_DOCK` con `_NET_WM_STRUT_PARTIAL` per riservare spazio schermo
 - Auto-show sidebar su display senza finestre (rilevamento via `wmctrl`)
 - Single instance lock via `app.requestSingleInstanceLock()`
-- Tre preload separati (sidebar, overlay, settings) con `contextIsolation: true`
+- Quattro preload separati (sidebar, overlay, settings, meeting-dock) con `contextIsolation: true`
 - AI clinical note: testo in lingua da psicologo occupazionale + stress forecast 5 giorni
 - AI notes collassabile nella sidebar via click su urgency bar
 - Jira favorites: stella su task Jira per aggiungerli a sezione "Preferiti" dedicata tra GCal e Jira nella sidebar; persistenza in tabella `jira_favorites` con FK cascade
 - Creazione eventi GCal dalla sidebar: bottone orologio su task → form inline con data/ora/durata/calendario → `calendar.events.insert()` → evento formato Tempo-compatible `[JIRA-KEY] - Titolo`
+- Meeting dock: finestra Electron DOCK trasparente in basso su ogni display, mostra riunioni GCal nei prossimi N minuti (configurabile) con link Meet cliccabile
+- Meet URL con `?authuser=`: account Google parametrico in config (`sources.google_calendar.google_account`), applicato solo su domini meet.google.com/hangouts.google.com
+- Meet link estratto da `hangoutLink` (prioritario) o `conferenceData.entryPoints[type=video]`, persistito in colonna `meet_url`
+- Meeting dock senza strut (no riserva spazio), solo alwaysOnTop + DOCK type; si nasconde quando 0 riunioni imminenti
 
 ## Configurazione
 

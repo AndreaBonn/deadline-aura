@@ -92,6 +92,36 @@ function runMigrations(database) {
     backfill(needsBackfill);
   }
 
+  // 007: add meet_url column for conference/meeting links (idempotent)
+  if (!columnNames.has('meet_url')) {
+    database.exec('ALTER TABLE tasks ADD COLUMN meet_url TEXT');
+  }
+
+  // 007b: backfill meet_url from raw_json for existing gcal events
+  const needsMeetBackfill = database
+    .prepare(
+      "SELECT id, raw_json FROM tasks WHERE source = 'gcal' AND meet_url IS NULL AND raw_json IS NOT NULL",
+    )
+    .all();
+  if (needsMeetBackfill.length > 0) {
+    const { extractMeetUrl } = require('../integrations/google-calendar');
+    const updateMeet = database.prepare('UPDATE tasks SET meet_url = ? WHERE id = ?');
+    const backfillMeet = database.transaction((rows) => {
+      for (const row of rows) {
+        try {
+          const event = JSON.parse(row.raw_json);
+          const meetUrl = extractMeetUrl(event);
+          if (meetUrl) {
+            updateMeet.run(meetUrl, row.id);
+          }
+        } catch {
+          // skip malformed raw_json
+        }
+      }
+    });
+    backfillMeet(needsMeetBackfill);
+  }
+
   // 006: extend source CHECK to include 'local' (idempotent)
   // SQLite cannot ALTER CHECK constraints — recreate table with new constraint
   const sourceCheck = database
@@ -115,11 +145,12 @@ function runMigrations(database) {
         ai_scored_at  INTEGER,
         web_url     TEXT,
         ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
-        start_at    INTEGER
+        start_at    INTEGER,
+        meet_url    TEXT
       );
       INSERT INTO tasks_new SELECT id, source, title, due_at, priority, is_done, is_stale,
         raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
-        web_url, ai_cognitive_type, start_at FROM tasks;
+        web_url, ai_cognitive_type, start_at, meet_url FROM tasks;
       DROP TABLE tasks;
       ALTER TABLE tasks_new RENAME TO tasks;
       CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
@@ -172,10 +203,28 @@ function getUpcomingCalendarEvents(horizonMs) {
     .all(now, horizon, now, horizon);
 }
 
+function getUpcomingMeetings(horizonMs) {
+  const now = Date.now();
+  const horizon = now + horizonMs;
+  return getDb()
+    .prepare(
+      `SELECT * FROM tasks
+     WHERE is_done = 0
+       AND is_stale = 0
+       AND source = 'gcal'
+       AND meet_url IS NOT NULL
+       AND start_at IS NOT NULL
+       AND start_at >= ?
+       AND start_at <= ?
+     ORDER BY start_at ASC`,
+    )
+    .all(now, horizon);
+}
+
 function upsertTask(task) {
   const stmt = getDb().prepare(`
-    INSERT INTO tasks (id, source, title, due_at, start_at, priority, is_done, is_stale, web_url, raw_json, synced_at)
-    VALUES (@id, @source, @title, @due_at, @start_at, @priority, @is_done, 0, @web_url, @raw_json, @synced_at)
+    INSERT INTO tasks (id, source, title, due_at, start_at, priority, is_done, is_stale, web_url, meet_url, raw_json, synced_at)
+    VALUES (@id, @source, @title, @due_at, @start_at, @priority, @is_done, 0, @web_url, @meet_url, @raw_json, @synced_at)
     ON CONFLICT(id) DO UPDATE SET
       title = @title,
       due_at = @due_at,
@@ -184,10 +233,11 @@ function upsertTask(task) {
       is_done = @is_done,
       is_stale = 0,
       web_url = @web_url,
+      meet_url = @meet_url,
       raw_json = @raw_json,
       synced_at = @synced_at
   `);
-  return stmt.run({ start_at: null, ...task });
+  return stmt.run({ start_at: null, meet_url: null, ...task });
 }
 
 function markStale(source, activeIds) {
@@ -315,6 +365,7 @@ module.exports = {
   getDb,
   getActiveTasks,
   getUpcomingCalendarEvents,
+  getUpcomingMeetings,
   upsertTask,
   markStale,
   updateAiScores,

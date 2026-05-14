@@ -180,6 +180,111 @@ describe('db — getUpcomingCalendarEvents', () => {
   });
 });
 
+describe('db — getUpcomingMeetings', () => {
+  it('returns gcal events with meet_url within horizon', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_meet',
+      source: 'gcal',
+      start_at: now + 300000,
+      meet_url: 'https://meet.google.com/abc',
+    });
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_nomeet',
+      source: 'gcal',
+      start_at: now + 300000,
+      meet_url: null,
+    });
+
+    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const ids = meetings.map((m) => m.id);
+    expect(ids).toContain('gcal_meet');
+    expect(ids).not.toContain('gcal_nomeet');
+  });
+
+  it('excludes meetings outside horizon', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_far_meet',
+      source: 'gcal',
+      start_at: now + 20 * 60000,
+      meet_url: 'https://meet.google.com/xyz',
+    });
+
+    const meetings = db.getUpcomingMeetings(10 * 60000);
+    expect(meetings.some((m) => m.id === 'gcal_far_meet')).toBe(false);
+  });
+
+  it('excludes done and stale meetings', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_done_meet',
+      source: 'gcal',
+      start_at: now + 300000,
+      is_done: 1,
+      meet_url: 'https://meet.google.com/done',
+    });
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_stale_meet',
+      source: 'gcal',
+      start_at: now + 300000,
+      meet_url: 'https://meet.google.com/stale',
+    });
+    db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('gcal_stale_meet');
+
+    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const ids = meetings.map((m) => m.id);
+    expect(ids).not.toContain('gcal_done_meet');
+    expect(ids).not.toContain('gcal_stale_meet');
+  });
+
+  it('excludes events without start_at', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_nostart_meet',
+      source: 'gcal',
+      start_at: null,
+      due_at: now + 300000,
+      meet_url: 'https://meet.google.com/nostart',
+    });
+
+    const meetings = db.getUpcomingMeetings(10 * 60000);
+    expect(meetings.some((m) => m.id === 'gcal_nostart_meet')).toBe(false);
+  });
+
+  it('returns empty array when no meetings exist', () => {
+    expect(db.getUpcomingMeetings(10 * 60000)).toEqual([]);
+  });
+
+  it('orders by start_at ascending', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_later_meet',
+      source: 'gcal',
+      start_at: now + 500000,
+      meet_url: 'https://meet.google.com/later',
+    });
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_sooner_meet',
+      source: 'gcal',
+      start_at: now + 100000,
+      meet_url: 'https://meet.google.com/sooner',
+    });
+
+    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const ids = meetings.map((m) => m.id);
+    expect(ids.indexOf('gcal_sooner_meet')).toBeLessThan(ids.indexOf('gcal_later_meet'));
+  });
+});
+
 describe('db — getActiveTasks with local source', () => {
   it('includes local tasks regardless of due_at', () => {
     db.upsertTask({

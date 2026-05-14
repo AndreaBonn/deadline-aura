@@ -17,6 +17,7 @@ const burnoutDetector = require('./core/burnout-detector');
 const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
 const { loadConfig, saveConfig } = require('./config/loader');
+const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
 const i18n = require('./i18n');
@@ -87,6 +88,7 @@ let sidebarReady = false;
 let sidebarManualOpen = false;
 let sidebarManualClose = false;
 let stripWindows = new Map(); // displayId → BrowserWindow
+let meetingDockWindows = new Map(); // displayId → BrowserWindow
 let desktopCheckInterval = null;
 let currentPaletteHex = '#334155';
 let isUpdateCycleRunning = false;
@@ -317,6 +319,114 @@ function updateStripColor(hex) {
   }
 }
 
+// --- Meeting Dock (one per display, bottom edge) ---
+
+const MEETING_DOCK_HEIGHT = 52;
+
+function createMeetingDocks() {
+  destroyMeetingDocks();
+  if (!config.meeting_dock?.enabled) {
+    return;
+  }
+
+  const displays = screen.getAllDisplays();
+  for (const display of displays) {
+    const { x: wx, y: wy } = display.workArea;
+    const { width, height } = display.workAreaSize;
+    const displayId = String(display.id);
+
+    const dockWin = new BrowserWindow({
+      width: width,
+      height: MEETING_DOCK_HEIGHT,
+      x: wx,
+      y: wy + height - MEETING_DOCK_HEIGHT,
+      show: false,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false,
+      resizable: false,
+      backgroundColor: '#00000000',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload-meeting-dock.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    dockWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+    dockWin.loadFile(path.join(__dirname, 'renderer', 'meeting-dock.html'));
+
+    dockWin.webContents.once('did-finish-load', () => {
+      if (process.platform === 'linux' && process.env.DISPLAY) {
+        try {
+          const xidStr = String(dockWin.getNativeWindowHandle().readUInt32LE(0));
+          execFile(
+            'xprop',
+            [
+              '-id',
+              xidStr,
+              '-f',
+              '_NET_WM_WINDOW_TYPE',
+              '32a',
+              '-set',
+              '_NET_WM_WINDOW_TYPE',
+              '_NET_WM_WINDOW_TYPE_DOCK',
+            ],
+            () => {
+              execFile(
+                'xprop',
+                [
+                  '-id',
+                  xidStr,
+                  '-f',
+                  '_NET_WM_DESKTOP',
+                  '32c',
+                  '-set',
+                  '_NET_WM_DESKTOP',
+                  '0xffffffff',
+                ],
+                () => {
+                  // No strut reservation — dock overlaps, hidden when empty
+                },
+              );
+            },
+          );
+        } catch {
+          // xprop not available — proceed without DOCK type
+        }
+      }
+    });
+
+    meetingDockWindows.set(displayId, dockWin);
+  }
+}
+
+function destroyMeetingDocks() {
+  for (const win of meetingDockWindows.values()) {
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+  }
+  meetingDockWindows = new Map();
+}
+
+function updateMeetingDocks() {
+  if (!config.meeting_dock?.enabled) {
+    return;
+  }
+
+  const horizonMs = (config.meeting_dock?.lookahead_minutes || 10) * 60000;
+  const meetings = db.getUpcomingMeetings(horizonMs);
+
+  for (const win of meetingDockWindows.values()) {
+    if (win && !win.isDestroyed() && win.webContents) {
+      win.webContents.send('meetings-update', meetings);
+    }
+  }
+}
+
 // --- Desktop state check ---
 
 function checkDesktopState() {
@@ -361,12 +471,19 @@ function initSidebar() {
 
   createSidebar();
   createStrips();
+  // createMeetingDocks(); // temporarily disabled for debugging
 
   checkDesktopState();
   desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
 
-  screen.on('display-added', () => createStrips());
-  screen.on('display-removed', () => createStrips());
+  screen.on('display-added', () => {
+    createStrips();
+    createMeetingDocks();
+  });
+  screen.on('display-removed', () => {
+    createStrips();
+    createMeetingDocks();
+  });
 }
 
 async function runUpdateCycle({ force = false } = {}) {
@@ -394,6 +511,7 @@ async function runUpdateCycle({ force = false } = {}) {
     }
 
     updateStripColor(palette.accent_hex);
+    updateMeetingDocks();
 
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
@@ -529,6 +647,41 @@ app.whenReady().then(() => {
 
   ipcMain.on('sidebar:toggle', () => {
     toggleSidebar();
+  });
+
+  ipcMain.on('meeting-dock:open-link', (_event, url) => {
+    if (typeof url === 'string' && isSafeExternalUrl(url)) {
+      const googleAccount = config.sources?.google_calendar?.google_account;
+      const finalUrl = buildMeetUrl(url, googleAccount);
+      const { spawn, execFileSync } = require('child_process');
+      const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
+      let opened = false;
+      for (const bin of browsers) {
+        try {
+          execFileSync('which', [bin], { stdio: 'ignore' });
+          spawn(bin, [finalUrl], { detached: true, stdio: 'ignore' }).unref();
+          opened = true;
+          break;
+        } catch {
+          /* not found, try next */
+        }
+      }
+      if (!opened) {
+        spawn('xdg-open', [finalUrl], { detached: true, stdio: 'ignore' }).unref();
+      }
+    }
+  });
+
+  ipcMain.on('meeting-dock:set-visible', (_event, visible) => {
+    for (const win of meetingDockWindows.values()) {
+      if (win && !win.isDestroyed()) {
+        if (visible && !win.isVisible()) {
+          win.showInactive();
+        } else if (!visible && win.isVisible()) {
+          win.hide();
+        }
+      }
+    }
   });
 
   ipcMain.on('sync:run', async () => {

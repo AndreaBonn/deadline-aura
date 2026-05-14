@@ -1,0 +1,2 @@
+-- 007: placeholder — meet_url column added via idempotent ALTER in db.js
+-- (SQLite ALTER TABLE ADD COLUMN is idempotent with existence check)

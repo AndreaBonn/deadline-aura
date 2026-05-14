@@ -1,6 +1,10 @@
 'use strict';
 
-const { normalizeEvent, assignPriority } = require('../../integrations/google-calendar');
+const {
+  normalizeEvent,
+  assignPriority,
+  extractMeetUrl,
+} = require('../../integrations/google-calendar');
 
 describe('google-calendar — assignPriority', () => {
   it('returns 1 for red color events (colorId = 11)', () => {
@@ -29,6 +33,50 @@ describe('google-calendar — assignPriority', () => {
 
   it('is case-insensitive', () => {
     expect(assignPriority({ summary: 'URGENT deployment' })).toBe(2);
+  });
+});
+
+describe('google-calendar — extractMeetUrl', () => {
+  it('returns hangoutLink when present', () => {
+    const event = { hangoutLink: 'https://meet.google.com/abc-defg-hij' };
+    expect(extractMeetUrl(event)).toBe('https://meet.google.com/abc-defg-hij');
+  });
+
+  it('returns conferenceData video entryPoint when no hangoutLink', () => {
+    const event = {
+      conferenceData: {
+        entryPoints: [
+          { entryPointType: 'phone', uri: 'tel:+1234567890' },
+          { entryPointType: 'video', uri: 'https://zoom.us/j/123456' },
+        ],
+      },
+    };
+    expect(extractMeetUrl(event)).toBe('https://zoom.us/j/123456');
+  });
+
+  it('prefers hangoutLink over conferenceData', () => {
+    const event = {
+      hangoutLink: 'https://meet.google.com/abc',
+      conferenceData: {
+        entryPoints: [{ entryPointType: 'video', uri: 'https://zoom.us/j/999' }],
+      },
+    };
+    expect(extractMeetUrl(event)).toBe('https://meet.google.com/abc');
+  });
+
+  it('returns null when no meeting link exists', () => {
+    expect(extractMeetUrl({})).toBeNull();
+    expect(extractMeetUrl({ conferenceData: {} })).toBeNull();
+    expect(extractMeetUrl({ conferenceData: { entryPoints: [] } })).toBeNull();
+  });
+
+  it('skips entryPoints without uri', () => {
+    const event = {
+      conferenceData: {
+        entryPoints: [{ entryPointType: 'video' }],
+      },
+    };
+    expect(extractMeetUrl(event)).toBeNull();
   });
 });
 
@@ -93,6 +141,29 @@ describe('google-calendar — normalizeEvent', () => {
     // end is undefined → endTime is null → does not filter as past
     expect(result).not.toBeNull();
     expect(result.due_at).toBeNull();
+  });
+
+  it('extracts meet_url from hangoutLink', () => {
+    const event = {
+      id: 'meet1',
+      summary: 'Daily standup',
+      start: { dateTime: '2030-05-08T10:00:00Z' },
+      end: { dateTime: '2030-05-08T10:30:00Z' },
+      hangoutLink: 'https://meet.google.com/abc-defg-hij',
+    };
+    const result = normalizeEvent(event);
+    expect(result.meet_url).toBe('https://meet.google.com/abc-defg-hij');
+  });
+
+  it('returns null meet_url when no meeting link', () => {
+    const event = {
+      id: 'nomeet',
+      summary: 'Lunch',
+      start: { dateTime: '2030-05-08T12:00:00Z' },
+      end: { dateTime: '2030-05-08T13:00:00Z' },
+    };
+    const result = normalizeEvent(event);
+    expect(result.meet_url).toBeNull();
   });
 
   it('stores raw_json', () => {

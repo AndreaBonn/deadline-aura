@@ -21,7 +21,8 @@
     "days": "days",
     "days_short": "d",
     "in_minutes": "in {n} minutes",
-    "in_hours": "in {n} hours"
+    "in_hours": "in {n} hours",
+    "now": "now"
   },
   "sidebar": {
     "no_tasks": "No upcoming tasks",
@@ -176,7 +177,13 @@
     "work_shift_day_short_3": "Wed",
     "work_shift_day_short_4": "Thu",
     "work_shift_day_short_5": "Fri",
-    "work_shift_day_short_6": "Sat"
+    "work_shift_day_short_6": "Sat",
+    "google_account": "Google Account",
+    "google_account_placeholder": "email@example.com",
+    "google_account_hint": "To open Meet with the correct account",
+    "meeting_dock_group": "Meeting dock",
+    "meeting_dock_lookahead": "Lookahead (minutes)",
+    "meeting_dock_lookahead_hint": "Show meetings in the next N minutes"
   },
   "wallpaper": {
     "next_24h": "NEXT 24H",

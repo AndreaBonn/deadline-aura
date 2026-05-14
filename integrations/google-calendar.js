@@ -159,6 +159,20 @@ function assignPriority(event, priorityKeywords) {
   return 3;
 }
 
+function extractMeetUrl(event) {
+  if (event.hangoutLink) {
+    return event.hangoutLink;
+  }
+  const entryPoints = event.conferenceData?.entryPoints;
+  if (Array.isArray(entryPoints)) {
+    const videoEntry = entryPoints.find((ep) => ep.entryPointType === 'video' && ep.uri);
+    if (videoEntry) {
+      return videoEntry.uri;
+    }
+  }
+  return null;
+}
+
 function normalizeEvent(event, priorityKeywords) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
@@ -192,6 +206,7 @@ function normalizeEvent(event, priorityKeywords) {
     priority: assignPriority(event, priorityKeywords),
     is_done: 0,
     web_url: event.htmlLink || null,
+    meet_url: extractMeetUrl(event),
     raw_json: JSON.stringify(event),
     synced_at: Date.now(),
   };
@@ -326,6 +341,7 @@ module.exports = {
   fetchEvents,
   normalizeEvent,
   assignPriority,
+  extractMeetUrl,
   getAuthenticatedClient,
   listCalendars,
   createEvent,

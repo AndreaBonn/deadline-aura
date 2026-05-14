@@ -14,6 +14,7 @@ const configSchema = z.object({
       calendars: z.array(z.string()).min(1),
       priority_keywords: z.array(z.string()),
       default_log_calendar: z.string().optional(),
+      google_account: z.string().optional(),
     }),
     jira: z.object({
       enabled: z.boolean(),
@@ -72,6 +73,12 @@ const configSchema = z.object({
       cooldown_hours: z.number().int().min(1).max(168),
       stress_threshold: z.number().int().min(1).max(10),
       consecutive_days: z.number().int().min(2).max(7),
+    })
+    .optional(),
+  meeting_dock: z
+    .object({
+      enabled: z.boolean(),
+      lookahead_minutes: z.number().int().min(1).max(30),
     })
     .optional(),
   ui: z.object({

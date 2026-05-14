@@ -21,7 +21,8 @@
     "days": "giorni",
     "days_short": "g",
     "in_minutes": "tra {n} minuti",
-    "in_hours": "tra {n} ore"
+    "in_hours": "tra {n} ore",
+    "now": "ora"
   },
   "sidebar": {
     "no_tasks": "Nessun task in arrivo",
@@ -176,7 +177,13 @@
     "work_shift_day_short_3": "Mer",
     "work_shift_day_short_4": "Gio",
     "work_shift_day_short_5": "Ven",
-    "work_shift_day_short_6": "Sab"
+    "work_shift_day_short_6": "Sab",
+    "google_account": "Account Google",
+    "google_account_placeholder": "email@example.com",
+    "google_account_hint": "Per aprire Meet con l'account corretto",
+    "meeting_dock_group": "Dock riunioni",
+    "meeting_dock_lookahead": "Anticipo (minuti)",
+    "meeting_dock_lookahead_hint": "Mostra riunioni nei prossimi N minuti"
   },
   "wallpaper": {
     "next_24h": "PROSSIME 24H",
