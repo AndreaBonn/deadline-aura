@@ -30,6 +30,51 @@ Linux/X11/GNOME only.
 <br><em>Desktop view: colored wallpaper tint, post-it task notes, and the urgency strip on the right edge</em>
 </div>
 
+## Architecture
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph LR
+  gcal["Google Calendar"]
+  jira["Jira"]
+  local["Local Tasks"]
+  sync["Sync Daemon"]
+  store[("SQLite")]
+  ai["AI Scorer<br/>Multi-provider"]
+  engine["Deadline Engine"]
+  cmap["Color Mapper<br/>5 bands"]
+  wallpaper["Wallpaper PNG"]
+  strip["Strip Color"]
+  sidebar["Sidebar"]
+  dock["Meeting Dock"]
+
+  gcal --> sync
+  jira --> sync
+  local --> store
+  sync --> store
+  store --> engine
+  ai -.->|"70/30 blend"| engine
+  store -.-> ai
+  engine --> cmap
+  cmap --> wallpaper
+  cmap --> strip
+  cmap --> sidebar
+  cmap --> dock
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+
+  class gcal,jira ext
+  class local,store data
+  class sync,ai core
+  class engine,cmap engine
+  class wallpaper,strip,sidebar,dock core
+```
+
+For detailed technical diagrams (sync pipeline, database schema, task lifecycle, IPC), see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
 ## Features
 
 - Persistent 20px strip on every connected display; color interpolates across five urgency bands (calm → normal → attention → urgent → critical)
@@ -327,6 +372,8 @@ npm start
 Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, `integrations/`, and `renderer/`.
 
 ## Architecture decisions
+
+For technical diagrams (sync pipeline, database schema, task lifecycle, IPC communication), see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 Key design choices are documented as Architecture Decision Records in [`docs/decisions/`](./docs/decisions/):
 

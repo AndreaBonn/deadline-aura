@@ -45,8 +45,11 @@ Thumbs.db
 # Claude
 .claude/
 
-# Docs (session reports, local decisions)
-docs/
+# Docs (session reports, local decisions — keep ARCHITECTURE and decisions tracked)
+docs/*
+!docs/ARCHITECTURE.md
+!docs/ARCHITECTURE.it.md
+!docs/decisions/
 
 # Test coverage
 coverage/

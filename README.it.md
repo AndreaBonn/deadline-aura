@@ -30,6 +30,51 @@ Solo Linux/X11/GNOME.
 <br><em>Vista desktop: wallpaper con tinta cromatica, post-it dei task e striscia di urgenza sul bordo destro</em>
 </div>
 
+## Architettura
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+graph LR
+  gcal["Google Calendar"]
+  jira["Jira"]
+  local["Task Locali"]
+  sync["Sync Daemon"]
+  store[("SQLite")]
+  ai["AI Scorer<br/>Multi-provider"]
+  engine["Urgency Engine"]
+  cmap["Color Mapper<br/>5 bande"]
+  wallpaper["Wallpaper PNG"]
+  strip["Striscia Colore"]
+  sidebar["Sidebar"]
+  dock["Meeting Dock"]
+
+  gcal --> sync
+  jira --> sync
+  local --> store
+  sync --> store
+  store --> engine
+  ai -.->|"blend 70/30"| engine
+  store -.-> ai
+  engine --> cmap
+  cmap --> wallpaper
+  cmap --> strip
+  cmap --> sidebar
+  cmap --> dock
+
+  classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
+  classDef data fill:#d97706,stroke:#b45309,color:#fff
+  classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
+  classDef engine fill:#059669,stroke:#047857,color:#fff
+
+  class gcal,jira ext
+  class local,store data
+  class sync,ai core
+  class engine,cmap engine
+  class wallpaper,strip,sidebar,dock core
+```
+
+Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita task, IPC), vedi [docs/ARCHITECTURE.it.md](./docs/ARCHITECTURE.it.md).
+
 ## Funzionalità
 
 - Striscia da 20px persistente su ogni display connesso; il colore interpola su cinque bande di urgenza (calmo → normale → attenzione → urgente → critico)
