@@ -78,6 +78,52 @@ describe('google-calendar — extractMeetUrl', () => {
     };
     expect(extractMeetUrl(event)).toBeNull();
   });
+
+  it('extracts Teams link from description', () => {
+    const event = {
+      description:
+        'Agenda: demo\nhttps://teams.microsoft.com/meet/327100924612?p=abc\nID riunione: 123',
+    };
+    expect(extractMeetUrl(event)).toBe('https://teams.microsoft.com/meet/327100924612?p=abc');
+  });
+
+  it('extracts Zoom link from description', () => {
+    const event = {
+      description: 'Join: https://us02web.zoom.us/j/123456789?pwd=abc123',
+    };
+    expect(extractMeetUrl(event)).toBe('https://us02web.zoom.us/j/123456789?pwd=abc123');
+  });
+
+  it('extracts Teams link from location', () => {
+    const event = {
+      location: 'https://teams.microsoft.com/meet/99999?p=xyz',
+    };
+    expect(extractMeetUrl(event)).toBe('https://teams.microsoft.com/meet/99999?p=xyz');
+  });
+
+  it('prefers description over location for fallback', () => {
+    const event = {
+      description: 'https://teams.microsoft.com/meet/111?p=aaa',
+      location: 'https://teams.microsoft.com/meet/222?p=bbb',
+    };
+    expect(extractMeetUrl(event)).toBe('https://teams.microsoft.com/meet/111?p=aaa');
+  });
+
+  it('prefers hangoutLink over description fallback', () => {
+    const event = {
+      hangoutLink: 'https://meet.google.com/abc',
+      description: 'https://teams.microsoft.com/meet/999?p=xyz',
+    };
+    expect(extractMeetUrl(event)).toBe('https://meet.google.com/abc');
+  });
+
+  it('returns null when description has no meeting links', () => {
+    const event = {
+      description: 'Regular meeting, no video link here',
+      location: 'Room 42',
+    };
+    expect(extractMeetUrl(event)).toBeNull();
+  });
 });
 
 describe('google-calendar — normalizeEvent', () => {

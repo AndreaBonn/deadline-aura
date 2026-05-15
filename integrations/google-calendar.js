@@ -159,6 +159,17 @@ function assignPriority(event, priorityKeywords) {
   return 3;
 }
 
+const MEETING_URL_PATTERN =
+  /https?:\/\/(?:teams\.microsoft\.com\/[\w./?=&%-]+|[\w.-]+\.zoom\.us\/j\/[\w?=&-]+|meet\.google\.com\/[\w-]+)/i;
+
+function extractMeetUrlFromText(text) {
+  if (!text) {
+    return null;
+  }
+  const match = text.match(MEETING_URL_PATTERN);
+  return match ? match[0] : null;
+}
+
 function extractMeetUrl(event) {
   if (event.hangoutLink) {
     return event.hangoutLink;
@@ -170,7 +181,7 @@ function extractMeetUrl(event) {
       return videoEntry.uri;
     }
   }
-  return null;
+  return extractMeetUrlFromText(event.description) || extractMeetUrlFromText(event.location);
 }
 
 function normalizeEvent(event, priorityKeywords) {
