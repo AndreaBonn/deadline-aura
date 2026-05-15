@@ -54,6 +54,14 @@ function renderMeetings(meetings) {
       window.meetingDockApi.openMeetLink(meeting.meet_url);
     });
 
+    box.addEventListener('mouseenter', function () {
+      window.meetingDockApi.setIgnoreMouse(false);
+    });
+
+    box.addEventListener('mouseleave', function () {
+      window.meetingDockApi.setIgnoreMouse(true);
+    });
+
     container.appendChild(box);
   }
 }

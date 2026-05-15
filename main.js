@@ -385,6 +385,9 @@ function createMeetingDocks() {
       }
     });
 
+    // Click-through on transparent areas, forward mouse events to renderer
+    dockWin.setIgnoreMouseEvents(true, { forward: true });
+
     meetingDockWindows.set(displayId, dockWin);
   }
 }
@@ -666,6 +669,17 @@ app.whenReady().then(() => {
       }
       if (!opened) {
         spawn('xdg-open', [finalUrl], { detached: true, stdio: 'ignore' }).unref();
+      }
+    }
+  });
+
+  ipcMain.on('meeting-dock:set-ignore-mouse', (_event, ignore) => {
+    const senderWin = BrowserWindow.fromWebContents(_event.sender);
+    if (senderWin && !senderWin.isDestroyed()) {
+      if (ignore) {
+        senderWin.setIgnoreMouseEvents(true, { forward: true });
+      } else {
+        senderWin.setIgnoreMouseEvents(false);
       }
     }
   });

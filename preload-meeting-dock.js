@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('meetingDockApi', {
   onMeetings: (callback) => ipcRenderer.on('meetings-update', (_event, data) => callback(data)),
   openMeetLink: (url) => ipcRenderer.send('meeting-dock:open-link', url),
   setVisible: (visible) => ipcRenderer.send('meeting-dock:set-visible', visible),
+  setIgnoreMouse: (ignore) => ipcRenderer.send('meeting-dock:set-ignore-mouse', ignore),
 });
