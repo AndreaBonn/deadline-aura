@@ -52,6 +52,7 @@ let overlayWindow = null;
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
+const MEETING_DOCK_CHECK_MS = 30000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 10;
 const DESKTOP_CHECK_MS = 1000;
@@ -342,12 +343,11 @@ function createMeetingDocks() {
       y: wy + height - MEETING_DOCK_HEIGHT,
       show: false,
       frame: false,
-      transparent: false,
+      transparent: true,
       alwaysOnTop: true,
       skipTaskbar: true,
       focusable: true,
       resizable: false,
-      backgroundColor: '#1e1e2e',
       webPreferences: {
         preload: path.join(__dirname, 'preload-meeting-dock.js'),
         contextIsolation: true,
@@ -417,8 +417,8 @@ function updateMeetingDocks() {
     return;
   }
 
-  const horizonMs = (config.meeting_dock?.lookahead_minutes || 10) * 60000;
-  const meetings = db.getUpcomingMeetings(horizonMs);
+  const lookaheadMin = config.meeting_dock?.lookahead_minutes || 10;
+  const meetings = db.getUpcomingMeetings(lookaheadMin, -5);
 
   for (const win of meetingDockWindows.values()) {
     if (win && !win.isDestroyed() && win.webContents) {
@@ -603,7 +603,19 @@ app.whenReady().then(() => {
 
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
+  setInterval(updateMeetingDocks, MEETING_DOCK_CHECK_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
+
+  const syncDaemonModule = require('./core/sync-daemon');
+  const dataSyncIntervalMs = (config.sync.data_interval_minutes || 10) * 60000;
+  setInterval(async () => {
+    try {
+      await syncDaemonModule.sync(config);
+      runUpdateCycle({ force: true });
+    } catch (err) {
+      console.error('[data-sync] error:', err.message);
+    }
+  }, dataSyncIntervalMs);
 
   const burnoutIntervalMs = (config.burnout?.check_interval_hours || 2) * 3600000;
   setInterval(() => {

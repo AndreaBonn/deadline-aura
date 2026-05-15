@@ -72,8 +72,33 @@ function formatElapsed(startIso) {
   return h > 0 ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
 }
 
+/**
+ * Determines the display status of a calendar/task event.
+ *
+ * @param {object} task - Task object with start_at, due_at, hours_remaining, source.
+ * @param {number} now - Current timestamp in ms.
+ * @returns {{ status: string, label: string }} status ('ongoing'|'ended'|'future'|'default') and display label.
+ */
+function getEventStatus(task, now) {
+  if (task.source === 'gcal' && task.start_at && task.due_at) {
+    if (now >= task.start_at && now < task.due_at) {
+      const endDate = new Date(task.due_at);
+      const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return { status: 'ongoing', label: _t('countdown.ongoing') + ' - ' + endTime };
+    }
+    if (now >= task.due_at) {
+      return { status: 'ended', label: _t('countdown.ended') };
+    }
+    const startDate = new Date(task.start_at);
+    const startTime = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const hoursToStart = (task.start_at - now) / 3600000;
+    return { status: 'future', label: startTime + ' - ' + formatCountdown(hoursToStart) };
+  }
+  return { status: 'default', label: formatCountdown(task.hours_remaining) };
+}
+
 // CommonJS export for Node.js / test environment.
 // In the browser the functions are available as globals via <script src>.
 if (typeof module !== 'undefined') {
-  module.exports = { formatCountdown, urgencyToColor, formatElapsed };
+  module.exports = { formatCountdown, urgencyToColor, formatElapsed, getEventStatus };
 }

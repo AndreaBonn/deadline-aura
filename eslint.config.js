@@ -59,6 +59,7 @@ module.exports = [
       globals: {
         formatCountdown: 'readonly',
         urgencyToColor: 'readonly',
+        getEventStatus: 'readonly',
       },
     },
   },

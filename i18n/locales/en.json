@@ -22,7 +22,9 @@
     "days_short": "d",
     "in_minutes": "in {n} minutes",
     "in_hours": "in {n} hours",
-    "now": "now"
+    "now": "now",
+    "ongoing": "ongoing",
+    "ended": "ended"
   },
   "sidebar": {
     "no_tasks": "No upcoming tasks",

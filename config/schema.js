@@ -6,6 +6,7 @@ const configSchema = z.object({
   language: z.enum(['it', 'en']).optional(),
   sync: z.object({
     interval_minutes: z.number().int().min(1).max(60),
+    data_interval_minutes: z.number().int().min(1).max(60).optional(),
     lookahead_hours: z.number().int().min(1).max(720),
   }),
   sources: z.object({

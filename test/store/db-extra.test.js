@@ -181,7 +181,11 @@ describe('db — getUpcomingCalendarEvents', () => {
 });
 
 describe('db — getUpcomingMeetings', () => {
-  it('returns gcal events with meet_url within horizon', () => {
+  // New signature: getUpcomingMeetings(beforeMinutes, afterMinutes)
+  // beforeMinutes = lookahead (positive, e.g. 10 = show 10 min before start)
+  // afterMinutes = grace period (negative, e.g. -5 = show until 5 min after start)
+
+  it('returns gcal events with meet_url within window', () => {
     const now = Date.now();
     db.upsertTask({
       ...SAMPLE_TASK,
@@ -198,13 +202,13 @@ describe('db — getUpcomingMeetings', () => {
       meet_url: null,
     });
 
-    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const meetings = db.getUpcomingMeetings(10, -5);
     const ids = meetings.map((m) => m.id);
     expect(ids).toContain('gcal_meet');
     expect(ids).not.toContain('gcal_nomeet');
   });
 
-  it('excludes meetings outside horizon', () => {
+  it('excludes meetings outside lookahead window', () => {
     const now = Date.now();
     db.upsertTask({
       ...SAMPLE_TASK,
@@ -214,8 +218,36 @@ describe('db — getUpcomingMeetings', () => {
       meet_url: 'https://meet.google.com/xyz',
     });
 
-    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const meetings = db.getUpcomingMeetings(10, -5);
     expect(meetings.some((m) => m.id === 'gcal_far_meet')).toBe(false);
+  });
+
+  it('includes meetings that started up to afterMinutes ago', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_just_started',
+      source: 'gcal',
+      start_at: now - 3 * 60000,
+      meet_url: 'https://meet.google.com/started',
+    });
+
+    const meetings = db.getUpcomingMeetings(10, -5);
+    expect(meetings.some((m) => m.id === 'gcal_just_started')).toBe(true);
+  });
+
+  it('excludes meetings that started more than afterMinutes ago', () => {
+    const now = Date.now();
+    db.upsertTask({
+      ...SAMPLE_TASK,
+      id: 'gcal_old_started',
+      source: 'gcal',
+      start_at: now - 10 * 60000,
+      meet_url: 'https://meet.google.com/old',
+    });
+
+    const meetings = db.getUpcomingMeetings(10, -5);
+    expect(meetings.some((m) => m.id === 'gcal_old_started')).toBe(false);
   });
 
   it('excludes done and stale meetings', () => {
@@ -237,7 +269,7 @@ describe('db — getUpcomingMeetings', () => {
     });
     db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('gcal_stale_meet');
 
-    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const meetings = db.getUpcomingMeetings(10, -5);
     const ids = meetings.map((m) => m.id);
     expect(ids).not.toContain('gcal_done_meet');
     expect(ids).not.toContain('gcal_stale_meet');
@@ -254,12 +286,12 @@ describe('db — getUpcomingMeetings', () => {
       meet_url: 'https://meet.google.com/nostart',
     });
 
-    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const meetings = db.getUpcomingMeetings(10, -5);
     expect(meetings.some((m) => m.id === 'gcal_nostart_meet')).toBe(false);
   });
 
   it('returns empty array when no meetings exist', () => {
-    expect(db.getUpcomingMeetings(10 * 60000)).toEqual([]);
+    expect(db.getUpcomingMeetings(10, -5)).toEqual([]);
   });
 
   it('orders by start_at ascending', () => {
@@ -279,7 +311,7 @@ describe('db — getUpcomingMeetings', () => {
       meet_url: 'https://meet.google.com/sooner',
     });
 
-    const meetings = db.getUpcomingMeetings(10 * 60000);
+    const meetings = db.getUpcomingMeetings(10, -5);
     const ids = meetings.map((m) => m.id);
     expect(ids.indexOf('gcal_sooner_meet')).toBeLessThan(ids.indexOf('gcal_later_meet'));
   });

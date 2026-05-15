@@ -4,6 +4,7 @@ const DEFAULTS = {
   language: 'it',
   sync: {
     interval_minutes: 5,
+    data_interval_minutes: 10,
     lookahead_hours: 72,
   },
   sources: {

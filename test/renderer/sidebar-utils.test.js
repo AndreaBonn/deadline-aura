@@ -1,6 +1,6 @@
 'use strict';
 
-const { formatCountdown, urgencyToColor } = require('../../renderer/sidebar-utils');
+const { formatCountdown, urgencyToColor, getEventStatus } = require('../../renderer/sidebar-utils');
 
 describe('formatCountdown', () => {
   describe('null input', () => {
@@ -100,5 +100,91 @@ describe('urgencyToColor', () => {
     const lightLow = parseInt(low.match(/(\d+)%\)$/)[1], 10);
     const lightHigh = parseInt(high.match(/(\d+)%\)$/)[1], 10);
     expect(lightHigh).toBeGreaterThan(lightLow);
+  });
+});
+
+describe('getEventStatus', () => {
+  const BASE_TIME = new Date('2026-05-15T10:00:00').getTime();
+
+  describe('gcal events with start_at and due_at', () => {
+    it('returns ongoing when now is between start and end', () => {
+      const task = {
+        source: 'gcal',
+        start_at: BASE_TIME - 600000,
+        due_at: BASE_TIME + 1800000,
+        hours_remaining: 0.5,
+      };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('ongoing');
+      expect(result.label).toContain('in corso');
+    });
+
+    it('returns ended when now is past due_at', () => {
+      const task = {
+        source: 'gcal',
+        start_at: BASE_TIME - 3600000,
+        due_at: BASE_TIME - 600000,
+        hours_remaining: -0.1,
+      };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('ended');
+      expect(result.label).toBe('terminato');
+    });
+
+    it('returns future with start time and countdown for upcoming events', () => {
+      const task = {
+        source: 'gcal',
+        start_at: BASE_TIME + 3600000,
+        due_at: BASE_TIME + 7200000,
+        hours_remaining: 1,
+      };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('future');
+      expect(result.label).toContain('1h');
+    });
+
+    it('returns ongoing at exact start time', () => {
+      const task = {
+        source: 'gcal',
+        start_at: BASE_TIME,
+        due_at: BASE_TIME + 1800000,
+        hours_remaining: 0.5,
+      };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('ongoing');
+    });
+
+    it('returns ended at exact due_at time', () => {
+      const task = {
+        source: 'gcal',
+        start_at: BASE_TIME - 1800000,
+        due_at: BASE_TIME,
+        hours_remaining: 0,
+      };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('ended');
+    });
+  });
+
+  describe('non-gcal tasks and gcal without start/end', () => {
+    it('returns default status for jira tasks', () => {
+      const task = { source: 'jira', hours_remaining: 5 };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('default');
+      expect(result.label).toBe('5h');
+    });
+
+    it('returns default status for local tasks', () => {
+      const task = { source: 'local', hours_remaining: null };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('default');
+      expect(result.label).toBe('');
+    });
+
+    it('returns default for gcal task without due_at', () => {
+      const task = { source: 'gcal', start_at: BASE_TIME + 3600000, hours_remaining: 1 };
+      const result = getEventStatus(task, BASE_TIME);
+      expect(result.status).toBe('default');
+    });
   });
 });

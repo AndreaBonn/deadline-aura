@@ -203,9 +203,10 @@ function getUpcomingCalendarEvents(horizonMs) {
     .all(now, horizon, now, horizon);
 }
 
-function getUpcomingMeetings(horizonMs) {
+function getUpcomingMeetings(beforeMinutes, afterMinutes) {
   const now = Date.now();
-  const horizon = now + horizonMs;
+  const windowStart = now + afterMinutes * 60000;
+  const windowEnd = now + beforeMinutes * 60000;
   return getDb()
     .prepare(
       `SELECT * FROM tasks
@@ -214,11 +215,11 @@ function getUpcomingMeetings(horizonMs) {
        AND source = 'gcal'
        AND meet_url IS NOT NULL
        AND start_at IS NOT NULL
-       AND start_at >= ?
        AND start_at <= ?
+       AND start_at >= ?
      ORDER BY start_at ASC`,
     )
-    .all(now, horizon);
+    .all(windowEnd, windowStart);
 }
 
 function upsertTask(task) {

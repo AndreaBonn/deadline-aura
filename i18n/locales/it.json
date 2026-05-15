@@ -22,7 +22,9 @@
     "days_short": "g",
     "in_minutes": "tra {n} minuti",
     "in_hours": "tra {n} ore",
-    "now": "ora"
+    "now": "ora",
+    "ongoing": "in corso",
+    "ended": "terminato"
   },
   "sidebar": {
     "no_tasks": "Nessun task in arrivo",

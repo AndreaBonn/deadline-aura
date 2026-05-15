@@ -5,6 +5,8 @@
 
 const COLLAPSED_LIMIT = 5;
 const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
+const COLOR_ONGOING = '#4fc3f7';
+const COLOR_ENDED = '#888';
 
 let jiraFilter = '';
 let lastTasks = null;
@@ -636,8 +638,9 @@ function createTaskCard(task) {
   card.style.borderLeftColor = color;
 
   const isCritical = task.urgency_score > 0.8;
-  const hoursToShow = task.start_at ? (task.start_at - Date.now()) / 3600000 : task.hours_remaining;
-  const countdown = formatCountdown(hoursToShow);
+  const now = Date.now();
+  const eventStatus = getEventStatus(task, now);
+  const countdown = eventStatus.label;
 
   const header = document.createElement('div');
   header.className = 'task-header';
@@ -648,11 +651,19 @@ function createTaskCard(task) {
 
   const dot = document.createElement('span');
   dot.className = 'task-dot' + (isCritical ? ' critical' : '');
-  dot.style.background = color;
+  dot.style.background = eventStatus.status === 'ongoing' ? COLOR_ONGOING : color;
 
   const countdownEl = document.createElement('div');
   countdownEl.className = 'task-countdown';
-  countdownEl.style.color = color;
+  if (eventStatus.status === 'ongoing') {
+    countdownEl.style.color = COLOR_ONGOING;
+    countdownEl.classList.add('event-ongoing');
+  } else if (eventStatus.status === 'ended') {
+    countdownEl.style.color = COLOR_ENDED;
+    countdownEl.classList.add('event-ended');
+  } else {
+    countdownEl.style.color = color;
+  }
   countdownEl.textContent = countdown + ' ';
   countdownEl.appendChild(dot);
 
