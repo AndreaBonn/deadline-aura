@@ -138,7 +138,7 @@ Key files: `core/sync-daemon.js`, `store/local-queries.js`, `store/pinned-querie
 Electron main process communicates with five renderer windows through four separate preload bridges (`contextIsolation: true`). Push channels (main to renderer) deliver state updates. Request channels (renderer to main) handle user actions and invoke/handle pairs.
 
 ```mermaid
-%%{init: {'theme': 'default'}}%%
+%%{init: {'theme': 'neutral'}}%%
 graph TD
   main["Electron Main Process"]
 

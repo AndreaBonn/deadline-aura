@@ -33,7 +33,7 @@ Solo Linux/X11/GNOME.
 ## Architettura
 
 ```mermaid
-%%{init: {'theme': 'default'}}%%
+%%{init: {'theme': 'neutral'}}%%
 graph LR
   gcal["Google Calendar"]
   jira["Jira"]
