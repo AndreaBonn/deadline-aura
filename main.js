@@ -362,39 +362,25 @@ function createMeetingDocks() {
       if (process.platform === 'linux' && process.env.DISPLAY) {
         try {
           const xidStr = String(dockWin.getNativeWindowHandle().readUInt32LE(0));
+          // Sticky on all desktops — no DOCK type to preserve transparency
           execFile(
             'xprop',
             [
               '-id',
               xidStr,
               '-f',
-              '_NET_WM_WINDOW_TYPE',
-              '32a',
+              '_NET_WM_DESKTOP',
+              '32c',
               '-set',
-              '_NET_WM_WINDOW_TYPE',
-              '_NET_WM_WINDOW_TYPE_DOCK',
+              '_NET_WM_DESKTOP',
+              '0xffffffff',
             ],
             () => {
-              execFile(
-                'xprop',
-                [
-                  '-id',
-                  xidStr,
-                  '-f',
-                  '_NET_WM_DESKTOP',
-                  '32c',
-                  '-set',
-                  '_NET_WM_DESKTOP',
-                  '0xffffffff',
-                ],
-                () => {
-                  // No strut reservation — dock overlaps, hidden when empty
-                },
-              );
+              // No strut reservation — dock overlaps, hidden when empty
             },
           );
         } catch {
-          // xprop not available — proceed without DOCK type
+          // xprop not available — proceed without sticky desktop
         }
       }
     });
