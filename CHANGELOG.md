@@ -1,3 +1,27 @@
+## What's Changed in v1.2.0
+
+> La release v1.2.0 introduce una maggiore integrazione con Google Calendar e miglioramenti nella gestione delle riunioni.
+
+### ✨ New Features
+- Estrazione dei link di Teams e Zoom dagli eventi di Google Calendar nel dock delle riunioni (7ceb91a)
+- Introduzione della sincronizzazione differenziata, tempistica del dock delle riunioni e stati degli eventi di Google Calendar (feeba91)
+
+### 🐛 Bug Fixes
+- Prevenzione dell'overflow di contenuto a qualsiasi larghezza della barra laterale (58f2734)
+- Commutazione dei diagrammi Mermaid su tema neutro per una migliore leggibilità in modalità oscura (13285ae)
+- Rimozione del tipo di finestra DOCK per preservare la trasparenza su GNOME (82d7a31)
+
+### 📚 Documentation
+- Aggiunta di diagrammi Mermaid per l'architettura del sistema (023a29d)
+- Aggiornamento del README con dock delle riunioni, stati degli eventi e intervalli di sincronizzazione (7f52e31)
+
+### 🔧 Maintenance
+- Aggiornamento di CHANGELOG.md per v1.1.0 [skip ci] (9c02c4d)
+- Aggiornamento di CHANGELOG.en.md per v1.1.0 [skip ci] (c130f1f)
+- Rimozione di docs/decisions dai file tracciati (f03022d)
+- Rimozione di doc_progetto dal tracciamento e aggiunta a gitignore (089d5d4)
+- Aggiornamento dei badge [skip ci] (98cc1c1)
+
 ## What's Changed in v1.1.0
 
 > Aggiornamento dell'interfaccia utente e correzione di bug per migliorare l'esperienza utente.
