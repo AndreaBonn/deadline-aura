@@ -53,5 +53,8 @@ docs/*
 # Test coverage
 coverage/
 
+# Project docs (local only)
+doc_progetto/
+
 # Electron specific
 app/node_modules/
