@@ -99,6 +99,9 @@ Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita
 - Preferiti Jira: stella su qualsiasi task Jira per fissarlo in una sezione "Preferiti" dedicata tra Google Calendar e Jira nella sidebar; i preferiti persistono tra i riavvii
 - Time logging su Google Calendar: bottone orologio su qualsiasi task apre un form inline per creare un evento con data, ora, durata e calendario di destinazione; gli eventi sono formattati come `[CODICE-JIRA] - Titolo` per compatibilità con il tracciamento tempo di Tempo
 - Timer live: pulsante play/stop su qualsiasi task Jira o locale avvia un timer in tempo reale che crea un evento Google Calendar immediato e ne aggiorna l'orario di fine ogni 60 secondi; premendo stop l'evento viene finalizzato con la durata esatta. Lo stato del timer persiste in localStorage per il recupero da crash. Una sezione "In Corso" in cima alla sidebar evidenzia il task attualmente cronometrato
+- Meeting dock: barra trasparente flottante in basso su ogni display, mostra riunioni imminenti con link Meet/Teams/Zoom cliccabili. Le riunioni appaiono da 10 minuti prima a 5 minuti dopo l'orario di inizio, controllate ogni 30 secondi indipendentemente dal sync
+- Stato eventi calendario: gli eventi Google Calendar nella sidebar mostrano lo stato in tempo reale - "in corso" (azzurro) tra inizio e fine, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
+- Sync differenziato: i dati esterni (Google Calendar, Jira) si aggiornano ogni 10 minuti di default (`sync.data_interval_minutes`), l'AI ricalcola solo quando cambiano gli eventi o ogni 6 ore (`ai.recalc_hours`), e la UI si aggiorna ogni 60 secondi
 
 ## Installazione
 
@@ -228,7 +231,7 @@ systemctl --user enable --now deadlineaura-sync.timer
 
 ## Utilizzo
 
-Dopo aver avviato l'app (`npm start`), una striscia colorata appare sul bordo destro di ogni display. Il colore riflette il carico di lavoro attuale: verde in situazione tranquilla, giallo a carico moderato, rosso a pressione critica. La striscia si aggiorna automaticamente ogni 60 secondi.
+Dopo aver avviato l'app (`npm start`), una striscia colorata appare sul bordo destro di ogni display. Il colore riflette il carico di lavoro attuale: verde in situazione tranquilla, giallo a carico moderato, rosso a pressione critica. La UI si aggiorna ogni 60 secondi, mentre i dati esterni (Google Calendar, Jira) si sincronizzano ogni 10 minuti.
 
 ### Sidebar
 
@@ -240,7 +243,7 @@ Clicca la striscia per aprire la sidebar. I task sono raggruppati in sezioni:
 </div>
 
 1. **Locale** - task personali creati direttamente nell'app
-2. **Google Calendar** - eventi dai calendari sincronizzati
+2. **Google Calendar** - eventi dai calendari sincronizzati, con stato in tempo reale: "in corso" (azzurro) durante l'evento, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
 3. **Preferiti Jira** - task Jira che hai stellato (visibile solo se hai preferiti)
 4. **Jira** - task corrispondenti al filtro JQL configurato
 
@@ -295,6 +298,12 @@ Mentre un timer è attivo, il task compare in una sezione dedicata **In Corso** 
 
 Se l'app si chiude durante un timer attivo, alla riapertura il timer riprende automaticamente (lo stato è salvato in localStorage).
 
+### Meeting dock
+
+Una barra trasparente flottante appare in basso su ogni display quando hai riunioni imminenti con link a videochiamate. La dock controlla ogni 30 secondi e mostra le riunioni da 10 minuti prima a 5 minuti dopo l'orario di inizio. Clicca una riunione per aprire il link Meet, Teams o Zoom nel browser.
+
+La dock usa un effetto vetro traslucido (backdrop blur) e non riserva spazio sullo schermo: si sovrappone al desktop solo quando ci sono riunioni imminenti e si nasconde automaticamente quando non ce ne sono.
+
 ### Note AI e rilevamento burnout
 
 Clicca la barra di urgenza colorata in cima alla sidebar per espandere il pannello AI. Mostra:
@@ -315,7 +324,7 @@ Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ha
 
 | Tab         | Cosa puoi configurare                                                  |
 | ----------- | ---------------------------------------------------------------------- |
-| Generale    | Intervallo sync, finestra lookahead                                    |
+| Generale    | Intervallo sync UI, intervallo sync dati, finestra lookahead           |
 | Sorgenti    | Calendari e keyword Google Calendar, istanze Jira e JQL                |
 | AI          | Ordine priorità provider, intervallo ricalcolo, timeout, temperatura   |
 | Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it              |

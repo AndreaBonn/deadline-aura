@@ -99,6 +99,9 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - Jira favorites: star any Jira task to pin it in a dedicated "Favorites" section between Google Calendar and Jira in the sidebar; favorites persist across restarts
 - Time logging to Google Calendar: clock button on any task opens an inline form to create a calendar event with date, time, duration, and target calendar; events are formatted as `[JIRA-KEY] - Title` for compatibility with Tempo time tracking
 - Live timer: play/stop button on any Jira or local task starts a real-time timer that creates a Google Calendar event immediately and updates its end time every 60 seconds; pressing stop finalizes the event with the exact duration. Timer state persists in localStorage for crash recovery. An "In Progress" section at the top of the sidebar highlights the currently timed task
+- Meeting dock: a floating transparent bar at the bottom of each display shows upcoming meetings with clickable video call links (Meet, Teams, Zoom). Meetings appear from 10 minutes before to 5 minutes after the scheduled start time, checked every 30 seconds regardless of sync status
+- Calendar event status: Google Calendar events in the sidebar show real-time status - "ongoing" (blue) when between start and end time, "ended" (grey) after the event finishes, or start time with countdown for future events
+- Differentiated sync: external data (Google Calendar, Jira) refreshes every 10 minutes by default (`sync.data_interval_minutes`), AI scoring recalculates only when events change or every 6 hours (`ai.recalc_hours`), and the UI updates every 60 seconds
 
 ## Setup
 
@@ -228,7 +231,7 @@ systemctl --user enable --now deadlineaura-sync.timer
 
 ## Usage
 
-After starting the app (`npm start`), a colored strip appears on the right edge of each display. The color reflects your current workload: green when calm, yellow at moderate load, red at critical pressure. The strip updates automatically every 60 seconds.
+After starting the app (`npm start`), a colored strip appears on the right edge of each display. The color reflects your current workload: green when calm, yellow at moderate load, red at critical pressure. The UI updates every 60 seconds, while external data (Google Calendar, Jira) syncs every 10 minutes.
 
 ### Sidebar
 
@@ -240,7 +243,7 @@ Click the strip to open the sidebar. It shows your tasks grouped into sections:
 </div>
 
 1. **Local** - personal tasks you create directly in the app
-2. **Google Calendar** - upcoming events from your synced calendars
+2. **Google Calendar** - upcoming events from your synced calendars, with real-time status: "ongoing" (blue) during the event, "ended" (grey) after it finishes, or start time with countdown for future events
 3. **Jira Favorites** - Jira tasks you have starred (appears only if you have favorites)
 4. **Jira** - tasks matching your configured JQL filter
 
@@ -295,6 +298,12 @@ While a timer is running, the task appears in a dedicated **In Progress** sectio
 
 If the app closes while a timer is running, it resumes automatically on next launch (timer state is persisted in localStorage).
 
+### Meeting dock
+
+A floating transparent bar appears at the bottom of each display when you have upcoming meetings with video call links. The dock checks every 30 seconds and shows meetings from 10 minutes before to 5 minutes after the scheduled start time. Click a meeting to open its Meet, Teams, or Zoom link in the browser.
+
+The dock uses a translucent glass effect (backdrop blur) and does not reserve screen space - it overlays the desktop only when meetings are imminent and hides automatically when there are none.
+
 ### AI notes and burnout detection
 
 Click the colored urgency bar at the top of the sidebar to expand the AI panel. It shows:
@@ -315,7 +324,7 @@ Click the gear icon in the sidebar to open the settings panel. It has 9 tabs:
 
 | Tab           | What you can configure                                          |
 | ------------- | --------------------------------------------------------------- |
-| General       | Sync interval, lookahead window                                 |
+| General       | UI sync interval, data sync interval, lookahead window          |
 | Sources       | Google Calendar calendars and keywords, Jira instances and JQL  |
 | AI            | Provider priority order, refresh interval, timeout, temperature |
 | Wallpaper     | Enable/disable, background images, post-it settings             |

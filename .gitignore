@@ -44,6 +44,7 @@ Thumbs.db
 
 # Claude
 .claude/
+CLAUDE.md
 
 # Docs (session reports, local decisions — keep ARCHITECTURE tracked)
 docs/*
