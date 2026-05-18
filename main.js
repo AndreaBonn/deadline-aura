@@ -385,8 +385,13 @@ function createMeetingDocks() {
       }
     });
 
-    // Click-through on transparent areas, forward mouse events to renderer
-    dockWin.setIgnoreMouseEvents(true, { forward: true });
+    // Click-through on transparent areas, forward mouse events to renderer.
+    // On Linux (X11), forward option does not reliably deliver mouse events
+    // to the renderer, so mouseenter never fires and clicks pass through.
+    // Disable click-through on Linux to keep the dock interactive.
+    if (process.platform !== 'linux') {
+      dockWin.setIgnoreMouseEvents(true, { forward: true });
+    }
 
     meetingDockWindows.set(displayId, dockWin);
   }
@@ -674,6 +679,11 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('meeting-dock:set-ignore-mouse', (_event, ignore) => {
+    // On Linux, click-through with forwarding is disabled (see createMeetingDocks),
+    // so toggling ignore mouse events is unnecessary.
+    if (process.platform === 'linux') {
+      return;
+    }
     const senderWin = BrowserWindow.fromWebContents(_event.sender);
     if (senderWin && !senderWin.isDestroyed()) {
       if (ignore) {
