@@ -5,22 +5,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 SERVICE_SRC="$PROJECT_DIR/autostart/deadlineaura.service"
-DESKTOP_SRC="$PROJECT_DIR/autostart/deadlineaura.desktop"
-
 SYSTEMD_DIR="$HOME/.config/systemd/user"
 AUTOSTART_DIR="$HOME/.config/autostart"
 
 echo "=== DeadlineAura Autostart Setup ==="
 
-# 1. Installa systemd user service
+# 1. Rimuovi eventuale desktop entry GNOME (causa conflitto single-instance lock)
+if [ -f "$AUTOSTART_DIR/deadlineaura.desktop" ]; then
+  rm "$AUTOSTART_DIR/deadlineaura.desktop"
+  echo "✓ Rimosso desktop entry GNOME (conflitto con systemd service)"
+fi
+
+# 2. Installa systemd user service
 mkdir -p "$SYSTEMD_DIR"
 cp "$SERVICE_SRC" "$SYSTEMD_DIR/deadlineaura.service"
 echo "✓ Service copiato in $SYSTEMD_DIR"
-
-# 2. Installa desktop entry per autostart GNOME (backup)
-mkdir -p "$AUTOSTART_DIR"
-cp "$DESKTOP_SRC" "$AUTOSTART_DIR/deadlineaura.desktop"
-echo "✓ Desktop entry copiato in $AUTOSTART_DIR"
 
 # 3. Abilita e avvia il service
 systemctl --user daemon-reload

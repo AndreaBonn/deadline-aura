@@ -9,8 +9,10 @@ Environment=NODE_ENV=production
 PassEnvironment=DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR
 ExecStart=/home/bonn/.nvm/versions/node/v20.20.0/bin/npx electron /home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura --no-sandbox
 WorkingDirectory=/home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura
-Restart=on-failure
+Restart=always
 RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=5
 
 [Install]
 WantedBy=graphical-session.target
