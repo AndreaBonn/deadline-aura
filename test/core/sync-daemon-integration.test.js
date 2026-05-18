@@ -231,4 +231,32 @@ describe('sync-daemon — sync()', () => {
 
     expect(result.errors.some((e) => e.source === 'ai')).toBe(true);
   });
+
+  it('does not mark existing gcal tasks stale when fetchEvents throws', async () => {
+    const event = {
+      id: 'gcal_keep',
+      source: 'gcal',
+      title: 'Keep Me',
+      due_at: Date.now() + 3600000,
+      start_at: null,
+      priority: 3,
+      is_done: 0,
+      is_stale: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+    db.upsertTask(event);
+
+    vi.spyOn(gcal, 'fetchEvents').mockRejectedValue(new Error('invalid_grant'));
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+
+    const result = await sync(BASE_CONFIG);
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].source).toBe('google_calendar');
+
+    const task = db.getDb().prepare('SELECT is_stale FROM tasks WHERE id = ?').get('gcal_keep');
+    expect(task.is_stale).toBe(0);
+  });
 });

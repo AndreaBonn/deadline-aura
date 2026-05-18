@@ -244,6 +244,7 @@ async function fetchEvents(config) {
   const timeMax = getLookaheadEnd().toISOString();
 
   const allEvents = [];
+  const calendarErrors = [];
 
   for (const calendarId of gcalConfig.calendars) {
     try {
@@ -263,7 +264,14 @@ async function fetchEvents(config) {
       allEvents.push(...events);
     } catch (err) {
       console.error(`Google Calendar: error fetching ${calendarId}:`, err.message);
+      calendarErrors.push({ calendarId, message: err.message });
     }
+  }
+
+  if (calendarErrors.length === gcalConfig.calendars.length) {
+    throw new Error(
+      `All calendars failed: ${calendarErrors.map((e) => `${e.calendarId}: ${e.message}`).join('; ')}`,
+    );
   }
 
   return allEvents;
