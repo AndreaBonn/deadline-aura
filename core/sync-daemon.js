@@ -3,7 +3,6 @@
 require('dotenv').config();
 
 const db = require('../store/db');
-const { unpinStaleTasks } = require('../store/pinned-queries');
 const gcal = require('../integrations/google-calendar');
 const jira = require('../integrations/jira');
 const aiScorer = require('../ai/ai-scorer');
@@ -70,8 +69,6 @@ async function sync(config) {
   if (!failedSources.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
     jiraCount = upsertMany(jiraIssues, 'jira');
   }
-
-  unpinStaleTasks();
 
   const allTasks = [...gcalEvents, ...jiraIssues];
 

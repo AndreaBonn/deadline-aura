@@ -15,6 +15,8 @@ const CODE_FONT_SIZE = 11;
 const TITLE_FONT_SIZE = 12;
 const COUNTDOWN_FONT_SIZE = 10;
 
+const STALE_BORDER_COLOR = '#ef4444';
+
 const PRIORITY_COLORS = {
   1: '#ef4444',
   2: '#f97316',
@@ -83,13 +85,14 @@ function renderPostit(ctx, { task, x, y, scale }) {
   const pad = POSTIT_PADDING * s;
   const r = POSTIT_RADIUS * s;
   const headerH = HEADER_HEIGHT * s;
-  const accentColor = getPostitColor(task.priority);
+  const isStale = !!task.is_stale;
+  const accentColor = isStale ? STALE_BORDER_COLOR : getPostitColor(task.priority);
   const countdown = formatCountdown(task.due_at);
   const code = extractCode(task.task_id, task.title);
 
   // Shadow
   ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowColor = isStale ? 'rgba(239, 68, 68, 0.4)' : 'rgba(0, 0, 0, 0.35)';
   ctx.shadowBlur = SHADOW_BLUR * s;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = SHADOW_OFFSET_Y * s;
@@ -100,6 +103,17 @@ function renderPostit(ctx, { task, x, y, scale }) {
   ctx.roundRect(x, y, w, h, r);
   ctx.fill();
   ctx.restore();
+
+  // Stale border
+  if (isStale) {
+    ctx.save();
+    ctx.strokeStyle = STALE_BORDER_COLOR;
+    ctx.lineWidth = 2 * s;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Accent header bar
   ctx.fillStyle = accentColor;

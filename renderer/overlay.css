@@ -200,3 +200,17 @@ body {
 .postit-accent.p4 {
   background: #6b7280;
 }
+
+/* Stale task - not found in latest Jira sync */
+.postit-ghost.stale {
+  border: 2px solid #ef4444;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+}
+
+.postit-ghost.stale:hover {
+  box-shadow: 0 6px 24px rgba(239, 68, 68, 0.4);
+}
+
+.postit-ghost.stale .postit-remove {
+  display: flex;
+}

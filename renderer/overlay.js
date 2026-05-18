@@ -34,7 +34,7 @@ function extractCode(taskId) {
 
 function createPostitGhost(task) {
   const el = document.createElement('div');
-  el.className = 'postit-ghost';
+  el.className = task.is_stale ? 'postit-ghost stale' : 'postit-ghost';
   el.dataset.taskId = task.task_id;
   el.style.left = task.x_pct + '%';
   el.style.top = task.y_pct + '%';
