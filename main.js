@@ -224,14 +224,15 @@ function createStrips() {
   const displays = screen.getAllDisplays();
 
   for (const display of displays) {
-    const { x: wx, y: wy } = display.workArea;
-    const { width, height } = display.workAreaSize;
+    const { x: bx, width: bw } = display.bounds;
+    const { y: wy } = display.workArea;
+    const { height } = display.workAreaSize;
     const displayId = String(display.id);
 
     const stripWin = new BrowserWindow({
       width: STRIP_WIDTH,
       height: height,
-      x: wx + width - STRIP_WIDTH,
+      x: bx + bw - STRIP_WIDTH,
       y: wy,
       show: false,
       frame: false,
