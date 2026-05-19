@@ -58,26 +58,26 @@ function buildScoringPrompt(events, language = 'it') {
     })
     .join('\n');
 
-  return `You are a clinical psychologist specializing in occupational stress assessment. Your framework combines Cognitive Load Theory (Sweller), Attention Residue research (Leroy), and decision fatigue literature (Baumeister). You assess real psychological impact, not surface-level busyness.
+  return `You are a work-life strategist who understands cognitive load, attention residue, and decision fatigue. You read schedules the way a coach reads game tape: noticing what works well, where energy leaks, and what small adjustments would make the biggest difference. You are honest about real weight but equally honest about when things are fine.
 
 Current time: ${now}
 
 SCHEDULE:
 ${eventList}
 
-CALIBRATION ANCHORS (score the REAL psychological weight — underscoring is as wrong as inflating):
-1-2: Genuinely light. 1-3 low-stakes items, long recovery gaps, no travel, no deadlines this week.
-3-4: Manageable. A few meetings/tasks per day, single domain, no context-switching pressure. Most people feel "fine."
-5-6: Moderate load. Multiple commitments daily, some context switching, but still has breathing room. End-of-day tiredness but recoverable overnight.
-7-8: Heavy. Dense schedule across multiple days, travel (especially same-day return), multiple domains/clients/topics, emotional labor (teaching, presenting, evaluating). The person FEELS the weight — planning ahead, dreading the week, sleep may suffer. This is where most "busy weeks" actually land.
-9-10: Crushing. Back-to-back high-stakes across 4+ days, travel + deadlines + social performance simultaneously, zero recovery windows, decision fatigue guaranteed. Burnout risk if repeated.
+CALIBRATION ANCHORS (accuracy matters in both directions - underscoring a hard week is as wrong as inflating a light one):
+1-2: Restful. Few commitments, generous gaps between them, single domain. The schedule actively supports recovery. The person has margin to think, plan, or do nothing. This is a good week - acknowledge it.
+3-4: Comfortable. A steady rhythm of meetings or tasks, mostly in one domain, with natural breaks. No rushing between commitments. The person can be present in each event without worrying about the next. Sustainable long-term.
+5-6: Moderate. Multiple commitments daily with some context switching. Still has breathing room, but needs to be intentional about breaks. End-of-day tiredness that recovers overnight. A normal "working week" for most knowledge workers.
+7-8: Heavy. Dense schedule across multiple days, possible travel, multiple domains or clients, emotional labor (teaching, presenting, evaluating). The weight is felt: the person plans ahead, thinks about the week before it starts. Sleep or downtime may be affected. Where most "really busy weeks" actually land.
+9-10: Unsustainable. Back-to-back high-stakes across 4+ days, travel combined with deadlines and social performance, zero recovery windows. Decision quality degrades. Not a crisis if it happens once, but a clear signal if recurring.
 
-IMPORTANT CALIBRATION NOTES:
-- Travel (flights, trains, connections) is NOT "passive time" — it fragments the day, adds logistical stress, removes recovery, and creates anxiety about delays. Score it 4-6 per travel segment depending on complexity.
-- Teaching/lecturing requires PREPARATION time that isn't on the calendar. A 2h lecture = 4-6h cognitive commitment minimum.
-- Multiple video calls in one day compound: each one after the 3rd adds +1 to the day's effective stress.
-- Same-day multi-city travel (flight + train + meeting) is inherently 7+ regardless of what the meeting is about.
-- A week with 3+ "heavy days" (stress >= 7) should have global_stress >= 7, because recovery deficit compounds across days.
+CALIBRATION NOTES:
+- Travel (flights, trains, connections) fragments the day and removes recovery. Score 4-6 per travel segment depending on complexity.
+- Teaching/lecturing requires preparation time not on the calendar. A 2h lecture = 4-6h cognitive commitment minimum.
+- Video calls compound: each one after the 3rd in a day adds +1 to effective load.
+- Same-day multi-city travel (flight + train + meeting) is inherently 7+ regardless of meeting content.
+- A week with 3+ days scoring >= 7 should have global_stress >= 7 due to compounding recovery deficit.
 
 EVALUATION DIMENSIONS:
 1. Cognitive complexity per event: deep analytical work (high) vs routine meeting (low) vs passive attendance (minimal)
@@ -85,7 +85,7 @@ EVALUATION DIMENSIONS:
 3. Time architecture: gaps <20min between demanding tasks = no real recovery. Fragmented schedules (many short gaps) drain more than dense-but-blocked ones
 4. Emotional labor: events requiring performance, conflict management, evaluation, or high-stakes decisions carry hidden load beyond their duration
 5. Cumulative compounding: a moderate task after three demanding ones hits harder than the same task after rest. Score later events in context of what precedes them
-6. Invisible patterns: sequences the person cannot see from inside — creative tasks clustered without breaks, all high-stakes items in one half-day, no transition buffers before important events
+6. Schedule quality: well-placed breaks, similar topics grouped together, demanding work in peak-energy hours, buffer time before important events. Good scheduling deserves recognition.
 
 Respond with ONLY valid JSON, no markdown, no text before or after:
 {
@@ -95,7 +95,7 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
       "date": "YYYY-MM-DD",
       "stress": <1-10>,
       "peak_window": "HH:MM-HH:MM",
-      "reasoning": "2-3 sentences: what compounds, where recovery is missing, what makes this day specifically heavy or light"
+      "reasoning": "2-3 sentences: what compounds, where recovery is missing, OR what makes this day well-structured and sustainable"
     }
   ],
   "per_event": [
@@ -116,9 +116,9 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
     "recovery_adequacy": "sufficient|marginal|insufficient"
   },
   "patterns": [
-    "Specific invisible pattern with evidence, e.g.: 3 creative tasks consecutive 14:00-17:30 with no break — decision quality degrades after 2nd"
+    "Notable pattern with evidence. Can be positive (good grouping, natural recovery gaps) or concerning (3 creative tasks consecutive with no break). Always cite specific times and events."
   ],
-  "clinical_note": "Write in ${outputLanguage}. 2-3 sentences as an occupational psychologist writing a private note to the person. Focus on ONE specific invisible pattern from this schedule (not a generic warning). Name the concrete mechanism: which events compound, where recovery is missing, what cognitive cost is hidden. End with one actionable micro-adjustment (move X, add a buffer before Y, protect morning for Z). Tone: direct and warm, like a trusted colleague who happens to be a psychologist — never alarmist, never generic, never 'you are doing too much'."
+  "note": "Write in ${outputLanguage}. 2-3 sentences as a sharp, supportive colleague who understands how cognitive load works. ADAPT TONE TO THE ACTUAL SCORE: If global_stress <= 4, lead with what is working well in this schedule and why it supports good energy - only add a suggestion if something genuinely stands out. If global_stress 5-6, balance acknowledgment of the manageable load with one concrete observation about where a small tweak would help. If global_stress >= 7, focus on the specific pattern that makes this week heavy - name which events compound and where recovery is missing, then suggest one practical micro-adjustment (move X, add a buffer before Y, protect morning for Z). In ALL cases: be specific to THIS schedule, never generic. Never alarmist. Never patronizing. Think of a friend who is good at noticing things you miss about your own week."
 }`;
 }
 
@@ -193,9 +193,10 @@ function parseAiResponse(text) {
   if (!Array.isArray(parsed.patterns)) {
     parsed.patterns = [];
   }
-  if (typeof parsed.clinical_note !== 'string') {
-    parsed.clinical_note = '';
+  if (typeof parsed.note !== 'string') {
+    parsed.note = parsed.clinical_note || '';
   }
+  delete parsed.clinical_note;
 
   return parsed;
 }

@@ -12,7 +12,7 @@ describe('prompt', () => {
 
       expect(prompt).toContain('Sprint Review');
       expect(prompt).toContain('AUTH-441 Fix login');
-      expect(prompt).toContain('clinical psychologist');
+      expect(prompt).toContain('work-life strategist');
       expect(prompt.toLowerCase()).toContain('context switching');
     });
 
@@ -21,15 +21,15 @@ describe('prompt', () => {
       const prompt = buildScoringPrompt(events);
 
       expect(prompt).toContain('CALIBRATION ANCHORS');
-      expect(prompt).toContain('1-2: Genuinely light');
-      expect(prompt).toContain('9-10: Crushing');
+      expect(prompt).toContain('1-2: Restful');
+      expect(prompt).toContain('9-10: Unsustainable');
     });
 
-    it('requests clinical_note and patterns in JSON schema', () => {
+    it('requests note and patterns in JSON schema', () => {
       const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
       const prompt = buildScoringPrompt(events);
 
-      expect(prompt).toContain('clinical_note');
+      expect(prompt).toContain('"note"');
       expect(prompt).toContain('patterns');
       expect(prompt).toContain('cognitive_type');
       expect(prompt).toContain('decision_fatigue_risk');
@@ -63,20 +63,20 @@ describe('prompt', () => {
       expect(prompt).toContain('Simple event');
     });
 
-    it('defaults clinical_note language to Italian', () => {
+    it('defaults note language to Italian', () => {
       const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
       const prompt = buildScoringPrompt(events);
       expect(prompt).toContain('Write in Italian');
     });
 
-    it('uses English for clinical_note when language is en', () => {
+    it('uses English for note when language is en', () => {
       const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
       const prompt = buildScoringPrompt(events, 'en');
       expect(prompt).toContain('Write in English');
       expect(prompt).not.toContain('Write in Italian');
     });
 
-    it('uses Italian for clinical_note when language is it', () => {
+    it('uses Italian for note when language is it', () => {
       const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
       const prompt = buildScoringPrompt(events, 'it');
       expect(prompt).toContain('Write in Italian');
@@ -88,11 +88,19 @@ describe('prompt', () => {
       expect(prompt).toContain('Write in Italian');
     });
 
-    it('includes actionability constraint in clinical_note instruction', () => {
+    it('includes tone adaptation by stress level in note instruction', () => {
       const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
       const prompt = buildScoringPrompt(events);
-      expect(prompt).toContain('actionable micro-adjustment');
-      expect(prompt).toContain('invisible pattern');
+      expect(prompt).toContain('ADAPT TONE TO THE ACTUAL SCORE');
+      expect(prompt).toContain('global_stress <= 4');
+      expect(prompt).toContain('global_stress >= 7');
+    });
+
+    it('includes positive scheduling recognition in evaluation dimensions', () => {
+      const events = [{ id: 'ev1', title: 'Test', source: 'gcal' }];
+      const prompt = buildScoringPrompt(events);
+      expect(prompt).toContain('Schedule quality');
+      expect(prompt).toContain('Good scheduling deserves recognition');
     });
   });
 
@@ -120,13 +128,13 @@ describe('prompt', () => {
         recovery_adequacy: 'marginal',
       },
       patterns: ['Back-to-back meetings 9:00-12:00 with no buffer'],
-      clinical_note: 'Schedule lacks recovery windows between demanding blocks.',
+      note: 'Schedule lacks recovery windows between demanding blocks.',
     };
 
     it('parses valid JSON response with all fields', () => {
       const result = parseAiResponse(JSON.stringify(validResponse));
       expect(result.global_stress).toBe(7);
-      expect(result.clinical_note).toContain('recovery windows');
+      expect(result.note).toContain('recovery windows');
       expect(result.patterns).toHaveLength(1);
       expect(result.per_event[0].cognitive_type).toBe('analytical');
       expect(result.cognitive_factors.decision_fatigue_risk).toBe('medium');
@@ -217,20 +225,30 @@ describe('prompt', () => {
       expect(result.patterns).toEqual([]);
     });
 
-    it('defaults missing clinical_note to empty string', () => {
+    it('defaults missing note to empty string', () => {
       const result = parseAiResponse('{"global_stress": 3}');
-      expect(result.clinical_note).toBe('');
+      expect(result.note).toBe('');
     });
 
-    it('preserves valid patterns and clinical_note', () => {
+    it('preserves valid patterns and note', () => {
       const response = {
         global_stress: 5,
         patterns: ['Pattern A', 'Pattern B'],
-        clinical_note: 'Important observation',
+        note: 'Important observation',
       };
       const result = parseAiResponse(JSON.stringify(response));
       expect(result.patterns).toEqual(['Pattern A', 'Pattern B']);
-      expect(result.clinical_note).toBe('Important observation');
+      expect(result.note).toBe('Important observation');
+    });
+
+    it('migrates legacy clinical_note to note', () => {
+      const response = {
+        global_stress: 5,
+        clinical_note: 'Legacy note from cached response',
+      };
+      const result = parseAiResponse(JSON.stringify(response));
+      expect(result.note).toBe('Legacy note from cached response');
+      expect(result.clinical_note).toBeUndefined();
     });
   });
 });

@@ -297,16 +297,16 @@ describe('db module exported functions', () => {
     });
 
     it('returns parsed JSON from latest cache entry', () => {
-      db.setAiCache('hash_a', '{"clinical_note": "Take a break"}');
+      db.setAiCache('hash_a', '{"note": "Take a break"}');
       const result = db.getLatestAiCacheResponse();
-      expect(result.clinical_note).toBe('Take a break');
+      expect(result.note).toBe('Take a break');
     });
 
     it('returns latest entry when multiple exist', () => {
-      db.setAiCache('hash_old', '{"clinical_note": "old"}');
-      db.setAiCache('hash_new', '{"clinical_note": "new"}');
+      db.setAiCache('hash_old', '{"note": "old"}');
+      db.setAiCache('hash_new', '{"note": "new"}');
       const result = db.getLatestAiCacheResponse();
-      expect(result.clinical_note).toBe('new');
+      expect(result.note).toBe('new');
     });
 
     it('returns null for malformed JSON', () => {

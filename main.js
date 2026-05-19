@@ -512,7 +512,7 @@ async function runUpdateCycle({ force = false } = {}) {
     const favoriteIds = favoriteQueries.getAllFavoriteIds();
 
     const aiResponse = db.getLatestAiCacheResponse();
-    const clinicalNote = aiResponse?.clinical_note || null;
+    const clinicalNote = aiResponse?.note || aiResponse?.clinical_note || null;
     const stressForecast = aiResponse?.daily_breakdown || [];
 
     if (sidebarWindow && !sidebarWindow.isDestroyed() && sidebarReady) {
