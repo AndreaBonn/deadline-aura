@@ -116,6 +116,26 @@ describe('db module exported functions', () => {
       expect(tasks.find((t) => t.id === 'jira_far')).toBeDefined();
     });
 
+    it('excludes ended gcal events with due_at in the past', () => {
+      db.upsertTask({
+        ...SAMPLE_TASK,
+        id: 'gcal_ended',
+        source: 'gcal',
+        due_at: Date.now() - 3600000,
+      });
+      db.upsertTask({
+        ...SAMPLE_TASK,
+        id: 'gcal_ongoing',
+        source: 'gcal',
+        due_at: Date.now() + 1800000,
+      });
+
+      const tasks = db.getActiveTasks(72 * 3600000);
+      const ids = tasks.map((t) => t.id);
+      expect(ids).not.toContain('gcal_ended');
+      expect(ids).toContain('gcal_ongoing');
+    });
+
     it('still filters gcal tasks by lookahead window', () => {
       db.upsertTask({
         ...SAMPLE_TASK,

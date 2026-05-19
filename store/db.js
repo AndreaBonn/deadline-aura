@@ -172,16 +172,17 @@ function getActiveTasks(lookaheadMs) {
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
     .all();
+  const now = Date.now();
   const otherTasks = getDb()
     .prepare(
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
        AND source NOT IN ('jira', 'local')
-       AND (due_at IS NULL OR due_at <= ?)
+       AND (due_at IS NULL OR (due_at >= ? AND due_at <= ?))
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
-    .all(deadline);
+    .all(now, deadline);
   return [...persistentTasks, ...otherTasks];
 }
 
