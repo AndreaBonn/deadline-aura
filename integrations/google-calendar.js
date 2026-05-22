@@ -223,24 +223,21 @@ function normalizeEvent(event, priorityKeywords) {
   };
 }
 
-async function fetchEvents(config) {
-  const { google_calendar: gcalConfig } = config.sources;
+function isInvalidGrant(errorMessage) {
+  return typeof errorMessage === 'string' && errorMessage.includes('invalid_grant');
+}
 
-  if (!gcalConfig.enabled) {
-    return [];
+function deleteToken() {
+  try {
+    fs.unlinkSync(TOKEN_PATH);
+    console.log('Google Calendar: deleted expired token, will re-authenticate');
+  } catch {
+    // token file already gone
   }
+}
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    console.error('Google Calendar: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
-    return [];
-  }
-
-  const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+async function fetchCalendarEvents(oAuth2Client, gcalConfig) {
   const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
-
   const timeMax = getLookaheadEnd().toISOString();
 
   const allEvents = [];
@@ -266,6 +263,38 @@ async function fetchEvents(config) {
       console.error(`Google Calendar: error fetching ${calendarId}:`, err.message);
       calendarErrors.push({ calendarId, message: err.message });
     }
+  }
+
+  return { allEvents, calendarErrors };
+}
+
+async function fetchEvents(config) {
+  const { google_calendar: gcalConfig } = config.sources;
+
+  if (!gcalConfig.enabled) {
+    return [];
+  }
+
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error('Google Calendar: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    return [];
+  }
+
+  let oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+  let { allEvents, calendarErrors } = await fetchCalendarEvents(oAuth2Client, gcalConfig);
+
+  const hasInvalidGrant =
+    calendarErrors.length === gcalConfig.calendars.length &&
+    calendarErrors.every((e) => isInvalidGrant(e.message));
+
+  if (hasInvalidGrant) {
+    console.warn('Google Calendar: token revoked/expired, re-authenticating...');
+    deleteToken();
+    oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
+    ({ allEvents, calendarErrors } = await fetchCalendarEvents(oAuth2Client, gcalConfig));
   }
 
   if (calendarErrors.length === gcalConfig.calendars.length) {
@@ -365,5 +394,8 @@ module.exports = {
   listCalendars,
   createEvent,
   updateEvent,
+  isInvalidGrant,
+  deleteToken,
+  fetchCalendarEvents,
   TOKEN_PATH,
 };
