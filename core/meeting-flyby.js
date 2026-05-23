@@ -155,16 +155,16 @@ function checkAndLaunch({ config, db, screen }) {
 
   cleanupCooldowns();
   const triggered = findTriggeredMeetings(events, triggerSeconds);
-  const display = screen.getPrimaryDisplay();
+  const displays = screen.getAllDisplays();
 
   triggered.forEach((meeting, index) => {
     cooldownMap.set(meeting.id, Date.now());
     const delay = index * STAGGER_DELAY_MS;
     if (delay === 0) {
-      launchFlyby({ meeting, display, durationSeconds });
+      displays.forEach((display) => launchFlyby({ meeting, display, durationSeconds }));
     } else {
       setTimeout(() => {
-        launchFlyby({ meeting, display, durationSeconds });
+        displays.forEach((display) => launchFlyby({ meeting, display, durationSeconds }));
       }, delay);
     }
   });
