@@ -82,6 +82,13 @@ const configSchema = z.object({
       lookahead_minutes: z.number().int().min(1).max(30),
     })
     .optional(),
+  meeting_flyby: z
+    .object({
+      enabled: z.boolean(),
+      trigger_seconds: z.number().int().min(10).max(300),
+      duration_seconds: z.number().int().min(3).max(20),
+    })
+    .optional(),
   ui: z.object({
     max_tasks_shown: z.number().int().min(1).max(20),
     show_source_badge: z.boolean(),

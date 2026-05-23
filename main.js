@@ -16,6 +16,7 @@ const favoriteQueries = require('./store/favorite-queries');
 const burnoutDetector = require('./core/burnout-detector');
 const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
+const meetingFlyby = require('./core/meeting-flyby');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { DEFAULTS } = require('./config/defaults');
@@ -596,9 +597,12 @@ if (!gotLock) {
 app.whenReady().then(() => {
   initSidebar();
 
+  meetingFlyby.init();
+
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
   setInterval(updateMeetingDocks, MEETING_DOCK_CHECK_MS);
+  setInterval(() => meetingFlyby.checkAndLaunch({ config, db, screen }), MEETING_DOCK_CHECK_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
 
   const syncDaemonModule = require('./core/sync-daemon');
@@ -964,6 +968,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
+  meetingFlyby.destroyAll();
   destroyStrips();
   db.close();
   app.quit();

@@ -65,6 +65,11 @@ const DEFAULTS = {
     enabled: true,
     lookahead_minutes: 10,
   },
+  meeting_flyby: {
+    enabled: true,
+    trigger_seconds: 60,
+    duration_seconds: 8,
+  },
   ui: {
     max_tasks_shown: 8,
     show_source_badge: true,
