@@ -28,16 +28,16 @@ body {
   align-items: center;
   background: rgba(30, 30, 46, 0.88);
   border: 1px solid rgba(137, 180, 250, 0.3);
-  border-radius: 8px;
-  padding: 8px 16px;
-  max-width: 320px;
+  border-radius: 10px;
+  padding: 10px 20px;
+  max-width: 400px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
 }
 
 #bannerText {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   color: #cdd6f4;
   white-space: nowrap;
@@ -46,7 +46,7 @@ body {
 }
 
 #rope {
-  width: 24px;
+  width: 30px;
   height: 2px;
   background: repeating-linear-gradient(
     90deg,
@@ -60,8 +60,8 @@ body {
 
 #airplane {
   flex-shrink: 0;
-  width: 56px;
-  height: 32px;
+  width: 72px;
+  height: 42px;
   transition: transform 0.1s ease;
 }
 

@@ -2,8 +2,8 @@
 
 const path = require('path');
 
-const FLYBY_WINDOW_WIDTH = 450;
-const FLYBY_WINDOW_HEIGHT = 70;
+const FLYBY_WINDOW_WIDTH = 560;
+const FLYBY_WINDOW_HEIGHT = 90;
 const ANIMATION_TICK_MS = 33;
 const COOLDOWN_MS = 5 * 60 * 1000;
 const TRIGGER_WINDOW_MS = 15 * 1000;

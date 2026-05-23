@@ -68,7 +68,7 @@ const DEFAULTS = {
   meeting_flyby: {
     enabled: true,
     trigger_seconds: 60,
-    duration_seconds: 8,
+    duration_seconds: 20,
   },
   ui: {
     max_tasks_shown: 8,
