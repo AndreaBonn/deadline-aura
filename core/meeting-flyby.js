@@ -99,6 +99,7 @@ function launchFlyby({ meeting, display, durationSeconds }) {
   const totalTicks = Math.round((durationSeconds * 1000) / ANIMATION_TICK_MS);
   const pxPerTick = totalDistance / totalTicks;
   const startX = bounds.x - FLYBY_WINDOW_WIDTH;
+  const endX = bounds.x + bounds.width;
   let tickCount = 0;
 
   const state = { interval: null };
@@ -116,13 +117,24 @@ function launchFlyby({ meeting, display, durationSeconds }) {
         return;
       }
 
-      tickCount++;
-      const currentX = Math.round(startX + pxPerTick * tickCount);
-
-      if (currentX > bounds.x + bounds.width) {
+      if (meeting.start_at && Date.now() >= meeting.start_at) {
         clearInterval(state.interval);
         activeFlybys.delete(win);
         win.close();
+        return;
+      }
+
+      tickCount++;
+      const currentX = Math.round(startX + pxPerTick * tickCount);
+
+      if (currentX > endX) {
+        tickCount = 0;
+        try {
+          win.setPosition(startX, yPosition);
+        } catch {
+          clearInterval(state.interval);
+          activeFlybys.delete(win);
+        }
         return;
       }
 
