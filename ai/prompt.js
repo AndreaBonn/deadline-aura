@@ -18,45 +18,62 @@ function buildScoringPrompt(events, language = 'it') {
   const outputLanguage = language === 'en' ? 'English' : 'Italian';
   const now = new Date().toISOString();
 
-  const eventList = events
-    .map((e, i) => {
-      const title = sanitizeField(e.title, MAX_TITLE_LENGTH);
-      const parts = [`${i + 1}. "${title}"`];
-      if (e.due_at) {
-        parts.push(`due: ${new Date(e.due_at).toISOString()}`);
-      }
-      if (e.source) {
-        parts.push(`source: ${e.source}`);
-      }
-      if (e.raw_json) {
-        try {
-          const raw = JSON.parse(e.raw_json);
-          if (raw.description) {
-            parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
-          }
-          if (raw.location) {
-            parts.push(`location: ${sanitizeField(raw.location, MAX_FIELD_LENGTH)}`);
-          }
-          if (raw.start) {
-            parts.push(`start: ${raw.start.dateTime || raw.start.date}`);
-          }
-          if (raw.end) {
-            parts.push(`end: ${raw.end.dateTime || raw.end.date}`);
-          }
-          if (raw.organizer) {
-            const org = raw.organizer.email || raw.organizer.displayName;
-            parts.push(`organizer: ${sanitizeField(org, MAX_FIELD_LENGTH)}`);
-          }
-          if (raw.attendees) {
-            parts.push(`attendees: ${raw.attendees.length}`);
-          }
-        } catch {
-          // raw_json not parseable, skip extra fields
+  const calendarEvents = [];
+  const backlogTasks = [];
+
+  events.forEach((e, i) => {
+    const title = sanitizeField(e.title, MAX_TITLE_LENGTH);
+    const parts = [`${i + 1}. "${title}"`];
+    if (e.due_at) {
+      parts.push(`due: ${new Date(e.due_at).toISOString()}`);
+    }
+    if (e.source) {
+      parts.push(`source: ${e.source}`);
+    }
+    if (e.raw_json) {
+      try {
+        const raw = JSON.parse(e.raw_json);
+        if (raw.description) {
+          parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
         }
+        if (raw.location) {
+          parts.push(`location: ${sanitizeField(raw.location, MAX_FIELD_LENGTH)}`);
+        }
+        if (raw.start) {
+          parts.push(`start: ${raw.start.dateTime || raw.start.date}`);
+        }
+        if (raw.end) {
+          parts.push(`end: ${raw.end.dateTime || raw.end.date}`);
+        }
+        if (raw.organizer) {
+          const org = raw.organizer.email || raw.organizer.displayName;
+          parts.push(`organizer: ${sanitizeField(org, MAX_FIELD_LENGTH)}`);
+        }
+        if (raw.attendees) {
+          parts.push(`attendees: ${raw.attendees.length}`);
+        }
+      } catch {
+        // raw_json not parseable, skip extra fields
       }
-      return parts.join(' | ');
-    })
-    .join('\n');
+    }
+    const line = parts.join(' | ');
+    if (e.source === 'gcal') {
+      calendarEvents.push(line);
+    } else {
+      backlogTasks.push(line);
+    }
+  });
+
+  const scheduleSections = [];
+  if (calendarEvents.length > 0) {
+    scheduleSections.push(`CALENDAR EVENTS (committed time blocks):\n${calendarEvents.join('\n')}`);
+  }
+  if (backlogTasks.length > 0) {
+    scheduleSections.push(
+      `BACKLOG TASKS (Jira, local — work pool, not concurrent obligations):\n${backlogTasks.join('\n')}`,
+    );
+  }
+  const eventList = scheduleSections.join('\n\n');
 
   return `You are a work-life strategist who understands cognitive load, attention residue, and decision fatigue. You read schedules the way a coach reads game tape: noticing what works well, where energy leaks, and what small adjustments would make the biggest difference. You are honest about real weight but equally honest about when things are fine.
 
@@ -64,6 +81,19 @@ Current time: ${now}
 
 SCHEDULE:
 ${eventList}
+
+SOURCE WEIGHTING:
+- CALENDAR EVENTS are the primary stress drivers. They are committed time blocks with real people waiting. Their density, spacing, and content determine the shape of the day.
+- BACKLOG TASKS (Jira, local) are a pool of available work. Having 20 backlog items does NOT mean 20 things to do this week. Most will be done later. Score each backlog item individually by deadline proximity and complexity, but do NOT let backlog volume inflate global_stress. A person with 3 calendar events and 30 backlog tasks is NOT more stressed than someone with 8 back-to-back meetings and 2 backlog tasks.
+- When computing global_stress, weight calendar event density and quality 3-4x more than backlog task count.
+
+READING EVENT SIGNALS (use title, description, attendees, organizer to infer real weight):
+- External attendees (domains different from the organizer) signal client-facing work: higher stakes, performance pressure, preparation needed.
+- Keywords signaling urgency: "deadline", "release", "go-live", "review finale", "consegna", "demo", "presentazione", "escalation", "blocco", "critico", "urgente".
+- Recurring topic across multiple events (same project/client name appearing 3+ times in the week) signals sustained focus on a single deliverable: this compounds pressure even if individual events are short.
+- Events with many attendees (>5) often require more preparation and carry social performance load.
+- 1-on-1 meetings are generally low stress unless the title or description suggests evaluation, feedback, or conflict.
+- Events with video call links (Meet, Teams, Zoom) are active participation. Events without may be optional or informational.
 
 CALIBRATION ANCHORS (accuracy matters in both directions - underscoring a hard week is as wrong as inflating a light one):
 1-2: Restful. Few commitments, generous gaps between them, single domain. The schedule actively supports recovery. The person has margin to think, plan, or do nothing. This is a good week - acknowledge it.

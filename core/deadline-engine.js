@@ -8,6 +8,7 @@ const MS_PER_HOUR = 3600000;
 const AI_SCORE_MAX_AGE_MS = 12 * 3600000; // AI score valid for 12 hours
 const VOLUME_THRESHOLD = 5; // Above this, volume amplifies mechanical score
 const VOLUME_AMPLIFIER = 0.15; // Per-event amplification above threshold
+const BACKLOG_VOLUME_WEIGHT = 0.2; // Backlog tasks count 20% for volume calc
 
 function computeTaskUrgency(
   task,
@@ -87,9 +88,12 @@ function computeMechanicalScore(scored, priorityWeights) {
 
   let base = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-  // Volume amplification: many events compound psychological load
-  // even if individually not urgent
-  const excessEvents = Math.max(0, scored.length - VOLUME_THRESHOLD);
+  // Volume amplification: calendar events compound psychological load
+  // Backlog tasks (jira, local) are a work pool — reduced volume weight
+  const calendarCount = scored.filter((t) => t.source === 'gcal').length;
+  const backlogCount = scored.length - calendarCount;
+  const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
+  const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
   const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
   base = Math.min(1, base + volumeBoost * (1 - base));
 
@@ -176,5 +180,6 @@ module.exports = {
   AI_SCORE_MAX_AGE_MS,
   VOLUME_THRESHOLD,
   VOLUME_AMPLIFIER,
+  BACKLOG_VOLUME_WEIGHT,
   getLookaheadEnd,
 };
