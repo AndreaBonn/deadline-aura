@@ -29,6 +29,7 @@
   "sidebar": {
     "no_tasks": "Nessun task in arrivo",
     "google_calendar": "Google Calendar",
+    "google_tasks": "Google Tasks",
     "jira": "Jira",
     "local": "Personali",
     "new_task": "Nuovo task",
@@ -192,6 +193,7 @@
     "mental_load": "carico mentale",
     "others": "+ {n} altri",
     "cal_badge": "CAL",
+    "tasks_badge": "TASKS",
     "jira_badge": "JIRA"
   },
   "bands": {

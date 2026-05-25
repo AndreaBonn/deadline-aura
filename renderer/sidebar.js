@@ -249,6 +249,9 @@ function renderTaskList(tasks, palette) {
   const localTasks = tasks.filter(function (task) {
     return task.source === 'local';
   });
+  const gtasksTasks = tasks.filter(function (task) {
+    return task.source === 'gtasks';
+  });
 
   const favoriteTasks = tasks.filter(function (task) {
     return task.source === 'jira' && favoriteTaskIds.has(task.id);
@@ -256,6 +259,9 @@ function renderTaskList(tasks, palette) {
 
   renderActiveTimerSection(container, tasks, palette);
   renderLocalSection(container, localTasks, palette);
+  if (gtasksTasks.length > 0) {
+    renderSection(container, t('sidebar.google_tasks'), gtasksTasks, palette, 'gtasks');
+  }
   if (gcalTasks.length > 0) {
     renderSection(container, t('sidebar.google_calendar'), gcalTasks, palette, 'gcal');
   }

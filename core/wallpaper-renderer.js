@@ -197,8 +197,14 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
 
     // Source badge
     const badgeX = startX + 52;
-    const badgeLabel = ev.source === 'gcal' ? t('wallpaper.cal_badge') : t('wallpaper.jira_badge');
-    const badgeColor = ev.source === 'gcal' ? 'rgba(66, 133, 244, 0.5)' : 'rgba(255, 152, 0, 0.5)';
+    const badgeMap = {
+      gcal: { label: t('wallpaper.cal_badge'), color: 'rgba(66, 133, 244, 0.5)' },
+      gtasks: { label: t('wallpaper.tasks_badge'), color: 'rgba(52, 168, 83, 0.5)' },
+      jira: { label: t('wallpaper.jira_badge'), color: 'rgba(255, 152, 0, 0.5)' },
+    };
+    const badge = badgeMap[ev.source] || badgeMap.jira;
+    const badgeLabel = badge.label;
+    const badgeColor = badge.color;
 
     ctx.fillStyle = badgeColor;
     ctx.font = '700 8px "Ubuntu", system-ui, sans-serif';

@@ -89,7 +89,7 @@ function computeMechanicalScore(scored, priorityWeights) {
   let base = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
   // Volume amplification: calendar events compound psychological load
-  // Backlog tasks (jira, local) are a work pool — reduced volume weight
+  // Backlog tasks (jira, local, gtasks) are a work pool — reduced volume weight
   const calendarCount = scored.filter((t) => t.source === 'gcal').length;
   const backlogCount = scored.length - calendarCount;
   const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;

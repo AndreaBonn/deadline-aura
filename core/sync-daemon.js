@@ -4,6 +4,7 @@ require('dotenv').config();
 
 const db = require('../store/db');
 const gcal = require('../integrations/google-calendar');
+const gtasks = require('../integrations/google-tasks');
 const jira = require('../integrations/jira');
 const aiScorer = require('../ai/ai-scorer');
 const crypto = require('crypto');
@@ -35,11 +36,18 @@ function shouldRecalcAi(config) {
 async function sync(config) {
   const errors = [];
   let gcalCount = 0;
+  let gtasksCount = 0;
   let jiraCount = 0;
 
   const gcalEvents = await fetchWithErrorCapture(
     () => gcal.fetchEvents(config),
     'google_calendar',
+    errors,
+  );
+
+  const googleTasks = await fetchWithErrorCapture(
+    () => gtasks.fetchTasks(config),
+    'google_tasks',
     errors,
   );
 
@@ -66,17 +74,21 @@ async function sync(config) {
     gcalCount = upsertMany(gcalEvents, 'gcal');
   }
 
+  if (!failedSources.has('google_tasks') && config.sources.google_calendar.enabled) {
+    gtasksCount = upsertMany(googleTasks, 'gtasks');
+  }
+
   if (!failedSources.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
     jiraCount = upsertMany(jiraIssues, 'jira');
   }
 
-  const allTasks = [...gcalEvents, ...jiraIssues];
+  const allTasks = [...gcalEvents, ...googleTasks, ...jiraIssues];
 
   if (config.ai?.enabled && allTasks.length > 0) {
     await runAiScoring(allTasks, config, errors);
   }
 
-  return { gcal: gcalCount, jira: jiraCount, errors };
+  return { gcal: gcalCount, gtasks: gtasksCount, jira: jiraCount, errors };
 }
 
 async function runAiScoring(tasks, config, errors) {
@@ -143,7 +155,9 @@ if (require.main === module) {
 
   sync(loadConfig())
     .then((result) => {
-      console.log(`Sync complete: gcal=${result.gcal}, jira=${result.jira}`);
+      console.log(
+        `Sync complete: gcal=${result.gcal}, gtasks=${result.gtasks}, jira=${result.jira}`,
+      );
       if (result.errors.length > 0) {
         console.error('Errors:', result.errors);
       }

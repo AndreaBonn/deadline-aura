@@ -12,7 +12,10 @@ const CONFIG_DIR = path.join(os.homedir(), '.config', 'deadlineaura');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'google-token.json');
 const OAUTH_PORT = 34567;
 const OAUTH_TIMEOUT_MS = 5 * 60 * 1000;
-const SCOPES = ['https://www.googleapis.com/auth/calendar'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar',
+  'https://www.googleapis.com/auth/tasks.readonly',
+];
 
 const { getLookaheadEnd } = require('../core/deadline-engine');
 

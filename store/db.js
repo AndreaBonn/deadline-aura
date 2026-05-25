@@ -127,11 +127,11 @@ function runMigrations(database) {
   const sourceCheck = database
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
     .get();
-  if (sourceCheck && !sourceCheck.sql.includes("'local'")) {
+  if (sourceCheck && !sourceCheck.sql.includes("'gtasks'")) {
     database.exec(`
       CREATE TABLE IF NOT EXISTS tasks_new (
         id          TEXT PRIMARY KEY,
-        source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local')),
+        source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local', 'gtasks')),
         title       TEXT NOT NULL,
         due_at      INTEGER,
         priority    INTEGER NOT NULL DEFAULT 3 CHECK(priority BETWEEN 1 AND 4),
@@ -168,7 +168,7 @@ function getActiveTasks(lookaheadMs) {
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
-       AND source IN ('jira', 'local')
+       AND source IN ('jira', 'local', 'gtasks')
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
     .all();
@@ -178,7 +178,7 @@ function getActiveTasks(lookaheadMs) {
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
-       AND source NOT IN ('jira', 'local')
+       AND source NOT IN ('jira', 'local', 'gtasks')
        AND (due_at IS NULL OR (due_at >= ? AND due_at <= ?))
      ORDER BY due_at IS NULL, due_at ASC, priority ASC`,
     )
