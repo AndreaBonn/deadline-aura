@@ -5,7 +5,11 @@ require('dotenv').config();
 const { app, BrowserWindow, screen, ipcMain } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
-const { setX11Strut, getDisplaysWithWindows } = require('./core/display-controller');
+const {
+  setX11Strut,
+  getDisplaysWithWindows,
+  getVirtualScreenWidth,
+} = require('./core/display-controller');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
@@ -223,12 +227,14 @@ function toggleSidebar() {
 function createStrips() {
   destroyStrips();
   const displays = screen.getAllDisplays();
+  const virtualWidth = getVirtualScreenWidth(screen);
 
   for (const display of displays) {
     const { x: bx, width: bw } = display.bounds;
     const { y: wy } = display.workArea;
     const { height } = display.workAreaSize;
     const displayId = String(display.id);
+    const isRightmost = bx + bw >= virtualWidth;
 
     const stripWin = new BrowserWindow({
       width: STRIP_WIDTH,
@@ -250,13 +256,19 @@ function createStrips() {
       },
     });
 
-    stripWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+    // Only the rightmost-display strip needs to be sticky across workspaces
+    // (it carries the strut). On secondary displays, sticky + DOCK causes
+    // GNOME/Mutter to pin the window to the primary monitor.
+    if (isRightmost) {
+      stripWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
+    }
     stripWin.loadFile(path.join(__dirname, 'renderer', 'strip.html'));
 
     stripWin.webContents.once('did-finish-load', () => {
       stripWin.webContents.send('strip-color', currentPaletteHex);
-      // Set DOCK type + sticky desktop BEFORE show() — required by GNOME Mutter
-      if (process.platform === 'linux' && process.env.DISPLAY) {
+      // DOCK + sticky desktop only on the rightmost display (where the strut is applied).
+      // Applying them to secondary displays causes Mutter to relocate the window to primary.
+      if (process.platform === 'linux' && process.env.DISPLAY && isRightmost) {
         try {
           const xidStr = String(stripWin.getNativeWindowHandle().readUInt32LE(0));
           execFile(
@@ -293,7 +305,7 @@ function createStrips() {
           );
         } catch {
           stripWin.show();
-          setX11Strut(stripWin, display, STRIP_WIDTH);
+          setX11Strut(stripWin, display, STRIP_WIDTH, screen);
         }
       } else {
         stripWin.show();
