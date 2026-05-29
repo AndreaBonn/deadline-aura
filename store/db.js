@@ -158,6 +158,42 @@ function runMigrations(database) {
       CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
     `);
   }
+
+  // 007: extend ai_category CHECK to include 'off' (for OOO/PTO/vacation events)
+  const aiCategoryCheck = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
+    .get();
+  if (aiCategoryCheck && !aiCategoryCheck.sql.includes("'off'")) {
+    database.exec(`
+      CREATE TABLE IF NOT EXISTS tasks_new (
+        id          TEXT PRIMARY KEY,
+        source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local', 'gtasks')),
+        title       TEXT NOT NULL,
+        due_at      INTEGER,
+        priority    INTEGER NOT NULL DEFAULT 3 CHECK(priority BETWEEN 1 AND 4),
+        is_done     INTEGER NOT NULL DEFAULT 0,
+        is_stale    INTEGER NOT NULL DEFAULT 0,
+        raw_json    TEXT,
+        synced_at   INTEGER NOT NULL,
+        ai_stress     INTEGER CHECK(ai_stress BETWEEN 1 AND 10),
+        ai_category   TEXT CHECK(ai_category IN ('work-critical', 'work-routine', 'personal', 'admin', 'off')),
+        ai_reasoning  TEXT,
+        ai_scored_at  INTEGER,
+        web_url     TEXT,
+        ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
+        start_at    INTEGER,
+        meet_url    TEXT
+      );
+      INSERT INTO tasks_new SELECT id, source, title, due_at, priority, is_done, is_stale,
+        raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
+        web_url, ai_cognitive_type, start_at, meet_url FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_new RENAME TO tasks;
+      CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
+      CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
+      CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
+    `);
+  }
 }
 
 function getActiveTasks(lookaheadMs) {

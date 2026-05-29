@@ -33,6 +33,16 @@ function buildScoringPrompt(events, language = 'it') {
     if (e.raw_json) {
       try {
         const raw = JSON.parse(e.raw_json);
+        if (raw.eventType && raw.eventType !== 'default') {
+          parts.push(`eventType: ${raw.eventType}`);
+        }
+        if (raw.transparency) {
+          parts.push(`transparency: ${raw.transparency}`);
+        }
+        const isAllDay = !!(raw.start && !raw.start.dateTime && raw.start.date);
+        if (isAllDay) {
+          parts.push(`all_day: true`);
+        }
         if (raw.description) {
           parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
         }
@@ -87,7 +97,7 @@ SOURCE WEIGHTING:
 - BACKLOG TASKS (Jira, local) are a pool of available work. Having 20 backlog items does NOT mean 20 things to do this week. Most will be done later. Score each backlog item individually by deadline proximity and complexity, but do NOT let backlog volume inflate global_stress. A person with 3 calendar events and 30 backlog tasks is NOT more stressed than someone with 8 back-to-back meetings and 2 backlog tasks.
 - When computing global_stress, weight calendar event density and quality 3-4x more than backlog task count.
 
-READING EVENT SIGNALS (use title, description, attendees, organizer to infer real weight):
+READING EVENT SIGNALS — UPWARD (these ADD load):
 - External attendees (domains different from the organizer) signal client-facing work: higher stakes, performance pressure, preparation needed.
 - Keywords signaling urgency: "deadline", "release", "go-live", "review finale", "consegna", "demo", "presentazione", "escalation", "blocco", "critico", "urgente".
 - Recurring topic across multiple events (same project/client name appearing 3+ times in the week) signals sustained focus on a single deliverable: this compounds pressure even if individual events are short.
@@ -95,19 +105,34 @@ READING EVENT SIGNALS (use title, description, attendees, organizer to infer rea
 - 1-on-1 meetings are generally low stress unless the title or description suggests evaluation, feedback, or conflict.
 - Events with video call links (Meet, Teams, Zoom) are active participation. Events without may be optional or informational.
 
+READING EVENT SIGNALS — DOWNWARD / ABSENCE (these REMOVE load — they NEVER add it):
+- Native Google OOO flag: \`eventType: outOfOffice\` → the day is off, regardless of title or duration.
+- Free-time marker: \`transparency: transparent\` → the event does not occupy work attention even if it sits on the calendar.
+- Title keywords (case-insensitive, any language): "ferie", "fuori sede", "OOO", "out of office", "PTO", "vacation", "holiday", "congedo", "permesso", "malattia", "sick leave", "leave", "off-day", "day off", "non in ufficio", "in ferie", "vacanza", "weekend off", "annual leave".
+- Multiple consecutive all-day events with absence keywords → ONE vacation block, NOT N separate workloads. Do not multiply load by the number of OOO events.
+- Absence event scoring (mandatory): \`stress: 1\`, \`category: "off"\`, \`cognitive_type: "passive"\`. It MUST NOT contribute to context-switching, fragmentation, calendar density, volume amplification, or per-day stress.
+- OOO DOMINANCE RULE (critical, this is the common case): if absence events cover the working hours of a day (typical work day = 09:00-18:00, with or without a lunch gap), the day is OFF FROM WORK — even if other events also appear on that day. On such a day, classify each residual event:
+  * WORK residuals (Jira tasks, backlog with work-org organizer, meetings with external/colleague attendees, work-keyword titles like "review", "SAL", "demo", "weekly", "standup", "deploy", source = jira/local task with work title) → stress 1, category "off", cognitive_type "passive". These are stale items the user will NOT do during vacation. They MUST NOT inflate per-day stress. Example: "Cambia parametro Data in Bank" on a ferie day → stress 1, off.
+  * PERSONAL residuals (medical appointments, gym, family, errands, personal calendar source, titles like "dentista", "medico", "palestra", "cena", "compleanno", "spesa", "viaggio", "treno", "volo", "bambini") → KEEP normal scoring (stress 2-6 depending on type), category "personal". These ARE real commitments even during vacation and DO count toward per-day stress. A dentist appointment at 11am during ferie is still a real obligation.
+  * AMBIGUOUS residuals (cannot tell work vs personal from signals) → default to stress 1, category "off". Bias toward dropping rather than inflating.
+- Day-level stress on an OOO-dominant day is driven ONLY by personal commitments — never by work residuals. A ferie day with one dentist appointment is stress 2-3 (one real personal commitment). A ferie day with five orphaned Jira tasks is stress 1 (vacation).
+- A single full-day absence event (e.g., one all-day "ferie" with no end time during work hours) ALSO dominates the day, same rule.
+- If a day contains EXCLUSIVELY absence events, that day's stress is 1, period.
+
 CALIBRATION ANCHORS (accuracy matters in both directions - underscoring a hard week is as wrong as inflating a light one):
-1-2: Restful. Few commitments, generous gaps between them, single domain. The schedule actively supports recovery. The person has margin to think, plan, or do nothing. This is a good week - acknowledge it.
+1-2: Restful OR fully off. Either (a) few work commitments with generous gaps and single domain, OR (b) a week largely composed of OOO/PTO/ferie/vacation/holiday events — these REMOVE load even when they visually fill the calendar with all-day blocks. A week of 5 consecutive all-day "ferie" / "fuori sede" events is global_stress 1, NOT 7-8. The visual density of an OOO calendar is not workload. Acknowledge the rest, do not invent pressure that isn't there.
 3-4: Comfortable. A steady rhythm of meetings or tasks, mostly in one domain, with natural breaks. No rushing between commitments. The person can be present in each event without worrying about the next. Sustainable long-term.
 5-6: Moderate. Multiple commitments daily with some context switching. Still has breathing room, but needs to be intentional about breaks. End-of-day tiredness that recovers overnight. A normal "working week" for most knowledge workers.
 7-8: Heavy. Dense schedule across multiple days, possible travel, multiple domains or clients, emotional labor (teaching, presenting, evaluating). The weight is felt: the person plans ahead, thinks about the week before it starts. Sleep or downtime may be affected. Where most "really busy weeks" actually land.
 9-10: Unsustainable. Back-to-back high-stakes across 4+ days, travel combined with deadlines and social performance, zero recovery windows. Decision quality degrades. Not a crisis if it happens once, but a clear signal if recurring.
 
 CALIBRATION NOTES:
+- ABSENCE PRECEDENCE (highest priority — overrides everything below): when a day is OOO-dominant (absence events cover working hours, see OOO DOMINANCE RULE above) OR exclusively absence, that day counts as 0 working days for ALL density, compounding, fragmentation, and volume rules. Residual non-OOO events on an OOO-dominant day do NOT make it a working day. All calibration rules in this section apply ONLY to days of actual work commitment. A vacation week REDUCES global_stress; it never inflates it. If 3+ days of the week are OOO-dominant or exclusively OOO, global_stress is at most 3, regardless of any other rule.
 - Travel (flights, trains, connections) fragments the day and removes recovery. Score 4-6 per travel segment depending on complexity.
 - Teaching/lecturing requires preparation time not on the calendar. A 2h lecture = 4-6h cognitive commitment minimum.
 - Video calls compound: each one after the 3rd in a day adds +1 to effective load.
 - Same-day multi-city travel (flight + train + meeting) is inherently 7+ regardless of meeting content.
-- A week with 3+ days scoring >= 7 should have global_stress >= 7 due to compounding recovery deficit.
+- A week with 3+ WORKING days scoring >= 7 should have global_stress >= 7 due to compounding recovery deficit. OOO days do NOT count toward this threshold.
 
 EVALUATION DIMENSIONS:
 1. Cognitive complexity per event: deep analytical work (high) vs routine meeting (low) vs passive attendance (minimal)
@@ -132,7 +157,7 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
     {
       "id": <event index number>,
       "stress": <1-10>,
-      "category": "work-critical|work-routine|personal|admin",
+      "category": "work-critical|work-routine|personal|admin|off",
       "cognitive_type": "analytical|creative|social|passive|administrative",
       "reasoning": "1-2 sentences: specific cognitive/emotional demand AND how it interacts with adjacent events"
     }
@@ -152,7 +177,7 @@ Respond with ONLY valid JSON, no markdown, no text before or after:
 }`;
 }
 
-const VALID_CATEGORIES = new Set(['work-critical', 'work-routine', 'personal', 'admin']);
+const VALID_CATEGORIES = new Set(['work-critical', 'work-routine', 'personal', 'admin', 'off']);
 const VALID_COGNITIVE_TYPES = new Set([
   'analytical',
   'creative',

@@ -187,6 +187,14 @@ function extractMeetUrl(event) {
   return extractMeetUrlFromText(event.description) || extractMeetUrlFromText(event.location);
 }
 
+function isDeclinedByUser(event) {
+  if (!Array.isArray(event.attendees)) {
+    return false;
+  }
+  const selfAttendee = event.attendees.find((a) => a.self === true);
+  return selfAttendee?.responseStatus === 'declined';
+}
+
 function normalizeEvent(event, priorityKeywords) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
@@ -195,6 +203,14 @@ function normalizeEvent(event, priorityKeywords) {
       : null;
 
   if (endTime && endTime < Date.now()) {
+    return null;
+  }
+
+  if (event.status === 'cancelled') {
+    return null;
+  }
+
+  if (isDeclinedByUser(event)) {
     return null;
   }
 
@@ -391,6 +407,7 @@ async function updateEvent(config, { calendarId, eventId, endTime }) {
 module.exports = {
   fetchEvents,
   normalizeEvent,
+  isDeclinedByUser,
   assignPriority,
   extractMeetUrl,
   getAuthenticatedClient,
