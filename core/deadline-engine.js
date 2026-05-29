@@ -10,6 +10,9 @@ const VOLUME_THRESHOLD = 5; // Above this, volume amplifies mechanical score
 const VOLUME_AMPLIFIER = 0.15; // Per-event amplification above threshold
 const BACKLOG_VOLUME_WEIGHT = 0.2; // Backlog tasks count 20% for volume calc
 const VOLUME_AMP_MIN_BASE = 0.3; // Volume amplifies existing urgency; without urgency, idle events do not create stress
+const AI_BLEND_WEIGHT = 0.7; // Weight of AI score in the final blend
+const MECHANICAL_BLEND_WEIGHT = 0.3; // Weight of mechanical score in the final blend
+const TOP_DRIVERS_COUNT = 3; // How many top tasks to include in the breakdown
 
 function computeTaskUrgency(
   task,
@@ -73,17 +76,53 @@ function computeTaskUrgency(
   };
 }
 
+/**
+ * Compute the mechanical score from already-scored tasks.
+ *
+ * Returns a single number to preserve the existing signature. For a structured
+ * breakdown (base, volume boost, off filter), use describeMechanicalScore.
+ */
 function computeMechanicalScore(scored, priorityWeights) {
+  return describeMechanicalScore(scored, priorityWeights).score;
+}
+
+/**
+ * Compute the mechanical score and return rich diagnostics about how the
+ * result was reached. Used by the score-explainability breakdown.
+ */
+function describeMechanicalScore(scored, priorityWeights) {
   if (scored.length === 0) {
-    return 0;
+    return {
+      score: 0,
+      reason_key: 'empty',
+      base: 0,
+      active_count: 0,
+      ooo_filtered_count: 0,
+      volume_amp_applied: false,
+      effective_volume: 0,
+      calendar_count: 0,
+      backlog_count: 0,
+    };
   }
 
   // Drop OOO/vacation tasks before aggregation and volume counting — they
   // represent absence, not load. Without this filter, a week of all-day
   // "ferie" events saturates the volume amplifier and pegs mechanical at 1.0.
   const active = scored.filter((t) => t.ai_category !== 'off');
+  const oooCount = scored.length - active.length;
+
   if (active.length === 0) {
-    return 0;
+    return {
+      score: 0,
+      reason_key: 'all_off',
+      base: 0,
+      active_count: 0,
+      ooo_filtered_count: oooCount,
+      volume_amp_applied: false,
+      effective_volume: 0,
+      calendar_count: 0,
+      backlog_count: 0,
+    };
   }
 
   let weightedSum = 0;
@@ -95,26 +134,61 @@ function computeMechanicalScore(scored, priorityWeights) {
     totalWeight += weight;
   }
 
-  let base = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  const rawBase = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  let finalBase = rawBase;
+
+  const calendarCount = active.filter((t) => t.source === 'gcal').length;
+  const backlogCount = active.length - calendarCount;
+  const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
 
   // Volume amplification only applies when there is already real urgency to
   // compound. A calendar full of distant events (low urgency) does not
   // manufacture stress — that would peg mechanical at 1.0 for any user with
   // a populated multi-day calendar regardless of actual proximity.
-  if (base >= VOLUME_AMP_MIN_BASE) {
-    const calendarCount = active.filter((t) => t.source === 'gcal').length;
-    const backlogCount = active.length - calendarCount;
-    const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
+  let volumeAmpApplied = false;
+  if (rawBase >= VOLUME_AMP_MIN_BASE) {
     const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
     const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
-    base = Math.min(1, base + volumeBoost * (1 - base));
+    if (volumeBoost > 0) {
+      finalBase = Math.min(1, rawBase + volumeBoost * (1 - rawBase));
+      volumeAmpApplied = true;
+    }
   }
 
-  return Math.round(base * 1000) / 1000;
+  const reasonKey = volumeAmpApplied
+    ? 'volume_amplified'
+    : rawBase < VOLUME_AMP_MIN_BASE
+      ? 'no_imminent_urgency'
+      : 'urgency_below_volume_threshold';
+
+  return {
+    score: Math.round(finalBase * 1000) / 1000,
+    reason_key: reasonKey,
+    base: Math.round(rawBase * 1000) / 1000,
+    active_count: active.length,
+    ooo_filtered_count: oooCount,
+    volume_amp_applied: volumeAmpApplied,
+    effective_volume: Math.round(effectiveVolume * 10) / 10,
+    calendar_count: calendarCount,
+    backlog_count: backlogCount,
+  };
+}
+
+function pickTopDrivers(sortedTasks, count) {
+  return sortedTasks.slice(0, count).map((t) => ({
+    id: t.id,
+    title: t.title,
+    source: t.source,
+    urgency_score: t.urgency_score,
+    ai_stress: t.ai_stress || null,
+    ai_category: t.ai_category || null,
+    hours_remaining: t.hours_remaining,
+  }));
 }
 
 function computeGlobalScore(tasks, options = {}) {
   const { priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = options;
+  const computedAt = Date.now();
 
   const scored = tasks
     .map((task) => computeTaskUrgency(task, options))
@@ -124,11 +198,20 @@ function computeGlobalScore(tasks, options = {}) {
     return {
       global_score: 0,
       tasks: [],
-      computed_at: Date.now(),
+      computed_at: computedAt,
+      breakdown: {
+        global_score: 0,
+        ai: null,
+        mechanical: describeMechanicalScore([], priorityWeights),
+        blend: { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT },
+        top_drivers: [],
+        computed_at: computedAt,
+      },
     };
   }
 
-  const mechanicalScore = computeMechanicalScore(scored, priorityWeights);
+  const mechanicalDetail = describeMechanicalScore(scored, priorityWeights);
+  const mechanicalScore = mechanicalDetail.score;
 
   // Check for recent AI score — it reflects true psychological load
   let aiScore = options.aiScore || null;
@@ -140,21 +223,54 @@ function computeGlobalScore(tasks, options = {}) {
     }
   }
 
-  let globalScore;
+  const aiFresh = aiScore && computedAt - aiScore.computed_at < AI_SCORE_MAX_AGE_MS;
 
-  if (aiScore && Date.now() - aiScore.computed_at < AI_SCORE_MAX_AGE_MS) {
+  let globalScore;
+  let aiBreakdown = null;
+
+  if (aiFresh) {
     const aiNormalized = aiScore.global_stress / 10;
     // AI is authoritative, but blend with mechanical for recency sensitivity
-    // 70% AI (psychological truth) + 30% mechanical (temporal proximity)
-    globalScore = Math.round((aiNormalized * 0.7 + mechanicalScore * 0.3) * 1000) / 1000;
+    globalScore =
+      Math.round(
+        (aiNormalized * AI_BLEND_WEIGHT + mechanicalScore * MECHANICAL_BLEND_WEIGHT) * 1000,
+      ) / 1000;
+    aiBreakdown = {
+      global_stress: aiScore.global_stress,
+      normalized: aiNormalized,
+      computed_at: aiScore.computed_at,
+      age_ms: computedAt - aiScore.computed_at,
+      fresh: true,
+    };
   } else {
     globalScore = mechanicalScore;
+    if (aiScore) {
+      aiBreakdown = {
+        global_stress: aiScore.global_stress,
+        normalized: aiScore.global_stress / 10,
+        computed_at: aiScore.computed_at,
+        age_ms: computedAt - aiScore.computed_at,
+        fresh: false,
+      };
+    }
   }
+
+  const sortedTasks = scored.sort((a, b) => b.urgency_score - a.urgency_score);
 
   return {
     global_score: globalScore,
-    tasks: scored.sort((a, b) => b.urgency_score - a.urgency_score),
-    computed_at: Date.now(),
+    tasks: sortedTasks,
+    computed_at: computedAt,
+    breakdown: {
+      global_score: globalScore,
+      ai: aiBreakdown,
+      mechanical: mechanicalDetail,
+      blend: aiFresh
+        ? { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT }
+        : { ai_weight: 0, mechanical_weight: 1 },
+      top_drivers: pickTopDrivers(sortedTasks, TOP_DRIVERS_COUNT),
+      computed_at: computedAt,
+    },
   };
 }
 
@@ -187,12 +303,17 @@ module.exports = {
   computeTaskUrgency,
   computeGlobalScore,
   computeMechanicalScore,
+  describeMechanicalScore,
   run,
   DEFAULT_PRIORITY_WEIGHTS,
   DEFAULT_K,
   AI_SCORE_MAX_AGE_MS,
+  AI_BLEND_WEIGHT,
+  MECHANICAL_BLEND_WEIGHT,
   VOLUME_THRESHOLD,
   VOLUME_AMPLIFIER,
   BACKLOG_VOLUME_WEIGHT,
+  VOLUME_AMP_MIN_BASE,
+  TOP_DRIVERS_COUNT,
   getLookaheadEnd,
 };

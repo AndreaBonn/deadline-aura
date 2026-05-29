@@ -102,18 +102,26 @@ describe('deadline-engine branch coverage', () => {
   });
 
   describe('volume amplification', () => {
-    it('amplifies score when events exceed threshold', () => {
-      const fewTasks = Array.from({ length: 4 }, (_, i) =>
+    it('applies the amp when both gates pass (base above threshold AND volume above threshold)', () => {
+      // All tasks overdue (urgency_score = 1.0 each) → base = 1.0. With 10
+      // tasks, calendar volume of 10 exceeds the threshold of 5 → amp gates open.
+      // We do not assert the score change here: a base of 1.0 leaves no
+      // headroom for the boost to add value. We assert the flag instead.
+      const overdueTasks = Array.from({ length: 10 }, (_, i) =>
+        makeTask({ id: `t${i}`, due_at: Date.now() - MS_PER_HOUR, priority: 1 }),
+      );
+      const result = computeGlobalScore(overdueTasks);
+      expect(result.breakdown.mechanical.volume_amp_applied).toBe(true);
+    });
+
+    it('does NOT amplify when base urgency is below the gate (idle calendar)', () => {
+      // Distant deadlines → low base urgency → volume amp must stay dormant
+      // even with many events. Prevents the "populated calendar always = max stress" bug.
+      const manyDistantTasks = Array.from({ length: 30 }, (_, i) =>
         makeTask({ id: `t${i}`, due_at: Date.now() + 72 * MS_PER_HOUR }),
       );
-      const manyTasks = Array.from({ length: 10 }, (_, i) =>
-        makeTask({ id: `t${i}`, due_at: Date.now() + 72 * MS_PER_HOUR }),
-      );
-
-      const fewResult = computeGlobalScore(fewTasks);
-      const manyResult = computeGlobalScore(manyTasks);
-
-      expect(manyResult.global_score).toBeGreaterThan(fewResult.global_score);
+      const result = computeGlobalScore(manyDistantTasks);
+      expect(result.global_score).toBeLessThan(0.3);
     });
 
     it('caps amplified score at 1.0', () => {

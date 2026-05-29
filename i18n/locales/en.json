@@ -222,5 +222,27 @@
     "high_avg_stress": "Weekly average stress is high ({avg}/10). Consider delegating or postponing.",
     "insufficient_recovery": "Insufficient recovery for {days} consecutive days. Real breaks are needed.",
     "high_emotional_load": "High emotional load for {days} consecutive days. Watch out for overload."
+  },
+  "score_breakdown": {
+    "button_title": "Why this number?",
+    "unavailable": "Breakdown unavailable",
+    "ai_title": "AI Component",
+    "ai_global": "AI global score",
+    "ai_unavailable": "AI score unavailable",
+    "ai_stale": "AI score expired, ignored in the blend",
+    "mechanical_title": "Mechanical Component",
+    "score": "Value",
+    "weight": "Weight",
+    "volume_amp": "Volume amplifier",
+    "volume_amp_yes": "active",
+    "volume_amp_no": "inactive",
+    "ooo_filtered": "OOO events excluded",
+    "reason_empty": "No active task in the period.",
+    "reason_all_off": "Every task is OOO/PTO: no workload.",
+    "reason_no_imminent_urgency": "Calendar is busy but deadlines are far: no imminent pressure.",
+    "reason_urgency_below_volume_threshold": "Urgency present but below the amplification threshold.",
+    "reason_volume_amplified": "High event volume amplified the existing urgency.",
+    "top_drivers_title": "Top drivers",
+    "total": "Total"
   }
 }

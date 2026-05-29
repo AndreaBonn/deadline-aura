@@ -222,5 +222,27 @@
     "high_avg_stress": "Stress medio della settimana elevato ({avg}/10). Considera di delegare o posticipare.",
     "insufficient_recovery": "Recupero insufficiente per {days} giorni consecutivi. Servono pause reali.",
     "high_emotional_load": "Carico emotivo alto per {days} giorni consecutivi. Attenzione al sovraccarico."
+  },
+  "score_breakdown": {
+    "button_title": "Perché questo numero?",
+    "unavailable": "Breakdown non disponibile",
+    "ai_title": "Componente AI",
+    "ai_global": "Score AI globale",
+    "ai_unavailable": "Score AI non disponibile",
+    "ai_stale": "Score AI scaduto, ignorato nella media",
+    "mechanical_title": "Componente Meccanica",
+    "score": "Valore",
+    "weight": "Peso",
+    "volume_amp": "Amplificatore volume",
+    "volume_amp_yes": "attivo",
+    "volume_amp_no": "non attivo",
+    "ooo_filtered": "Eventi OOO esclusi",
+    "reason_empty": "Nessun task attivo nel periodo.",
+    "reason_all_off": "Tutti i task sono OOO/ferie: nessun carico di lavoro.",
+    "reason_no_imminent_urgency": "Calendario popolato ma scadenze lontane: nessuna pressione imminente.",
+    "reason_urgency_below_volume_threshold": "Urgenza presente ma sotto la soglia di amplificazione.",
+    "reason_volume_amplified": "Volume di eventi alto ha amplificato l'urgenza esistente.",
+    "top_drivers_title": "Top driver",
+    "total": "Totale"
   }
 }

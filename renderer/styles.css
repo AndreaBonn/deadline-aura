@@ -130,11 +130,209 @@ body {
 .urgency-meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-top: 6px;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.3);
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+
+.urgency-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-help-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.score-help-btn:hover {
+  background: rgba(137, 180, 250, 0.18);
+  border-color: rgba(137, 180, 250, 0.45);
+  color: #cdd6f4;
+}
+
+.score-help-btn:active {
+  background: rgba(137, 180, 250, 0.3);
+}
+
+/* --- Score breakdown panel --- */
+
+.score-breakdown-panel {
+  margin: 8px 12px 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+.score-breakdown-panel[hidden] {
+  display: none;
+}
+
+.breakdown-section {
+  margin-bottom: 12px;
+}
+
+.breakdown-section:last-of-type {
+  margin-bottom: 8px;
+}
+
+.breakdown-section-title {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 6px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.breakdown-label {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.breakdown-value {
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-muted {
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+}
+
+.breakdown-formula {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.breakdown-reason {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: rgba(137, 180, 250, 0.08);
+  border-left: 2px solid rgba(137, 180, 250, 0.4);
+  border-radius: 0 4px 4px 0;
+  font-size: 10px;
+  color: rgba(205, 214, 244, 0.75);
+}
+
+.breakdown-warning {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #f9e2af;
+  font-style: italic;
+}
+
+.breakdown-empty {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  text-align: center;
+  padding: 6px 0;
+}
+
+.breakdown-driver {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.breakdown-driver:last-child {
+  border-bottom: none;
+}
+
+.breakdown-driver-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.breakdown-driver-title {
+  color: rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.breakdown-driver-urgency {
+  color: #f9e2af;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.breakdown-driver-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-driver-ai {
+  color: rgba(137, 180, 250, 0.7);
+}
+
+.breakdown-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.breakdown-footer-value {
+  color: rgba(255, 255, 255, 0.95);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+}
+
+.breakdown-footer-formula {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* --- Clinical note --- */

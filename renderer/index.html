@@ -27,7 +27,19 @@
         </div>
         <div class="urgency-meta">
           <span id="urgencyLabel">--</span>
-          <span id="urgencyScore">0.00</span>
+          <span class="urgency-meta-right">
+            <span id="urgencyScore">0.00</span>
+            <button
+              class="score-help-btn"
+              id="scoreHelpBtn"
+              type="button"
+              data-i18n-title="score_breakdown.button_title"
+              title="Perché questo numero?"
+              aria-label="Score breakdown"
+            >
+              ?
+            </button>
+          </span>
         </div>
       </div>
 
@@ -35,6 +47,8 @@
         <div class="clinical-note" id="clinicalNote"></div>
         <div class="stress-forecast" id="stressForecast"></div>
       </div>
+
+      <div class="score-breakdown-panel" id="scoreBreakdownPanel" hidden></div>
 
       <div class="divider"></div>
 

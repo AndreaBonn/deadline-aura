@@ -1211,6 +1211,17 @@ document.getElementById('btnLayout').addEventListener('click', function () {
   });
 })();
 
+(function bindScoreBreakdownButton() {
+  const btn = document.getElementById('scoreHelpBtn');
+  if (!btn) {
+    return;
+  }
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    toggleScoreBreakdown();
+  });
+})();
+
 document.getElementById('btnClose').addEventListener('click', function () {
   window.deadlineAura.toggleSidebar();
 });
@@ -1226,6 +1237,191 @@ function renderClinicalNote(note) {
   }
   el.style.display = '';
   el.textContent = note;
+}
+
+const SOURCE_LABEL_KEYS = {
+  gcal: 'sidebar.google_calendar',
+  gtasks: 'sidebar.google_tasks',
+  jira: 'sidebar.jira',
+  local: 'sidebar.local',
+};
+
+function formatHoursRemaining(hours) {
+  if (hours === null || hours === undefined) {
+    return '—';
+  }
+  if (hours < 0) {
+    return t('postit.expired');
+  }
+  if (hours < 1) {
+    return `${Math.round(hours * 60)}m`;
+  }
+  if (hours < 24) {
+    return `${Math.floor(hours)}h`;
+  }
+  return `${Math.round(hours / 24)}${t('countdown.days_short')}`;
+}
+
+function buildBreakdownSection(titleKey, bodyHtml) {
+  return `
+    <div class="breakdown-section">
+      <div class="breakdown-section-title">${t(titleKey)}</div>
+      ${bodyHtml}
+    </div>
+  `;
+}
+
+function buildAiSection(breakdown) {
+  const ai = breakdown.ai;
+  if (!ai) {
+    return buildBreakdownSection(
+      'score_breakdown.ai_title',
+      `<div class="breakdown-empty">${t('score_breakdown.ai_unavailable')}</div>`,
+    );
+  }
+  const weightPct = Math.round(breakdown.blend.ai_weight * 100);
+  const freshness = ai.fresh
+    ? ''
+    : `<div class="breakdown-warning">${t('score_breakdown.ai_stale')}</div>`;
+  const formula = ai.fresh
+    ? `<div class="breakdown-formula">${ai.global_stress}/10 × ${weightPct}%</div>`
+    : '';
+  return buildBreakdownSection(
+    'score_breakdown.ai_title',
+    `<div class="breakdown-row">
+       <span class="breakdown-label">${t('score_breakdown.ai_global')}</span>
+       <span class="breakdown-value">${ai.global_stress}/10</span>
+     </div>
+     <div class="breakdown-row">
+       <span class="breakdown-label">${t('score_breakdown.weight')}</span>
+       <span class="breakdown-value">${weightPct}%</span>
+     </div>
+     ${formula}
+     ${freshness}`,
+  );
+}
+
+function buildMechanicalSection(breakdown) {
+  const mech = breakdown.mechanical;
+  const weightPct = Math.round(breakdown.blend.mechanical_weight * 100);
+  const reasonLabel = t(`score_breakdown.reason_${mech.reason_key}`);
+  const ampLine = mech.volume_amp_applied
+    ? `<div class="breakdown-row">
+         <span class="breakdown-label">${t('score_breakdown.volume_amp')}</span>
+         <span class="breakdown-value">${t('score_breakdown.volume_amp_yes')}</span>
+       </div>`
+    : `<div class="breakdown-row">
+         <span class="breakdown-label">${t('score_breakdown.volume_amp')}</span>
+         <span class="breakdown-value breakdown-muted">${t('score_breakdown.volume_amp_no')}</span>
+       </div>`;
+  const oooLine =
+    mech.ooo_filtered_count > 0
+      ? `<div class="breakdown-row">
+           <span class="breakdown-label">${t('score_breakdown.ooo_filtered')}</span>
+           <span class="breakdown-value">${mech.ooo_filtered_count}</span>
+         </div>`
+      : '';
+  return buildBreakdownSection(
+    'score_breakdown.mechanical_title',
+    `<div class="breakdown-row">
+       <span class="breakdown-label">${t('score_breakdown.score')}</span>
+       <span class="breakdown-value">${mech.score.toFixed(2)}</span>
+     </div>
+     <div class="breakdown-row">
+       <span class="breakdown-label">${t('score_breakdown.weight')}</span>
+       <span class="breakdown-value">${weightPct}%</span>
+     </div>
+     ${ampLine}
+     ${oooLine}
+     <div class="breakdown-reason">${reasonLabel}</div>`,
+  );
+}
+
+function buildTopDriversSection(breakdown) {
+  if (!breakdown.top_drivers || breakdown.top_drivers.length === 0) {
+    return '';
+  }
+  const rows = breakdown.top_drivers
+    .map((d) => {
+      const sourceKey = SOURCE_LABEL_KEYS[d.source] || null;
+      const sourceLabel = sourceKey ? t(sourceKey) : d.source;
+      const aiTag =
+        d.ai_stress !== null ? `<span class="breakdown-driver-ai">AI ${d.ai_stress}/10</span>` : '';
+      const eta = formatHoursRemaining(d.hours_remaining);
+      const safeTitle = escapeHtml(d.title);
+      return `
+        <div class="breakdown-driver">
+          <div class="breakdown-driver-main">
+            <span class="breakdown-driver-title" title="${safeTitle}">${safeTitle}</span>
+            <span class="breakdown-driver-urgency">${(d.urgency_score * 100).toFixed(0)}%</span>
+          </div>
+          <div class="breakdown-driver-meta">
+            <span>${sourceLabel}</span>
+            <span>${eta}</span>
+            ${aiTag}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+  return buildBreakdownSection('score_breakdown.top_drivers_title', rows);
+}
+
+function buildBlendFooter(breakdown) {
+  const aiW = Math.round(breakdown.blend.ai_weight * 100);
+  const mechW = Math.round(breakdown.blend.mechanical_weight * 100);
+  const total = breakdown.global_score.toFixed(2);
+  return `
+    <div class="breakdown-footer">
+      <span>${t('score_breakdown.total')}</span>
+      <span class="breakdown-footer-value">${total}</span>
+      <span class="breakdown-footer-formula">(AI ${aiW}% + Mech ${mechW}%)</span>
+    </div>
+  `;
+}
+
+function renderScoreBreakdown(payload) {
+  const panel = document.getElementById('scoreBreakdownPanel');
+  if (!panel) {
+    return;
+  }
+  if (!payload || !payload.breakdown) {
+    panel.innerHTML = `<div class="breakdown-empty">${t('score_breakdown.unavailable')}</div>`;
+    return;
+  }
+  const { breakdown } = payload;
+  panel.innerHTML = [
+    buildAiSection(breakdown),
+    buildMechanicalSection(breakdown),
+    buildTopDriversSection(breakdown),
+    buildBlendFooter(breakdown),
+  ].join('');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text === null || text === undefined ? '' : String(text);
+  return div.innerHTML;
+}
+
+async function toggleScoreBreakdown() {
+  const panel = document.getElementById('scoreBreakdownPanel');
+  if (!panel) {
+    return;
+  }
+  const isOpen = !panel.hasAttribute('hidden');
+  if (isOpen) {
+    panel.setAttribute('hidden', '');
+    return;
+  }
+  panel.removeAttribute('hidden');
+  try {
+    const payload = await window.deadlineAura.getScoreBreakdown();
+    renderScoreBreakdown(payload);
+  } catch (err) {
+    console.error('[score-breakdown] failed to load:', err);
+    renderScoreBreakdown(null);
+  }
 }
 
 function stressToColor(stress) {

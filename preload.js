@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('deadlineAura', {
   getTranslations: () => ipcRenderer.invoke('i18n:get-translations'),
+  getScoreBreakdown: () => ipcRenderer.invoke('score:get-breakdown'),
   onUpdate: (callback) => ipcRenderer.on('update', (_event, data) => callback(data)),
   onStripColor: (callback) => ipcRenderer.on('strip-color', (_event, hex) => callback(hex)),
   toggleSidebar: () => ipcRenderer.send('sidebar:toggle'),

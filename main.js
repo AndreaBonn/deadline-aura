@@ -763,6 +763,24 @@ app.whenReady().then(() => {
 
   ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
 
+  ipcMain.handle('score:get-breakdown', () => {
+    try {
+      const result = deadlineEngine.run({
+        lookaheadHours: config.sync.lookahead_hours,
+        k: config.engine.k_constant,
+        priorityWeights: config.engine.priority_weights,
+      });
+      const aiResponse = db.getLatestAiCacheResponse();
+      return {
+        breakdown: result.breakdown,
+        ai_daily_breakdown: aiResponse?.daily_breakdown || null,
+      };
+    } catch (err) {
+      console.error('[score:get-breakdown] error:', err.message);
+      return null;
+    }
+  });
+
   ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
   ipcMain.handle('settings:get-config', () => maskConfigForRenderer(config));
   ipcMain.handle('settings:get-defaults', () => DEFAULTS);
