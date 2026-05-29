@@ -9,6 +9,7 @@ const AI_SCORE_MAX_AGE_MS = 12 * 3600000; // AI score valid for 12 hours
 const VOLUME_THRESHOLD = 5; // Above this, volume amplifies mechanical score
 const VOLUME_AMPLIFIER = 0.15; // Per-event amplification above threshold
 const BACKLOG_VOLUME_WEIGHT = 0.2; // Backlog tasks count 20% for volume calc
+const VOLUME_AMP_MIN_BASE = 0.3; // Volume amplifies existing urgency; without urgency, idle events do not create stress
 
 function computeTaskUrgency(
   task,
@@ -77,10 +78,18 @@ function computeMechanicalScore(scored, priorityWeights) {
     return 0;
   }
 
+  // Drop OOO/vacation tasks before aggregation and volume counting — they
+  // represent absence, not load. Without this filter, a week of all-day
+  // "ferie" events saturates the volume amplifier and pegs mechanical at 1.0.
+  const active = scored.filter((t) => t.ai_category !== 'off');
+  if (active.length === 0) {
+    return 0;
+  }
+
   let weightedSum = 0;
   let totalWeight = 0;
 
-  for (const task of scored) {
+  for (const task of active) {
     const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
     weightedSum += task.urgency_score * weight;
     totalWeight += weight;
@@ -88,14 +97,18 @@ function computeMechanicalScore(scored, priorityWeights) {
 
   let base = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-  // Volume amplification: calendar events compound psychological load
-  // Backlog tasks (jira, local, gtasks) are a work pool — reduced volume weight
-  const calendarCount = scored.filter((t) => t.source === 'gcal').length;
-  const backlogCount = scored.length - calendarCount;
-  const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
-  const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
-  const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
-  base = Math.min(1, base + volumeBoost * (1 - base));
+  // Volume amplification only applies when there is already real urgency to
+  // compound. A calendar full of distant events (low urgency) does not
+  // manufacture stress — that would peg mechanical at 1.0 for any user with
+  // a populated multi-day calendar regardless of actual proximity.
+  if (base >= VOLUME_AMP_MIN_BASE) {
+    const calendarCount = active.filter((t) => t.source === 'gcal').length;
+    const backlogCount = active.length - calendarCount;
+    const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
+    const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
+    const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
+    base = Math.min(1, base + volumeBoost * (1 - base));
+  }
 
   return Math.round(base * 1000) / 1000;
 }
