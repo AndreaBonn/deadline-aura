@@ -122,14 +122,45 @@ function runMigrations(database) {
     backfillMeet(needsMeetBackfill);
   }
 
-  // 006: extend source CHECK to include 'local' (idempotent)
-  // SQLite cannot ALTER CHECK constraints — recreate table with new constraint
+  // Helper: SQLite cannot ALTER CHECK constraints — when we need to extend an
+  // enum, the only option is to rebuild the table via CREATE/INSERT/DROP/RENAME.
+  // The DROP step cascade-deletes rows in any table with ON DELETE CASCADE FKs
+  // pointing here (notably pinned_tasks), so we MUST disable foreign keys for
+  // the duration of the rebuild. The pin rows survive because their task_id
+  // values are preserved through the INSERT INTO tasks_new SELECT * FROM tasks.
+  function rebuildTasksTable(newSchema, columnList) {
+    const fkWasOn = database.pragma('foreign_keys', { simple: true }) === 1;
+    if (fkWasOn) {
+      database.pragma('foreign_keys = OFF');
+    }
+    try {
+      database.exec(`
+        ${newSchema}
+        INSERT INTO tasks_new SELECT ${columnList} FROM tasks;
+        DROP TABLE tasks;
+        ALTER TABLE tasks_new RENAME TO tasks;
+        CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
+        CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
+        CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
+      `);
+    } finally {
+      if (fkWasOn) {
+        database.pragma('foreign_keys = ON');
+      }
+    }
+  }
+
+  const TASKS_COLUMNS = `id, source, title, due_at, priority, is_done, is_stale,
+    raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
+    web_url, ai_cognitive_type, start_at, meet_url`;
+
+  // 006: extend source CHECK to include 'gtasks' (idempotent)
   const sourceCheck = database
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
     .get();
   if (sourceCheck && !sourceCheck.sql.includes("'gtasks'")) {
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS tasks_new (
+    rebuildTasksTable(
+      `CREATE TABLE IF NOT EXISTS tasks_new (
         id          TEXT PRIMARY KEY,
         source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local', 'gtasks')),
         title       TEXT NOT NULL,
@@ -147,16 +178,9 @@ function runMigrations(database) {
         ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
         start_at    INTEGER,
         meet_url    TEXT
-      );
-      INSERT INTO tasks_new SELECT id, source, title, due_at, priority, is_done, is_stale,
-        raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
-        web_url, ai_cognitive_type, start_at, meet_url FROM tasks;
-      DROP TABLE tasks;
-      ALTER TABLE tasks_new RENAME TO tasks;
-      CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
-      CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
-      CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
-    `);
+      );`,
+      TASKS_COLUMNS,
+    );
   }
 
   // 007: extend ai_category CHECK to include 'off' (for OOO/PTO/vacation events)
@@ -164,8 +188,8 @@ function runMigrations(database) {
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
     .get();
   if (aiCategoryCheck && !aiCategoryCheck.sql.includes("'off'")) {
-    database.exec(`
-      CREATE TABLE IF NOT EXISTS tasks_new (
+    rebuildTasksTable(
+      `CREATE TABLE IF NOT EXISTS tasks_new (
         id          TEXT PRIMARY KEY,
         source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local', 'gtasks')),
         title       TEXT NOT NULL,
@@ -183,16 +207,9 @@ function runMigrations(database) {
         ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
         start_at    INTEGER,
         meet_url    TEXT
-      );
-      INSERT INTO tasks_new SELECT id, source, title, due_at, priority, is_done, is_stale,
-        raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
-        web_url, ai_cognitive_type, start_at, meet_url FROM tasks;
-      DROP TABLE tasks;
-      ALTER TABLE tasks_new RENAME TO tasks;
-      CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
-      CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
-      CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
-    `);
+      );`,
+      TASKS_COLUMNS,
+    );
   }
 }
 
