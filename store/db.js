@@ -4,6 +4,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const dbBackup = require('./db-backup');
 
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const DB_PATH = path.join(DATA_DIR, 'db.sqlite');
@@ -128,7 +129,21 @@ function runMigrations(database) {
   // pointing here (notably pinned_tasks), so we MUST disable foreign keys for
   // the duration of the rebuild. The pin rows survive because their task_id
   // values are preserved through the INSERT INTO tasks_new SELECT * FROM tasks.
-  function rebuildTasksTable(newSchema, columnList) {
+  //
+  // A snapshot of the database is taken before every rebuild so the user can
+  // recover from a botched migration. Backup failures abort the migration to
+  // avoid running a destructive change without a safety net.
+  function rebuildTasksTable(newSchema, columnList, migrationLabel) {
+    try {
+      const backupPath = dbBackup.createBackup(database, DB_PATH, migrationLabel);
+      console.log(`[migrations] ${migrationLabel} backup → ${backupPath}`);
+    } catch (err) {
+      throw new Error(
+        `Aborting ${migrationLabel}: backup failed (${err.message}). ` +
+          `Refusing to run a destructive migration without a recovery point.`,
+      );
+    }
+
     const fkWasOn = database.pragma('foreign_keys', { simple: true }) === 1;
     if (fkWasOn) {
       database.pragma('foreign_keys = OFF');
@@ -180,6 +195,7 @@ function runMigrations(database) {
         meet_url    TEXT
       );`,
       TASKS_COLUMNS,
+      'mig-006-gtasks',
     );
   }
 
@@ -209,6 +225,7 @@ function runMigrations(database) {
         meet_url    TEXT
       );`,
       TASKS_COLUMNS,
+      'mig-007-off-category',
     );
   }
 }
