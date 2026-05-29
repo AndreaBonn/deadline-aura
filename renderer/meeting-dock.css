@@ -24,13 +24,14 @@ body {
 }
 
 .meeting-box {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   background: rgba(30, 30, 46, 0.82);
   border: 1px solid rgba(137, 180, 250, 0.25);
   border-radius: 10px;
-  padding: 6px 14px;
+  padding: 6px 22px 6px 14px;
   cursor: pointer;
   transition:
     background 0.2s,
@@ -42,6 +43,39 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.meeting-dismiss {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: rgba(205, 214, 244, 0.5);
+  font-size: 14px;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.meeting-dismiss:hover {
+  background: rgba(243, 139, 168, 0.25);
+  color: #f38ba8;
+}
+
+.meeting-dismiss:active {
+  background: rgba(243, 139, 168, 0.4);
 }
 
 .meeting-box:hover {
