@@ -7,17 +7,20 @@ const gcal = require('../integrations/google-calendar');
 const gtasks = require('../integrations/google-tasks');
 const jira = require('../integrations/jira');
 const aiScorer = require('../ai/ai-scorer');
+const { PROMPT_VERSION } = require('../ai/prompt');
 const crypto = require('crypto');
 
 // SHA-256 is used here purely as a change-detection fingerprint, not for
 // security purposes. Collision probability (~2^-128) is negligible for this
 // use case and does not require explicit collision handling.
+// PROMPT_VERSION participates in the hash so any change to the prompt or
+// parser invalidates the cache automatically — no manual clear needed.
 function computeEventsHash(tasks) {
   const data = tasks
     .map((t) => `${t.id}|${t.title}|${t.due_at}|${t.priority}`)
     .sort()
     .join('\n');
-  return crypto.createHash('sha256').update(data).digest('hex');
+  return crypto.createHash('sha256').update(`v=${PROMPT_VERSION}\n${data}`).digest('hex');
 }
 
 function shouldRecalcAi(config) {

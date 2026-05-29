@@ -1,8 +1,25 @@
 'use strict';
 
+const crypto = require('crypto');
+const fs = require('fs');
+
 const MAX_TITLE_LENGTH = 150;
 const MAX_DESCRIPTION_LENGTH = 200;
 const MAX_FIELD_LENGTH = 100;
+
+// Fingerprint of this file's contents. Any change to the prompt structure or
+// the parser invalidates the AI cache so stale responses cannot be reused.
+const PROMPT_VERSION = (() => {
+  try {
+    return crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(__filename, 'utf-8'))
+      .digest('hex')
+      .slice(0, 12);
+  } catch {
+    return 'unknown';
+  }
+})();
 
 function sanitizeField(value, maxLength) {
   if (typeof value !== 'string') {
@@ -259,6 +276,7 @@ function parseAiResponse(text) {
 module.exports = {
   buildScoringPrompt,
   parseAiResponse,
+  PROMPT_VERSION,
   VALID_CATEGORIES,
   VALID_COGNITIVE_TYPES,
   VALID_LEVELS,
