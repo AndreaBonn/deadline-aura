@@ -4,13 +4,13 @@
 
 const PARTICLE_COUNT = 14;
 const EXPLOSION_DURATION_MS = 550;
-const PARTICLE_COLORS = ['#3b82f6', '#60a5fa', '#93c5fd', '#dbeafe', '#2563eb', '#ffffff'];
+const PARTICLE_COLORS = ['#cbd5e1', '#e2e8f0', '#f8fafc', '#94a3b8', '#818cf8', '#ffffff'];
 const PARTICLE_SIZES = [5, 7, 9, 11];
 
 const flybyEl = document.getElementById('flyby');
 const explosionEl = document.getElementById('explosion');
 const bannerText = document.getElementById('bannerText');
-const airplaneEl = document.getElementById('airplane');
+const pigeonEl = document.getElementById('pigeon');
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -66,7 +66,7 @@ function createExplosionParticles(originX, originY) {
 function handleClick() {
   flybyApi.clicked();
 
-  const rect = airplaneEl.getBoundingClientRect();
+  const rect = pigeonEl.getBoundingClientRect();
   const originX = rect.left + rect.width / 2;
   const originY = rect.top + rect.height / 2;
 

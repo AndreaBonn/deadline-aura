@@ -58,20 +58,54 @@ body {
   flex-shrink: 0;
 }
 
-#airplane {
+#pigeon {
   flex-shrink: 0;
   width: 72px;
   height: 42px;
   transition: transform 0.1s ease;
 }
 
-#airplane svg {
+#pigeon svg {
   width: 100%;
   height: 100%;
+  animation: bob 0.9s ease-in-out infinite;
 }
 
-#airplane:hover {
+#pigeon .wing {
+  transform-box: fill-box;
+  transform-origin: bottom right;
+  animation: flap 0.45s ease-in-out infinite;
+}
+
+#pigeon:hover {
   transform: scale(1.1);
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes flap {
+  0%,
+  100% {
+    transform: rotate(6deg);
+  }
+  50% {
+    transform: rotate(-22deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pigeon svg,
+  #pigeon .wing {
+    animation: none;
+  }
 }
 
 /* --- Explosion --- */
