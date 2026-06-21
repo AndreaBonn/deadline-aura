@@ -2,7 +2,7 @@
 
 require('dotenv').config();
 
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
 const {
@@ -62,6 +62,7 @@ const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 10;
 const DESKTOP_CHECK_MS = 1000;
 const TOKEN_MASK = '••••••••';
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
 function maskConfigForRenderer(cfg) {
   const masked = JSON.parse(JSON.stringify(cfg));
@@ -110,6 +111,7 @@ function openSettingsWindow() {
     frame: false,
     resizable: false,
     backgroundColor: '#0a0c14',
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload-settings.js'),
       contextIsolation: true,
@@ -607,6 +609,13 @@ if (!gotLock) {
 }
 
 app.whenReady().then(() => {
+  if (nativeImage.createFromPath(APP_ICON_PATH).isEmpty()) {
+    console.warn(
+      `[icon] App icon missing or unreadable at ${APP_ICON_PATH} - dock will show the generic icon. ` +
+        'Place a PNG (1024x1024 recommended) there.',
+    );
+  }
+
   initSidebar();
 
   meetingFlyby.init();

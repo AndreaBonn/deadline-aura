@@ -2,9 +2,10 @@
 Type=Application
 Name=DeadlineAura
 Exec=/home/bonn/.nvm/versions/node/v20.20.0/bin/npx electron /home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura --no-sandbox
-Icon=deadlineaura
+Icon=/home/bonn/Documenti/00_Lavoro/ProgettiPersonali/deadline-aura/assets/icon.png
 Comment=Deadline-aware desktop widget
 Categories=Utility;
+StartupWMClass=deadlineaura
 X-GNOME-Autostart-enabled=true
 Hidden=false
 NoDisplay=false
