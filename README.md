@@ -6,6 +6,7 @@ Desktop widget for Linux that maps your workload into an ambient visual signal �
 
 <div align="center">
 
+[![Download .deb](https://img.shields.io/github/v/release/AndreaBonn/deadline-aura?label=download%20.deb&color=brightgreen&sort=semver)](https://github.com/AndreaBonn/deadline-aura/releases/latest)
 [![CI](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml/badge.svg)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AndreaBonn/deadline-aura/main/badges/test-badge.json)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/AndreaBonn/deadline-aura/main/badges/coverage-badge.json)](https://github.com/AndreaBonn/deadline-aura/actions/workflows/ci.yml)
@@ -103,7 +104,46 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - Calendar event status: Google Calendar events in the sidebar show real-time status - "ongoing" (blue) when between start and end time, "ended" (grey) after the event finishes, or start time with countdown for future events
 - Differentiated sync: external data (Google Calendar, Jira) refreshes every 10 minutes by default (`sync.data_interval_minutes`), AI scoring recalculates only when events change or every 6 hours (`ai.recalc_hours`), and the UI updates every 60 seconds
 
-## Setup
+## Download and install (Debian/Ubuntu)
+
+DeadlineAura ships as a ready-to-install `.deb` package. You do not need Node.js, a terminal, or any build step.
+
+**1. Download the package**
+
+Open the **[latest release](https://github.com/AndreaBonn/deadline-aura/releases/latest)**. Under **Assets**, click the file ending in `.deb` (for example `deadlineaura_1.3.0_amd64.deb`) and save it, usually to your `Downloads` folder. This link always points to the newest version.
+
+**2. Install it**
+
+The simplest way: double-click the downloaded `.deb` file. Your system's software installer opens; click **Install** and type your password.
+
+Prefer the terminal? Run:
+
+```bash
+cd ~/Downloads
+sudo apt install ./deadlineaura_*.deb
+```
+
+`apt` automatically pulls in the system libraries DeadlineAura needs.
+
+**3. Start it**
+
+Open it from your applications menu (search for "DeadlineAura"), or run `deadlineaura`. From then on it starts automatically every time you log in.
+
+API keys for the AI providers, Google Calendar and Jira are entered inside the app, under **Settings → AI**, and stored only on your machine in `~/.config/deadlineaura/config.json`. Nothing sensitive is bundled in the package.
+
+**Update**: download the newer `.deb` from the [latest release](https://github.com/AndreaBonn/deadline-aura/releases/latest) and install it the same way. It replaces the previous version and keeps your data.
+
+**Uninstall**:
+
+```bash
+sudo apt remove deadlineaura
+```
+
+Your data in `~/.config/deadlineaura` and `~/.local/share/deadlineaura` is left untouched.
+
+## Setup (from source)
+
+For development, or to run on non-Debian distributions, build from source.
 
 ### Step 1 — Install system dependencies
 
