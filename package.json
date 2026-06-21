@@ -14,7 +14,7 @@
     "format:check": "prettier --check .",
     "sync": "node core/sync-daemon.js",
     "rebuild": "electron-rebuild",
-    "dist": "electron-builder --linux deb",
+    "dist": "electron-builder --linux deb --publish never",
     "prepare": "husky"
   },
   "engines": {
