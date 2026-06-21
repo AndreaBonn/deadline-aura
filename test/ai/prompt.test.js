@@ -160,7 +160,12 @@ describe('prompt', () => {
     it('clamps global_stress to 1-10 range', () => {
       expect(parseAiResponse('{"global_stress": 15}').global_stress).toBe(10);
       expect(parseAiResponse('{"global_stress": -3}').global_stress).toBe(1);
-      expect(parseAiResponse('{"global_stress": 5.7}').global_stress).toBe(6);
+    });
+
+    it('preserves one decimal place of precision in global_stress', () => {
+      expect(parseAiResponse('{"global_stress": 5.7}').global_stress).toBe(5.7);
+      expect(parseAiResponse('{"global_stress": 6.84}').global_stress).toBe(6.8);
+      expect(parseAiResponse('{"global_stress": 5}').global_stress).toBe(5);
     });
 
     it('clamps per_event stress to 1-10 range', () => {

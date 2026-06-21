@@ -159,9 +159,11 @@ EVALUATION DIMENSIONS:
 5. Cumulative compounding: a moderate task after three demanding ones hits harder than the same task after rest. Score later events in context of what precedes them
 6. Schedule quality: well-placed breaks, similar topics grouped together, demanding work in peak-energy hours, buffer time before important events. Good scheduling deserves recognition.
 
+SCORE PRECISION: express global_stress as a decimal with one decimal place (e.g. 5.4, 6.8, 3.2), NOT a whole number. Use the decimal to place the week precisely between the anchors above: two weeks that both feel "moderate" but differ in density must get different scores (e.g. 5.3 vs 5.9). Reserve whole numbers only when the week lands exactly on an anchor.
+
 Respond with ONLY valid JSON, no markdown, no text before or after:
 {
-  "global_stress": <1-10 integer>,
+  "global_stress": <1.0-10.0, one decimal place>,
   "daily_breakdown": [
     {
       "date": "YYYY-MM-DD",
@@ -217,7 +219,7 @@ function parseAiResponse(text) {
     throw new Error('Missing or invalid global_stress');
   }
 
-  parsed.global_stress = Math.max(1, Math.min(10, Math.round(parsed.global_stress)));
+  parsed.global_stress = Math.max(1, Math.min(10, Math.round(parsed.global_stress * 10) / 10));
 
   if (Array.isArray(parsed.per_event)) {
     for (const event of parsed.per_event) {
