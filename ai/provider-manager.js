@@ -23,17 +23,40 @@ const ENV_KEY_MAP = {
 let cachedProviders = null;
 let cachedCacheKey = null;
 
-function buildCacheKey(priority) {
-  const envParts = priority.map((name) => {
-    const envVar = ENV_KEY_MAP[name];
-    return `${name}:${process.env[envVar] || ''}`;
-  });
-  return priority.join(',') + '|' + envParts.join('|');
+/**
+ * Resolve the raw key string for a provider.
+ *
+ * Keys entered from the settings UI (config.ai.api_keys) take precedence over
+ * the *_API_KEYS environment variables, which remain a fallback for development
+ * and headless setups. The returned string may hold several comma-separated keys.
+ *
+ * @param {string} name - Provider name (groq, gemini, openai, anthropic).
+ * @param {object} config - Application config.
+ * @returns {string} Raw key string, empty when no key is configured.
+ */
+function resolveKeyString(name, config) {
+  const fromConfig = config.ai?.api_keys?.[name];
+  if (fromConfig && fromConfig.trim()) {
+    return fromConfig;
+  }
+  return process.env[ENV_KEY_MAP[name]] || '';
+}
+
+function parseKeys(keysStr) {
+  return keysStr
+    .split(',')
+    .map((k) => k.trim())
+    .filter(Boolean);
+}
+
+function buildCacheKey(priority, config) {
+  const parts = priority.map((name) => `${name}:${resolveKeyString(name, config)}`);
+  return priority.join(',') + '|' + parts.join('|');
 }
 
 function loadProviders(config) {
   const priority = config.ai?.provider_priority || ['groq', 'gemini', 'openai', 'anthropic'];
-  const cacheKey = buildCacheKey(priority);
+  const cacheKey = buildCacheKey(priority, config);
 
   if (cachedProviders && cachedCacheKey === cacheKey) {
     return cachedProviders;
@@ -42,17 +65,7 @@ function loadProviders(config) {
   const providers = [];
 
   for (const name of priority) {
-    const envVar = ENV_KEY_MAP[name];
-    const keysStr = process.env[envVar];
-
-    if (!keysStr) {
-      continue;
-    }
-
-    const keys = keysStr
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean);
+    const keys = parseKeys(resolveKeyString(name, config));
     if (keys.length === 0) {
       continue;
     }
@@ -114,4 +127,4 @@ async function scoreEvents(events, config) {
   return null;
 }
 
-module.exports = { scoreEvents, loadProviders };
+module.exports = { scoreEvents, loadProviders, resolveKeyString };

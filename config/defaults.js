@@ -32,6 +32,12 @@ const DEFAULTS = {
     provider_timeout_ms: 5000,
     total_timeout_ms: 15000,
     temperature: 0.15,
+    api_keys: {
+      groq: '',
+      gemini: '',
+      openai: '',
+      anthropic: '',
+    },
   },
   wallpaper: {
     enabled: true,

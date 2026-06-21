@@ -3,7 +3,7 @@
 /* global settingsApi, createToggle, createNumberInput, createRangeWithValue,
    createSelect, createTextInput, createTagInput, createPriorityList,
    createField, createFieldGroup, createCheckboxGroup, createDateList,
-   createTimeSlotList, createVariableMonthGrid, initI18n, t */
+   createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t */
 
 let config = {};
 let defaults = {};
@@ -247,7 +247,34 @@ function renderAI() {
       }),
     ),
   );
-  return [group];
+
+  if (!config.ai.api_keys) {
+    config.ai.api_keys = { groq: '', gemini: '', openai: '', anthropic: '' };
+  }
+  const keys = createFieldGroup(t('settings.ai_api_keys'));
+  const providers = [
+    { id: 'groq', label: 'Groq' },
+    { id: 'gemini', label: 'Google Gemini' },
+    { id: 'openai', label: 'OpenAI' },
+    { id: 'anthropic', label: 'Anthropic' },
+  ];
+  for (const { id, label } of providers) {
+    keys.append(
+      createField(
+        label,
+        createSecretInput(
+          config.ai.api_keys[id] || '',
+          { placeholder: t('settings.api_key_placeholder') },
+          (v) => {
+            config.ai.api_keys[id] = v;
+          },
+        ),
+        t('settings.api_key_hint'),
+      ),
+    );
+  }
+
+  return [group, keys];
 }
 
 function renderWallpaper() {

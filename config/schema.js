@@ -45,6 +45,18 @@ const configSchema = z.object({
     provider_timeout_ms: z.number().int().min(1000).max(30000),
     total_timeout_ms: z.number().int().min(1000).max(60000),
     temperature: z.number().min(0).max(1),
+    // Per-provider API keys entered from the settings UI. Each value may hold a
+    // single key or several comma-separated keys, mirroring the *_API_KEYS env
+    // vars. Optional and partial so configs written before this field still load.
+    api_keys: z
+      .object({
+        groq: z.string(),
+        gemini: z.string(),
+        openai: z.string(),
+        anthropic: z.string(),
+      })
+      .partial()
+      .optional(),
   }),
   wallpaper: z.object({
     enabled: z.boolean(),

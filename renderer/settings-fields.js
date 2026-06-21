@@ -84,6 +84,33 @@ function createTextInput(value, { placeholder = '' } = {}, onChange) {
   return input;
 }
 
+function createSecretInput(value, { placeholder = '' } = {}, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'field-input secret-input';
+  const input = document.createElement('input');
+  input.type = 'password';
+  input.value = value;
+  input.placeholder = placeholder;
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.addEventListener('change', () => onChange(input.value));
+
+  const show = typeof t === 'function' ? t('settings.secret_show') : 'Show';
+  const hide = typeof t === 'function' ? t('settings.secret_hide') : 'Hide';
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'secret-toggle';
+  toggle.textContent = show;
+  toggle.addEventListener('click', () => {
+    const masked = input.type === 'password';
+    input.type = masked ? 'text' : 'password';
+    toggle.textContent = masked ? hide : show;
+  });
+
+  wrap.append(input, toggle);
+  return wrap;
+}
+
 function createTagInput(values, { placeholder } = {}, onChange) {
   const defaultPlaceholder =
     typeof t === 'function' ? t('settings.tag_add_placeholder') : 'Aggiungi...';
