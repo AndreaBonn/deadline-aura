@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=DeadlineAura
+Comment=Deadline-aware ambient desktop widget
+Exec=/opt/DeadlineAura/deadlineaura
+Icon=deadlineaura
+Terminal=false
+Categories=Utility;
+StartupWMClass=deadlineaura
+X-GNOME-Autostart-enabled=true

@@ -7,8 +7,15 @@ node_modules/
 dist/
 dist-electron/
 out/
-build/
 release/
+
+# Packaging resources (electron-builder buildResources) are tracked; only
+# ignore stray generated output that may land in build/.
+build/*
+!build/icons/
+!build/autostart/
+!build/deb-after-install.sh
+!build/deb-after-remove.sh
 *.dmg
 *.exe
 *.AppImage

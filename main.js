@@ -1,6 +1,17 @@
 'use strict';
 
-require('dotenv').config();
+// Load secrets before anything reads process.env. Primary source is the
+// per-user env file the installed .deb expects; the .env in the working
+// directory is a fallback for running from a source checkout in development.
+// dotenv does not overwrite already-set variables, so the user file wins.
+{
+  const nodePath = require('node:path');
+  const nodeOs = require('node:os');
+  require('dotenv').config({
+    path: nodePath.join(nodeOs.homedir(), '.config', 'deadlineaura', '.env'),
+  });
+  require('dotenv').config();
+}
 
 const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
 const { execFile } = require('child_process');
