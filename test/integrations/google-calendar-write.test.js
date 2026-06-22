@@ -24,7 +24,7 @@ describe('google-calendar — write operations', () => {
           startTime: new Date().toISOString(),
           durationMinutes: 60,
         }),
-      ).rejects.toThrow('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+      ).rejects.toThrow('client_id and client_secret required (settings or env)');
     });
 
     it('throws when only GOOGLE_CLIENT_ID is set', async () => {
@@ -40,7 +40,7 @@ describe('google-calendar — write operations', () => {
           startTime: new Date().toISOString(),
           durationMinutes: 30,
         }),
-      ).rejects.toThrow('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+      ).rejects.toThrow('client_id and client_secret required (settings or env)');
     });
   });
 
@@ -57,7 +57,7 @@ describe('google-calendar — write operations', () => {
           eventId: 'evt123',
           endTime: new Date().toISOString(),
         }),
-      ).rejects.toThrow('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+      ).rejects.toThrow('client_id and client_secret required (settings or env)');
     });
 
     it('throws when endTime is invalid', async () => {

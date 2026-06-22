@@ -31,7 +31,7 @@ describe('google-calendar — fetchEvents edge cases', () => {
 
     expect(result).toEqual([]);
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('GOOGLE_CLIENT_ID'),
+      expect.stringContaining('client_id and client_secret required'),
     );
     consoleSpy.mockRestore();
   });
