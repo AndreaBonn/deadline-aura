@@ -189,6 +189,10 @@
     "google_account": "Google Account",
     "google_account_placeholder": "email@example.com",
     "google_account_hint": "To open Meet with the correct account",
+    "google_client_id": "Google Client ID",
+    "google_client_secret": "Google Client Secret",
+    "google_client_id_placeholder": "xxxx.apps.googleusercontent.com",
+    "google_oauth_hint": "OAuth credentials from Google Cloud Console. If empty, environment variables are used.",
     "meeting_dock_group": "Meeting dock",
     "meeting_dock_lookahead": "Lookahead (minutes)",
     "meeting_dock_lookahead_hint": "Show meetings in the next N minutes"

@@ -189,6 +189,10 @@
     "google_account": "Account Google",
     "google_account_placeholder": "email@example.com",
     "google_account_hint": "Per aprire Meet con l'account corretto",
+    "google_client_id": "Google Client ID",
+    "google_client_secret": "Google Client Secret",
+    "google_client_id_placeholder": "xxxx.apps.googleusercontent.com",
+    "google_oauth_hint": "Credenziali OAuth da Google Cloud Console. Se vuote, usa le variabili d'ambiente.",
     "meeting_dock_group": "Dock riunioni",
     "meeting_dock_lookahead": "Anticipo (minuti)",
     "meeting_dock_lookahead_hint": "Mostra riunioni nei prossimi N minuti"

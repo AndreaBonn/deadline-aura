@@ -22,6 +22,25 @@ const { getLookaheadEnd } = require('../core/deadline-engine');
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
 
+/**
+ * Resolve the Google OAuth client credentials.
+ *
+ * Values entered from the settings UI (config.sources.google_calendar.oauth)
+ * take precedence over the GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET environment
+ * variables, which remain a fallback for development and headless setups.
+ *
+ * @param {object} config - Application config.
+ * @returns {{clientId: string, clientSecret: string}} Resolved credentials; empty strings when unset.
+ */
+function resolveGoogleOAuth(config) {
+  const oauth = config?.sources?.google_calendar?.oauth || {};
+  const clientId =
+    (oauth.client_id && oauth.client_id.trim()) || process.env.GOOGLE_CLIENT_ID || '';
+  const clientSecret =
+    (oauth.client_secret && oauth.client_secret.trim()) || process.env.GOOGLE_CLIENT_SECRET || '';
+  return { clientId, clientSecret };
+}
+
 function createOAuthClient(clientId, clientSecret) {
   return new google.auth.OAuth2(
     clientId,
@@ -294,11 +313,10 @@ async function fetchEvents(config) {
     return [];
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
 
   if (!clientId || !clientSecret) {
-    console.error('Google Calendar: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    console.error('Google Calendar: client_id and client_secret required (settings or env)');
     return [];
   }
 
@@ -331,8 +349,7 @@ async function listCalendars(config) {
     return [];
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
   if (!clientId || !clientSecret) {
     return [];
   }
@@ -351,10 +368,9 @@ async function listCalendars(config) {
 }
 
 async function createEvent(config, { calendarId, summary, startTime, durationMinutes }) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    throw new Error('Google client_id and client_secret required (settings or env)');
   }
 
   const oAuth2Client = await getAuthenticatedClient(clientId, clientSecret);
@@ -379,10 +395,9 @@ async function createEvent(config, { calendarId, summary, startTime, durationMin
 }
 
 async function updateEvent(config, { calendarId, eventId, endTime }) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required');
+    throw new Error('Google client_id and client_secret required (settings or env)');
   }
 
   const end = new Date(endTime);
@@ -411,6 +426,7 @@ module.exports = {
   assignPriority,
   extractMeetUrl,
   getAuthenticatedClient,
+  resolveGoogleOAuth,
   listCalendars,
   createEvent,
   updateEvent,

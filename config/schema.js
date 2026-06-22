@@ -16,6 +16,12 @@ const configSchema = z.object({
       priority_keywords: z.array(z.string()),
       default_log_calendar: z.string().optional(),
       google_account: z.string().optional(),
+      oauth: z
+        .object({
+          client_id: z.string(),
+          client_secret: z.string(),
+        })
+        .optional(),
     }),
     jira: z.object({
       enabled: z.boolean(),

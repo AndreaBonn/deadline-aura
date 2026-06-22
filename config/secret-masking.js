@@ -33,6 +33,11 @@ function maskConfigForRenderer(cfg) {
     }
   }
 
+  const googleOauth = masked.sources?.google_calendar?.oauth;
+  if (googleOauth && googleOauth.client_secret) {
+    googleOauth.client_secret = TOKEN_MASK;
+  }
+
   return masked;
 }
 
@@ -62,6 +67,12 @@ function restoreTokens(newConfig, originalConfig) {
         newKeys[provider] = origKeys[provider];
       }
     }
+  }
+
+  const newOauth = newConfig.sources?.google_calendar?.oauth;
+  const origOauth = originalConfig.sources?.google_calendar?.oauth;
+  if (newOauth && origOauth && newOauth.client_secret === TOKEN_MASK && origOauth.client_secret) {
+    newOauth.client_secret = origOauth.client_secret;
   }
 }
 

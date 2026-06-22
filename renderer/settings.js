@@ -89,6 +89,9 @@ function renderGenerale() {
 }
 
 function renderSorgenti() {
+  if (!config.sources.google_calendar.oauth) {
+    config.sources.google_calendar.oauth = { client_id: '', client_secret: '' };
+  }
   const gcal = createFieldGroup(t('sidebar.google_calendar'));
   gcal.append(
     createField(
@@ -127,6 +130,27 @@ function renderSorgenti() {
         },
       ),
       t('settings.google_account_hint'),
+    ),
+    createField(
+      t('settings.google_client_id'),
+      createTextInput(
+        config.sources.google_calendar.oauth.client_id || '',
+        { placeholder: t('settings.google_client_id_placeholder') },
+        (v) => {
+          config.sources.google_calendar.oauth.client_id = v;
+        },
+      ),
+      t('settings.google_oauth_hint'),
+    ),
+    createField(
+      t('settings.google_client_secret'),
+      createSecretInput(
+        config.sources.google_calendar.oauth.client_secret || '',
+        { placeholder: t('settings.api_key_placeholder') },
+        (v) => {
+          config.sources.google_calendar.oauth.client_secret = v;
+        },
+      ),
     ),
   );
 

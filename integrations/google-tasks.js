@@ -1,7 +1,7 @@
 'use strict';
 
 const { google } = require('googleapis');
-const { getAuthenticatedClient } = require('./google-calendar');
+const { getAuthenticatedClient, resolveGoogleOAuth } = require('./google-calendar');
 
 const DEFAULT_PRIORITY = 3;
 const HIGH_PRIORITY = 2;
@@ -47,8 +47,7 @@ async function fetchTasks(config) {
     return [];
   }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
 
   if (!clientId || !clientSecret) {
     return [];
