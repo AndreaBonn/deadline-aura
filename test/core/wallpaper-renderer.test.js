@@ -3,7 +3,12 @@
 // Test pure/logic functions exported from wallpaper-renderer.
 // render() itself requires canvas and fs — not tested here (integration concern).
 
-const { getBackgroundFile, BACKGROUNDS_DIR } = require('../../core/wallpaper-renderer');
+const path = require('path');
+const {
+  getBackgroundFile,
+  BACKGROUNDS_DIR,
+  resolveUnpackedDir,
+} = require('../../core/wallpaper-renderer');
 
 describe('wallpaper-renderer — getBackgroundFile', () => {
   it('returns null when no background file exists for band', () => {
@@ -54,6 +59,26 @@ describe('wallpaper-renderer — getBackgroundFile', () => {
     expect(BACKGROUNDS_DIR.startsWith('/')).toBe(true);
     expect(BACKGROUNDS_DIR).toContain('assets');
     expect(BACKGROUNDS_DIR).toContain('backgrounds');
+  });
+});
+
+describe('wallpaper-renderer — resolveUnpackedDir', () => {
+  const sep = path.sep;
+
+  it('redirects an asar-packed path to app.asar.unpacked', () => {
+    const packed = `/opt/DeadlineAura/resources/app.asar${sep}assets${sep}backgrounds`;
+    const expected = `/opt/DeadlineAura/resources/app.asar.unpacked${sep}assets${sep}backgrounds`;
+    expect(resolveUnpackedDir(packed)).toBe(expected);
+  });
+
+  it('leaves a plain dev path unchanged (no asar segment)', () => {
+    const dev = `/home/dev/deadline-aura${sep}assets${sep}backgrounds`;
+    expect(resolveUnpackedDir(dev)).toBe(dev);
+  });
+
+  it('does not rewrite a path already pointing at app.asar.unpacked', () => {
+    const unpacked = `/opt/app/resources/app.asar.unpacked${sep}assets`;
+    expect(resolveUnpackedDir(unpacked)).toBe(unpacked);
   });
 });
 

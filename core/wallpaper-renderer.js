@@ -7,7 +7,16 @@ const path = require('path');
 const { renderPostits } = require('./postit-renderer');
 const { computeCanvasGeometry } = require('./display-manager');
 
-const BACKGROUNDS_DIR = path.join(__dirname, '..', 'assets', 'backgrounds');
+// node-canvas reads image files in native C++, bypassing Electron's asar fs
+// shim. Inside a packaged app the assets live in app.asar.unpacked (declared in
+// build.asarUnpack), so the path must point there or loadImage() silently fails
+// and the renderer falls back to the flat gradient. In dev there is no asar
+// segment, so this is a no-op.
+function resolveUnpackedDir(dir) {
+  return dir.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+}
+
+const BACKGROUNDS_DIR = resolveUnpackedDir(path.join(__dirname, '..', 'assets', 'backgrounds'));
 
 function truncateText(ctx, text, maxWidth) {
   if (ctx.measureText(text).width <= maxWidth) {
@@ -293,4 +302,4 @@ async function render({ displays, palette, score, engineResult, pinnedByDisplay,
   return canvas;
 }
 
-module.exports = { render, getBackgroundFile, BACKGROUNDS_DIR };
+module.exports = { render, getBackgroundFile, BACKGROUNDS_DIR, resolveUnpackedDir };
