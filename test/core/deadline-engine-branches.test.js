@@ -1,3 +1,4 @@
+const db = require('../../store/db');
 const {
   computeTaskUrgency,
   computeGlobalScore,
@@ -7,6 +8,14 @@ const {
 } = require('../../core/deadline-engine');
 
 const MS_PER_HOUR = 3600000;
+
+// These tests assert mechanical-only scoring. The engine falls back to
+// db.getLatestAiScore() when no aiScore is passed in options, which would
+// otherwise read the real on-disk database and make results environment-
+// dependent. Neutralize that fallback so the tests are deterministic.
+beforeEach(() => {
+  vi.spyOn(db, 'getLatestAiScore').mockReturnValue(null);
+});
 
 function makeTask(overrides = {}) {
   return {

@@ -10,6 +10,7 @@ vi.spyOn(os, 'homedir').mockReturnValue(
 
 const db = require('../../store/db');
 const gcal = require('../../integrations/google-calendar');
+const gtasks = require('../../integrations/google-tasks');
 const jira = require('../../integrations/jira');
 const aiScorer = require('../../ai/ai-scorer');
 const { sync } = require('../../core/sync-daemon');
@@ -39,6 +40,9 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Google Tasks is an always-on source: isolate it so the real integration
+  // (and the on-disk .env credentials) never runs during these tests.
+  vi.spyOn(gtasks, 'fetchTasks').mockResolvedValue([]);
   db.getDb().prepare('DELETE FROM tasks').run();
   db.getDb().prepare('DELETE FROM ai_cache').run();
   db.getDb().prepare('DELETE FROM scores').run();
@@ -124,7 +128,13 @@ describe('sync-daemon — AI scoring success path', () => {
     const newAiResult = {
       global_stress: 5,
       per_event: [
-        { id: 1, stress: 5, category: 'work-routine', reasoning: 'Normal', cognitive_type: 'administrative' },
+        {
+          id: 1,
+          stress: 5,
+          category: 'work-routine',
+          reasoning: 'Normal',
+          cognitive_type: 'administrative',
+        },
       ],
     };
     const scoreSpy = vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue(newAiResult);

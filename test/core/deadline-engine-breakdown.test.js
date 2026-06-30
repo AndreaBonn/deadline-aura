@@ -1,5 +1,6 @@
 'use strict';
 
+const db = require('../../store/db');
 const {
   computeGlobalScore,
   describeMechanicalScore,
@@ -9,6 +10,13 @@ const {
 } = require('../../core/deadline-engine');
 
 const MS_PER_HOUR = 3600000;
+
+// The "no AI" breakdown cases assert mechanical-only weights. Neutralize the
+// engine's db.getLatestAiScore() fallback so a fresh score in the real on-disk
+// database can't leak in and flip the blend weights.
+beforeEach(() => {
+  vi.spyOn(db, 'getLatestAiScore').mockReturnValue(null);
+});
 
 function makeTask(overrides = {}) {
   return {

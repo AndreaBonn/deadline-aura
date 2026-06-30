@@ -10,6 +10,7 @@ vi.spyOn(os, 'homedir').mockReturnValue(
 
 const db = require('../../store/db');
 const gcal = require('../../integrations/google-calendar');
+const gtasks = require('../../integrations/google-tasks');
 const jira = require('../../integrations/jira');
 const aiScorer = require('../../ai/ai-scorer');
 const { sync, computeEventsHash } = require('../../core/sync-daemon');
@@ -39,6 +40,9 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Google Tasks is an always-on source: isolate it so the real integration
+  // (and the on-disk .env credentials) never runs during these tests.
+  vi.spyOn(gtasks, 'fetchTasks').mockResolvedValue([]);
   db.getDb().prepare('DELETE FROM tasks').run();
   db.getDb().prepare('DELETE FROM ai_cache').run();
   db.getDb().prepare('DELETE FROM scores').run();
