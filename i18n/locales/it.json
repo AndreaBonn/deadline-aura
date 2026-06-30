@@ -26,6 +26,12 @@
     "ongoing": "in corso",
     "ended": "terminato"
   },
+  "flyby": {
+    "in_minute": "tra {n} minuto",
+    "in_minutes": "tra {n} minuti",
+    "in_second": "tra {n} secondo",
+    "in_seconds": "tra {n} secondi"
+  },
   "sidebar": {
     "no_tasks": "Nessun task in arrivo",
     "google_calendar": "Google Calendar",

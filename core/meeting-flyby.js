@@ -1,13 +1,14 @@
 'use strict';
 
 const path = require('path');
+const i18n = require('../i18n');
 
-const FLYBY_WINDOW_WIDTH = 560;
-const FLYBY_WINDOW_HEIGHT = 90;
-const ANIMATION_TICK_MS = 33;
+const FLYBY_WINDOW_HEIGHT = 200;
+const CAT_BAND_RATIO = 0.32;
 const COOLDOWN_MS = 5 * 60 * 1000;
 const TRIGGER_WINDOW_MS = 15 * 1000;
 const STAGGER_DELAY_MS = 2500;
+const CHOREOGRAPHY_MS = 9000;
 const cooldownMap = new Map();
 const activeFlybys = new Map();
 let initialized = false;
@@ -33,6 +34,45 @@ function findTriggeredMeetings(events, triggerSeconds) {
   });
 }
 
+/**
+ * Build the localized "in N minutes/seconds" phrase, with singular/plural.
+ *
+ * @param {number} secondsLeft - Seconds until the meeting starts.
+ * @param {(key: string, params?: object) => string} t - Translation function.
+ * @returns {string} Localized remaining-time phrase.
+ */
+function formatRemaining(secondsLeft, t) {
+  const s = Math.max(0, Math.round(secondsLeft));
+  if (s >= 60) {
+    const m = Math.round(s / 60);
+    return t(m === 1 ? 'flyby.in_minute' : 'flyby.in_minutes', { n: m });
+  }
+  return t(s === 1 ? 'flyby.in_second' : 'flyby.in_seconds', { n: s });
+}
+
+/**
+ * Compose the banner text shown by the flyby: "{title} {remaining phrase}".
+ *
+ * @param {string} title - Meeting title.
+ * @param {number} secondsLeft - Seconds until the meeting starts.
+ * @param {(key: string, params?: object) => string} t - Translation function.
+ * @returns {string} Full banner text.
+ */
+function formatLeadText(title, secondsLeft, t) {
+  return `${title} ${formatRemaining(secondsLeft, t)}`;
+}
+
+function closeFlyby(win) {
+  const state = activeFlybys.get(win);
+  if (state?.safetyTimer) {
+    clearTimeout(state.safetyTimer);
+  }
+  activeFlybys.delete(win);
+  if (win && !win.isDestroyed()) {
+    win.close();
+  }
+}
+
 function init() {
   if (initialized) {
     return;
@@ -41,41 +81,38 @@ function init() {
 
   const { BrowserWindow, ipcMain } = require('electron');
 
-  ipcMain.on('flyby:clicked', (event) => {
+  // Renderer drives the whole animation; it tells us when it's done (or the
+  // user clicked the cat, which makes it run off-screen).
+  ipcMain.on('flyby:done', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win || win.isDestroyed()) {
-      return;
-    }
-    const state = activeFlybys.get(win);
-    if (state?.interval) {
-      clearInterval(state.interval);
-      state.interval = null;
+    if (win) {
+      closeFlyby(win);
     }
   });
 
-  ipcMain.on('flyby:dismiss', (event) => {
+  // The window is click-through by default; the renderer flips this only while
+  // the pointer is over the cat, so the cat stays clickable without blocking
+  // the rest of the desktop.
+  ipcMain.on('flyby:set-ignore', (event, ignore) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (!win || win.isDestroyed()) {
       return;
     }
-    const state = activeFlybys.get(win);
-    if (state?.interval) {
-      clearInterval(state.interval);
-    }
-    activeFlybys.delete(win);
-    win.close();
+    win.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
   });
 }
 
 function launchFlyby({ meeting, display, durationSeconds }) {
   const { BrowserWindow } = require('electron');
   const { bounds } = display;
-  const yPosition = Math.round(bounds.y + bounds.height * 0.35);
+  const yPosition = Math.round(bounds.y + bounds.height * CAT_BAND_RATIO);
+  const secondsLeft = (meeting.start_at - Date.now()) / 1000;
+  const text = formatLeadText(meeting.title || 'Meeting', secondsLeft, i18n.t);
 
   const win = new BrowserWindow({
-    width: FLYBY_WINDOW_WIDTH,
+    width: bounds.width,
     height: FLYBY_WINDOW_HEIGHT,
-    x: bounds.x - FLYBY_WINDOW_WIDTH,
+    x: bounds.x,
     y: yPosition,
     show: false,
     frame: false,
@@ -92,64 +129,25 @@ function launchFlyby({ meeting, display, durationSeconds }) {
     },
   });
 
+  win.setIgnoreMouseEvents(true, { forward: true });
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'flyby.html'));
 
-  const totalDistance = bounds.width + FLYBY_WINDOW_WIDTH * 2;
-  const totalTicks = Math.round((durationSeconds * 1000) / ANIMATION_TICK_MS);
-  const pxPerTick = totalDistance / totalTicks;
-  const startX = bounds.x - FLYBY_WINDOW_WIDTH;
-  const endX = bounds.x + bounds.width;
-  let tickCount = 0;
-
-  const state = { interval: null };
+  const state = { safetyTimer: null };
   activeFlybys.set(win, state);
 
   win.webContents.once('did-finish-load', () => {
-    const title = meeting.title || 'Meeting';
-    win.webContents.send('flyby-init', { title });
+    win.webContents.send('flyby-init', { text, holdSeconds: durationSeconds });
     win.showInactive();
 
-    state.interval = setInterval(() => {
-      if (win.isDestroyed()) {
-        clearInterval(state.interval);
-        activeFlybys.delete(win);
-        return;
-      }
-
-      if (meeting.start_at && Date.now() >= meeting.start_at) {
-        clearInterval(state.interval);
-        activeFlybys.delete(win);
-        win.close();
-        return;
-      }
-
-      tickCount++;
-      const currentX = Math.round(startX + pxPerTick * tickCount);
-
-      if (currentX > endX) {
-        tickCount = 0;
-        try {
-          win.setPosition(startX, yPosition);
-        } catch {
-          clearInterval(state.interval);
-          activeFlybys.delete(win);
-        }
-        return;
-      }
-
-      try {
-        win.setPosition(currentX, yPosition);
-      } catch {
-        clearInterval(state.interval);
-        activeFlybys.delete(win);
-      }
-    }, ANIMATION_TICK_MS);
+    // Safety net: if the renderer never signals completion, close anyway.
+    const lifetimeMs = CHOREOGRAPHY_MS + durationSeconds * 1000 + 2000;
+    state.safetyTimer = setTimeout(() => closeFlyby(win), lifetimeMs);
   });
 
   win.on('closed', () => {
-    if (state.interval) {
-      clearInterval(state.interval);
+    if (state.safetyTimer) {
+      clearTimeout(state.safetyTimer);
     }
     activeFlybys.delete(win);
   });
@@ -184,8 +182,8 @@ function checkAndLaunch({ config, db, screen }) {
 
 function destroyAll() {
   for (const [win, state] of activeFlybys) {
-    if (state.interval) {
-      clearInterval(state.interval);
+    if (state.safetyTimer) {
+      clearTimeout(state.safetyTimer);
     }
     if (win && !win.isDestroyed()) {
       win.close();
@@ -201,6 +199,8 @@ module.exports = {
   _testing: {
     findTriggeredMeetings,
     cleanupCooldowns,
+    formatRemaining,
+    formatLeadText,
     cooldownMap,
     COOLDOWN_MS,
     TRIGGER_WINDOW_MS,

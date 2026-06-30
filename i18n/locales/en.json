@@ -26,6 +26,12 @@
     "ongoing": "ongoing",
     "ended": "ended"
   },
+  "flyby": {
+    "in_minute": "in {n} minute",
+    "in_minutes": "in {n} minutes",
+    "in_second": "in {n} second",
+    "in_seconds": "in {n} seconds"
+  },
   "sidebar": {
     "no_tasks": "No upcoming tasks",
     "google_calendar": "Google Calendar",

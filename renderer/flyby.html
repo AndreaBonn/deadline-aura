@@ -4,29 +4,33 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
     />
     <link rel="stylesheet" href="flyby.css" />
   </head>
   <body>
-    <div id="flyby">
-      <div id="banner">
-        <span id="bannerText"></span>
-      </div>
-      <div id="rope"></div>
-      <div id="pigeon">
-        <svg viewBox="0 0 80 40" xmlns="http://www.w3.org/2000/svg">
-          <path d="M58 24L80 14L77 24L80 34Z" fill="#64748b" />
-          <ellipse cx="40" cy="25" rx="24" ry="12" fill="#94a3b8" />
-          <ellipse cx="22" cy="20" rx="6" ry="4" fill="#818cf8" opacity="0.8" />
-          <circle cx="18" cy="16" r="8" fill="#cbd5e1" />
-          <path d="M11 14L2 17L11 20Z" fill="#f59e0b" />
-          <circle cx="16" cy="14" r="1.3" fill="#1e293b" />
-          <path class="wing" d="M30 22Q42 4 60 16Q46 24 30 22Z" fill="#64748b" />
+    <div id="stage">
+      <div id="catWrap"><div id="cat"></div></div>
+      <div id="thread"></div>
+      <div id="nameMask"><div id="nameText"></div></div>
+      <div id="yarn">
+        <svg viewBox="0 0 26 26">
+          <circle cx="13" cy="13" r="12" fill="#ef4444" />
+          <path
+            d="M3 9 Q13 3 23 11 M2 14 Q13 8 24 16 M5 20 Q13 15 21 21"
+            stroke="#b91c1c"
+            stroke-width="1.6"
+            fill="none"
+          />
+          <path
+            d="M9 3 Q17 8 14 18 M18 4 Q21 13 12 23"
+            stroke="#fca5a5"
+            stroke-width="1.3"
+            fill="none"
+          />
         </svg>
       </div>
     </div>
-    <div id="explosion"></div>
     <script src="flyby.js"></script>
   </body>
 </html>

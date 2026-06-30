@@ -5,9 +5,21 @@ vi.mock('electron', () => ({
   ipcMain: { on: vi.fn(), removeListener: vi.fn() },
 }));
 
+const i18n = require('../../i18n');
 const { _testing } = require('../../core/meeting-flyby');
-const { findTriggeredMeetings, cleanupCooldowns, cooldownMap, COOLDOWN_MS, TRIGGER_WINDOW_MS } =
-  _testing;
+const {
+  findTriggeredMeetings,
+  cleanupCooldowns,
+  formatRemaining,
+  formatLeadText,
+  cooldownMap,
+  COOLDOWN_MS,
+  TRIGGER_WINDOW_MS,
+} = _testing;
+
+// Fake translator: echoes key + interpolated count, so tests assert the
+// key-selection logic (singular/plural, minutes/seconds) independent of locale.
+const fakeT = (key, params) => `${key}:${params.n}`;
 
 beforeEach(() => {
   cooldownMap.clear();
@@ -127,5 +139,48 @@ describe('cleanupCooldowns', () => {
   it('handles empty cooldown map', () => {
     expect(() => cleanupCooldowns()).not.toThrow();
     expect(cooldownMap.size).toBe(0);
+  });
+});
+
+describe('formatRemaining', () => {
+  it('uses singular minute key for exactly one minute', () => {
+    expect(formatRemaining(60, fakeT)).toBe('flyby.in_minute:1');
+  });
+
+  it('uses plural minutes key for several minutes', () => {
+    expect(formatRemaining(120, fakeT)).toBe('flyby.in_minutes:2');
+  });
+
+  it('rounds fractional seconds to the nearest minute', () => {
+    expect(formatRemaining(90.4, fakeT)).toBe('flyby.in_minutes:2');
+  });
+
+  it('uses plural seconds key below one minute', () => {
+    expect(formatRemaining(59, fakeT)).toBe('flyby.in_seconds:59');
+  });
+
+  it('uses singular second key for exactly one second', () => {
+    expect(formatRemaining(1, fakeT)).toBe('flyby.in_second:1');
+  });
+
+  it('clamps negative values to zero seconds', () => {
+    expect(formatRemaining(-5, fakeT)).toBe('flyby.in_seconds:0');
+  });
+});
+
+describe('formatLeadText', () => {
+  it('joins title and remaining phrase', () => {
+    expect(formatLeadText('Standup', 60, fakeT)).toBe('Standup flyby.in_minute:1');
+  });
+
+  it('resolves real Italian copy with correct singular', () => {
+    i18n.setLanguage('it');
+    expect(formatLeadText('Standup del team', 60, i18n.t)).toBe('Standup del team tra 1 minuto');
+  });
+
+  it('resolves real English copy with correct plural', () => {
+    i18n.setLanguage('en');
+    expect(formatLeadText('Daily sync', 120, i18n.t)).toBe('Daily sync in 2 minutes');
+    i18n.setLanguage('it');
   });
 });
