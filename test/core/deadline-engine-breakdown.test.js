@@ -106,6 +106,14 @@ describe('computeGlobalScore breakdown', () => {
     expect(result.breakdown.blend.mechanical_weight).toBe(1);
   });
 
+  it('reports mechanical-only blend (no AI) when there are no tasks', () => {
+    const result = computeGlobalScore([]);
+    expect(result.global_score).toBe(0);
+    expect(result.breakdown.ai).toBeNull();
+    expect(result.breakdown.blend.ai_weight).toBe(0);
+    expect(result.breakdown.blend.mechanical_weight).toBe(1);
+  });
+
   it('exposes AI blend weights when AI score is fresh', () => {
     const tasks = [makeTask()];
     const aiScore = { global_stress: 7, computed_at: Date.now() };

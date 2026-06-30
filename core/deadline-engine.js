@@ -203,7 +203,7 @@ function computeGlobalScore(tasks, options = {}) {
         global_score: 0,
         ai: null,
         mechanical: describeMechanicalScore([], priorityWeights),
-        blend: { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT },
+        blend: { ai_weight: 0, mechanical_weight: 1 },
         top_drivers: [],
         computed_at: computedAt,
       },
