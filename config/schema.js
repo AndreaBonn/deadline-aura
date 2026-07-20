@@ -105,6 +105,7 @@ const configSchema = z.object({
       enabled: z.boolean(),
       trigger_seconds: z.number().int().min(10).max(300),
       duration_seconds: z.number().int().min(3).max(20),
+      snoozed_until: z.number().int().positive().nullable().optional(),
     })
     .optional(),
   ui: z.object({

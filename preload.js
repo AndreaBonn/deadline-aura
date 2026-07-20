@@ -26,5 +26,7 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   getDefaultLogCalendar: () => ipcRenderer.invoke('calendar:get-default'),
   setDefaultLogCalendar: (calendarId) => ipcRenderer.invoke('calendar:set-default', calendarId),
   getWorkShiftConfig: () => ipcRenderer.invoke('config:get-work-shift'),
+  getFlybyState: () => ipcRenderer.invoke('flyby:get-state'),
+  setFlybyState: (action) => ipcRenderer.invoke('flyby:set-state', action),
   onConfigChanged: (callback) => ipcRenderer.on('config-changed', (_event, cfg) => callback(cfg)),
 });

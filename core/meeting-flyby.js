@@ -2,6 +2,7 @@
 
 const path = require('path');
 const i18n = require('../i18n');
+const { isFlybySuppressed } = require('./flyby-snooze');
 
 const FLYBY_WINDOW_HEIGHT = 200;
 const CAT_BAND_RATIO = 0.32;
@@ -154,7 +155,15 @@ function launchFlyby({ meeting, display, durationSeconds }) {
 }
 
 function checkAndLaunch({ config, db, screen }) {
-  if (!config.meeting_flyby?.enabled) {
+  const flyby = config.meeting_flyby;
+  if (
+    !flyby ||
+    isFlybySuppressed({
+      enabled: flyby.enabled,
+      snoozed_until: flyby.snoozed_until,
+      now: Date.now(),
+    })
+  ) {
     return;
   }
 

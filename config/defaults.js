@@ -75,6 +75,7 @@ const DEFAULTS = {
     enabled: true,
     trigger_seconds: 60,
     duration_seconds: 20,
+    snoozed_until: null,
   },
   ui: {
     max_tasks_shown: 8,

@@ -165,6 +165,44 @@ function stopTimer() {
   }
 }
 
+// Latest known flyby state, kept in sync via getFlybyState / onConfigChanged.
+let _flybyState = { enabled: true, snoozed_until: null };
+
+/**
+ * Whether the flyby is suppressed right now. Mirrors the canonical rule in
+ * core/flyby-snooze.js isFlybySuppressed(); the renderer sandbox (no require,
+ * CSP script-src 'self') cannot share that module, so the two-term predicate is
+ * duplicated here. Keep both in sync if the rule changes.
+ *
+ * @param {{enabled: boolean, snoozed_until: number|null}} state - Flyby state.
+ * @param {number} now - Current epoch ms.
+ * @returns {boolean} True when the flyby should not launch.
+ */
+function isFlybySuppressed(state, now) {
+  if (!state.enabled) {
+    return true;
+  }
+  return typeof state.snoozed_until === 'number' && now < state.snoozed_until;
+}
+
+/**
+ * Reflect the flyby state on the cat button: crossed out (is-snoozed) when the
+ * flyby is suppressed (disabled or snoozed), normal otherwise. Recomputed every
+ * clock tick so an expired snooze clears the slash without waiting for a config
+ * broadcast.
+ */
+function applyFlybyIcon() {
+  const toggle = document.getElementById('flybyToggle');
+  if (!toggle) {
+    return;
+  }
+  const suppressed = isFlybySuppressed(_flybyState, Date.now());
+  toggle.classList.toggle('is-snoozed', suppressed);
+  if (_i18nReady) {
+    toggle.setAttribute('aria-label', t(suppressed ? 'flyby_menu.suspended' : 'flyby_menu.active'));
+  }
+}
+
 function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
@@ -176,6 +214,7 @@ function updateClock() {
   const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
   document.getElementById('clockDate').textContent = now.toLocaleDateString(locale, options);
   updateShiftCountdown();
+  applyFlybyIcon();
 }
 
 function renderUrgencyBar(globalScore, palette) {
@@ -1226,6 +1265,69 @@ document.getElementById('btnClose').addEventListener('click', function () {
   window.deadlineAura.toggleSidebar();
 });
 
+// Cat button: opens a small menu to snooze/disable/reactivate the meeting flyby.
+(function initFlybyToggle() {
+  const toggle = document.getElementById('flybyToggle');
+  const menu = document.getElementById('flybyMenu');
+  if (!toggle || !menu) {
+    return;
+  }
+
+  function closeMenu() {
+    menu.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+  }
+
+  function openMenu() {
+    menu.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (menu.hidden) {
+      openMenu();
+    } else {
+      closeMenu();
+    }
+  });
+
+  menu.querySelectorAll('.flyby-menu-item').forEach(function (item) {
+    item.addEventListener('click', async function (e) {
+      e.stopPropagation();
+      const action = item.dataset.action;
+      const res = await window.deadlineAura.setFlybyState(action);
+      if (res && res.ok && res.state) {
+        _flybyState = res.state;
+        applyFlybyIcon();
+      } else {
+        console.error('flyby:set-state failed for action', action, res && res.error);
+      }
+      closeMenu();
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!menu.hidden && !menu.contains(e.target) && !toggle.contains(e.target)) {
+      closeMenu();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !menu.hidden) {
+      closeMenu();
+      toggle.focus();
+    }
+  });
+
+  window.deadlineAura.getFlybyState().then(function (state) {
+    if (state) {
+      _flybyState = state;
+      applyFlybyIcon();
+    }
+  });
+})();
+
 function renderClinicalNote(note) {
   const el = document.getElementById('clinicalNote');
   if (!el) {
@@ -1490,6 +1592,13 @@ window.deadlineAura.getWorkShiftConfig().then((cfg) => {
 window.deadlineAura.onConfigChanged((cfg) => {
   setShiftConfig(cfg.work_shift || null);
   updateShiftCountdown();
+  if (cfg.meeting_flyby) {
+    _flybyState = {
+      enabled: cfg.meeting_flyby.enabled !== false,
+      snoozed_until: cfg.meeting_flyby.snoozed_until ?? null,
+    };
+    applyFlybyIcon();
+  }
 });
 
 window.deadlineAura.onUpdate(function (data) {

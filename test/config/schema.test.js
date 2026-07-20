@@ -87,4 +87,44 @@ describe('config schema', () => {
     };
     expect(() => validateConfig(invalid)).toThrow();
   });
+
+  it('accepts a numeric meeting_flyby.snoozed_until', () => {
+    const valid = {
+      ...DEFAULTS,
+      meeting_flyby: { ...DEFAULTS.meeting_flyby, snoozed_until: 1_700_000_000_000 },
+    };
+    expect(() => validateConfig(valid)).not.toThrow();
+  });
+
+  it('accepts a null meeting_flyby.snoozed_until', () => {
+    const valid = {
+      ...DEFAULTS,
+      meeting_flyby: { ...DEFAULTS.meeting_flyby, snoozed_until: null },
+    };
+    expect(() => validateConfig(valid)).not.toThrow();
+  });
+
+  it('accepts legacy meeting_flyby without snoozed_until', () => {
+    const legacy = {
+      ...DEFAULTS,
+      meeting_flyby: { enabled: true, trigger_seconds: 60, duration_seconds: 20 },
+    };
+    expect(() => validateConfig(legacy)).not.toThrow();
+  });
+
+  it('rejects a non-positive meeting_flyby.snoozed_until', () => {
+    const invalid = {
+      ...DEFAULTS,
+      meeting_flyby: { ...DEFAULTS.meeting_flyby, snoozed_until: 0 },
+    };
+    expect(() => validateConfig(invalid)).toThrow();
+  });
+
+  it('rejects a non-integer meeting_flyby.snoozed_until', () => {
+    const invalid = {
+      ...DEFAULTS,
+      meeting_flyby: { ...DEFAULTS.meeting_flyby, snoozed_until: 12.5 },
+    };
+    expect(() => validateConfig(invalid)).toThrow();
+  });
 });

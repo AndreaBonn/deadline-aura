@@ -32,6 +32,7 @@ const burnoutDetector = require('./core/burnout-detector');
 const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
+const { applyFlybyAction } = require('./core/flyby-snooze');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { DEFAULTS } = require('./config/defaults');
@@ -776,6 +777,32 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
+
+  function readFlybyState() {
+    return {
+      enabled: config.meeting_flyby?.enabled !== false,
+      snoozed_until: config.meeting_flyby?.snoozed_until ?? null,
+    };
+  }
+
+  ipcMain.handle('flyby:get-state', () => readFlybyState());
+
+  ipcMain.handle('flyby:set-state', (_event, action) => {
+    const next = applyFlybyAction(config, action, Date.now());
+    if (!next) {
+      return { ok: false, error: 'INVALID_ACTION' };
+    }
+    const result = configSchema.safeParse(next);
+    if (!result.success) {
+      return { ok: false, error: 'VALIDATION_ERROR' };
+    }
+    saveConfig(result.data);
+    config = loadConfig();
+    if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+      sidebarWindow.webContents.send('config-changed', config);
+    }
+    return { ok: true, state: readFlybyState() };
+  });
   ipcMain.handle('settings:get-config', () => maskConfigForRenderer(config));
   ipcMain.handle('settings:get-defaults', () => DEFAULTS);
   ipcMain.handle('settings:save-config', (_event, newConfig) => {

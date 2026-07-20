@@ -22,8 +22,134 @@ body {
 }
 
 .clock-section {
+  position: relative;
   padding: 24px 20px 16px;
   text-align: center;
+}
+
+/* --- Meeting flyby toggle (cat) --- */
+
+.flyby-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    color 0.2s,
+    background 0.15s;
+}
+
+.flyby-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.flyby-toggle:focus-visible {
+  outline: 2px solid rgba(137, 180, 250, 0.6);
+  outline-offset: 1px;
+}
+
+.flyby-cat-body {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.flyby-cat-eye {
+  fill: currentColor;
+  stroke: none;
+}
+
+.flyby-cat-slash {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+}
+
+.flyby-toggle.is-snoozed {
+  color: rgba(255, 255, 255, 0.28);
+}
+
+.flyby-toggle.is-snoozed .flyby-cat-body,
+.flyby-toggle.is-snoozed .flyby-cat-eye {
+  opacity: 0.4;
+}
+
+.flyby-toggle.is-snoozed .flyby-cat-slash {
+  opacity: 1;
+  stroke: rgba(239, 68, 68, 0.85);
+}
+
+.flyby-menu {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  z-index: 100;
+  min-width: 132px;
+  padding: 4px;
+  background: rgba(24, 24, 32, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.flyby-menu[hidden] {
+  display: none;
+}
+
+.flyby-menu-item {
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.flyby-menu-item:hover {
+  background: rgba(137, 180, 250, 0.16);
+  color: #cdd6f4;
+}
+
+.flyby-menu-item:focus-visible {
+  background: rgba(137, 180, 250, 0.16);
+  color: #cdd6f4;
+  outline: 2px solid rgba(137, 180, 250, 0.7);
+  outline-offset: -2px;
+}
+
+.flyby-menu-item--reactivate {
+  margin-top: 3px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(166, 227, 161, 0.85);
+}
+
+.flyby-menu-item--reactivate:hover,
+.flyby-menu-item--reactivate:focus-visible {
+  background: rgba(166, 227, 161, 0.16);
+  color: #a6e3a1;
 }
 
 .clock-time {

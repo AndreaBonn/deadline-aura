@@ -12,6 +12,73 @@
   <body>
     <div class="sidebar">
       <div class="clock-section">
+        <button
+          class="flyby-toggle"
+          id="flybyToggle"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          data-i18n-title="flyby_menu.button_title"
+          title="Avvisi call"
+          aria-label="Avvisi call"
+        >
+          <svg class="flyby-cat" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              class="flyby-cat-body"
+              d="M3.2 4.2l3.3 3.5a8 6.5 0 0 1 11 0l3.3-3.5-.8 6.4a7 6 0 0 1-1 2.7 7 6 0 0 1-12.9 0 7 6 0 0 1-1-2.7z"
+            />
+            <circle class="flyby-cat-eye" cx="9.4" cy="10.6" r="1" />
+            <circle class="flyby-cat-eye" cx="14.6" cy="10.6" r="1" />
+            <line class="flyby-cat-slash" x1="3.6" y1="3.4" x2="20.4" y2="20.6" />
+          </svg>
+        </button>
+        <div class="flyby-menu" id="flybyMenu" role="menu" hidden>
+          <button
+            class="flyby-menu-item"
+            type="button"
+            role="menuitem"
+            data-action="snooze-1h"
+            data-i18n="flyby_menu.snooze_1h"
+          >
+            Sospendi 1h
+          </button>
+          <button
+            class="flyby-menu-item"
+            type="button"
+            role="menuitem"
+            data-action="snooze-3h"
+            data-i18n="flyby_menu.snooze_3h"
+          >
+            Sospendi 3h
+          </button>
+          <button
+            class="flyby-menu-item"
+            type="button"
+            role="menuitem"
+            data-action="snooze-24h"
+            data-i18n="flyby_menu.snooze_24h"
+          >
+            Sospendi 24h
+          </button>
+          <button
+            class="flyby-menu-item"
+            type="button"
+            role="menuitem"
+            data-action="disable"
+            data-i18n="flyby_menu.disable"
+          >
+            Per sempre
+          </button>
+          <button
+            class="flyby-menu-item flyby-menu-item--reactivate"
+            type="button"
+            role="menuitem"
+            data-action="reactivate"
+            data-i18n="flyby_menu.reactivate"
+          >
+            Riattiva
+          </button>
+        </div>
         <div class="clock-time" id="clock">--:--</div>
         <div class="clock-date" id="clockDate"></div>
       </div>

@@ -32,6 +32,16 @@
     "in_second": "tra {n} secondo",
     "in_seconds": "tra {n} secondi"
   },
+  "flyby_menu": {
+    "button_title": "Avvisi call (gatto)",
+    "snooze_1h": "Sospendi 1h",
+    "snooze_3h": "Sospendi 3h",
+    "snooze_24h": "Sospendi 24h",
+    "disable": "Per sempre",
+    "reactivate": "Riattiva",
+    "active": "Avvisi call attivi",
+    "suspended": "Avvisi call sospesi"
+  },
   "sidebar": {
     "no_tasks": "Nessun task in arrivo",
     "google_calendar": "Google Calendar",

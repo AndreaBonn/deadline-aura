@@ -32,6 +32,16 @@
     "in_second": "in {n} second",
     "in_seconds": "in {n} seconds"
   },
+  "flyby_menu": {
+    "button_title": "Call alerts (cat)",
+    "snooze_1h": "Snooze 1h",
+    "snooze_3h": "Snooze 3h",
+    "snooze_24h": "Snooze 24h",
+    "disable": "Forever",
+    "reactivate": "Reactivate",
+    "active": "Call alerts on",
+    "suspended": "Call alerts suspended"
+  },
   "sidebar": {
     "no_tasks": "No upcoming tasks",
     "google_calendar": "Google Calendar",
