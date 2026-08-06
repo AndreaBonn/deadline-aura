@@ -154,6 +154,40 @@ function renderSorgenti() {
     ),
   );
 
+  if (!config.sources.outlook) {
+    config.sources.outlook = { enabled: false, ics_url: '', priority_keywords: [] };
+  }
+  const outlook = createFieldGroup(t('sidebar.outlook'));
+  outlook.append(
+    createField(
+      t('common.enabled'),
+      createToggle(config.sources.outlook.enabled, (v) => {
+        config.sources.outlook.enabled = v;
+      }),
+    ),
+    createField(
+      t('settings.outlook_ics_url'),
+      createSecretInput(
+        config.sources.outlook.ics_url || '',
+        { placeholder: t('settings.outlook_ics_url_placeholder') },
+        (v) => {
+          config.sources.outlook.ics_url = v;
+        },
+      ),
+      t('settings.outlook_ics_url_hint'),
+    ),
+    createField(
+      t('settings.priority_keywords'),
+      createTagInput(
+        config.sources.outlook.priority_keywords,
+        { placeholder: t('settings.keyword_placeholder') },
+        (v) => {
+          config.sources.outlook.priority_keywords = v;
+        },
+      ),
+    ),
+  );
+
   const jira = createFieldGroup(t('sidebar.jira'));
   jira.append(
     createField(
@@ -228,7 +262,7 @@ function renderSorgenti() {
   });
   jira.appendChild(addBtn);
 
-  return [gcal, jira];
+  return [gcal, outlook, jira];
 }
 
 function renderAI() {

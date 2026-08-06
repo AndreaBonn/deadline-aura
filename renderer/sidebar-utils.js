@@ -79,8 +79,12 @@ function formatElapsed(startIso) {
  * @param {number} now - Current timestamp in ms.
  * @returns {{ status: string, label: string }} status ('ongoing'|'ended'|'future'|'default') and display label.
  */
+// Kept in sync with CALENDAR_SOURCES in core/calendar-sources.js: this file is
+// loaded as a plain browser script, so it cannot require the shared module.
+const CALENDAR_SOURCES = ['gcal', 'outlook'];
+
 function getEventStatus(task, now) {
-  if (task.source === 'gcal' && task.start_at && task.due_at) {
+  if (CALENDAR_SOURCES.includes(task.source) && task.start_at && task.due_at) {
     if (now >= task.start_at && now < task.due_at) {
       const endDate = new Date(task.due_at);
       const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

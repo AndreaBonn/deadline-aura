@@ -46,6 +46,7 @@
     "no_tasks": "Nessun task in arrivo",
     "google_calendar": "Google Calendar",
     "google_tasks": "Google Tasks",
+    "outlook": "Outlook",
     "jira": "Jira",
     "local": "Personali",
     "new_task": "Nuovo task",
@@ -209,6 +210,9 @@
     "google_client_secret": "Google Client Secret",
     "google_client_id_placeholder": "xxxx.apps.googleusercontent.com",
     "google_oauth_hint": "Credenziali OAuth da Google Cloud Console. Se vuote, usa le variabili d'ambiente.",
+    "outlook_ics_url": "URL del feed ICS",
+    "outlook_ics_url_placeholder": "https://outlook.office365.com/owa/calendar/.../calendar.ics",
+    "outlook_ics_url_hint": "In Outlook web: Impostazioni, Calendario, Calendari condivisi, Pubblica un calendario, con permesso \"Tutti i dettagli\". Tratta il link come una password: chi lo ha legge il calendario. Microsoft aggiorna il feed ogni poche ore, quindi le modifiche dell'ultimo minuto arrivano in ritardo.",
     "meeting_dock_group": "Dock riunioni",
     "meeting_dock_lookahead": "Anticipo (minuti)",
     "meeting_dock_lookahead_hint": "Mostra riunioni nei prossimi N minuti"

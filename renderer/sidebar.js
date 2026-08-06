@@ -280,6 +280,13 @@ function renderTaskList(tasks, palette) {
     .sort(function (a, b) {
       return (a.due_at || 0) - (b.due_at || 0);
     });
+  const outlookTasks = tasks
+    .filter(function (task) {
+      return task.source === 'outlook';
+    })
+    .sort(function (a, b) {
+      return (a.due_at || 0) - (b.due_at || 0);
+    });
   const jiraTasks = filterJiraTasks(
     tasks.filter(function (task) {
       return task.source === 'jira';
@@ -303,6 +310,9 @@ function renderTaskList(tasks, palette) {
   }
   if (gcalTasks.length > 0) {
     renderSection(container, t('sidebar.google_calendar'), gcalTasks, palette, 'gcal');
+  }
+  if (outlookTasks.length > 0) {
+    renderSection(container, t('sidebar.outlook'), outlookTasks, palette, 'outlook');
   }
   if (favoriteTasks.length > 0) {
     renderSection(container, t('sidebar.jira_favorites'), favoriteTasks, palette, 'jira_favorites');
@@ -1346,6 +1356,7 @@ const SOURCE_LABEL_KEYS = {
   gtasks: 'sidebar.google_tasks',
   jira: 'sidebar.jira',
   local: 'sidebar.local',
+  outlook: 'sidebar.outlook',
 };
 
 function formatHoursRemaining(hours) {
