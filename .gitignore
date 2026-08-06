@@ -53,10 +53,12 @@ Thumbs.db
 .claude/
 CLAUDE.md
 
-# Docs (session reports, local decisions — keep ARCHITECTURE tracked)
+# Docs (session reports, local decisions; published docs stay tracked)
 docs/*
 !docs/ARCHITECTURE.md
 !docs/ARCHITECTURE.it.md
+!docs/USER-GUIDE.md
+!docs/USER-GUIDE.it.md
 
 # Test coverage
 coverage/
