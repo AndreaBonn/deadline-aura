@@ -125,4 +125,36 @@ describe('secret-masking — google oauth', () => {
 
     expect(incoming.sources.google_calendar.oauth.client_secret).toBe('new');
   });
+
+  describe('outlook feed url', () => {
+    it('masks a configured feed url', () => {
+      const cfg = { sources: { outlook: { ics_url: 'https://outlook.office365.com/x/cal.ics' } } };
+
+      expect(maskConfigForRenderer(cfg).sources.outlook.ics_url).toBe(TOKEN_MASK);
+    });
+
+    it('leaves an unconfigured feed url empty', () => {
+      const cfg = { sources: { outlook: { ics_url: '' } } };
+
+      expect(maskConfigForRenderer(cfg).sources.outlook.ics_url).toBe('');
+    });
+
+    it('restores the real feed url when the field comes back masked', () => {
+      const original = { sources: { outlook: { ics_url: 'https://real.example/cal.ics' } } };
+      const incoming = { sources: { outlook: { ics_url: TOKEN_MASK } } };
+
+      restoreTokens(incoming, original);
+
+      expect(incoming.sources.outlook.ics_url).toBe('https://real.example/cal.ics');
+    });
+
+    it('keeps a newly pasted feed url instead of restoring the old one', () => {
+      const original = { sources: { outlook: { ics_url: 'https://old.example/cal.ics' } } };
+      const incoming = { sources: { outlook: { ics_url: 'https://new.example/cal.ics' } } };
+
+      restoreTokens(incoming, original);
+
+      expect(incoming.sources.outlook.ics_url).toBe('https://new.example/cal.ics');
+    });
+  });
 });

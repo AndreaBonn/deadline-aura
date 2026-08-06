@@ -38,6 +38,13 @@ function maskConfigForRenderer(cfg) {
     googleOauth.client_secret = TOKEN_MASK;
   }
 
+  // The published feed url is the credential: whoever holds it reads the whole
+  // calendar without authenticating, so it is masked like any other secret.
+  const outlook = masked.sources?.outlook;
+  if (outlook && outlook.ics_url) {
+    outlook.ics_url = TOKEN_MASK;
+  }
+
   return masked;
 }
 
@@ -73,6 +80,12 @@ function restoreTokens(newConfig, originalConfig) {
   const origOauth = originalConfig.sources?.google_calendar?.oauth;
   if (newOauth && origOauth && newOauth.client_secret === TOKEN_MASK && origOauth.client_secret) {
     newOauth.client_secret = origOauth.client_secret;
+  }
+
+  const newOutlook = newConfig.sources?.outlook;
+  const origOutlook = originalConfig.sources?.outlook;
+  if (newOutlook && origOutlook && newOutlook.ics_url === TOKEN_MASK && origOutlook.ics_url) {
+    newOutlook.ics_url = origOutlook.ics_url;
   }
 }
 

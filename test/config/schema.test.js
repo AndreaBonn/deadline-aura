@@ -127,4 +127,42 @@ describe('config schema', () => {
     };
     expect(() => validateConfig(invalid)).toThrow();
   });
+
+  describe('outlook source', () => {
+    function withOutlook(outlook) {
+      return {
+        ...DEFAULTS,
+        sources: { ...DEFAULTS.sources, outlook: { ...DEFAULTS.sources.outlook, ...outlook } },
+      };
+    }
+
+    it('accepts an https feed url', () => {
+      expect(() =>
+        validateConfig(withOutlook({ ics_url: 'https://outlook.office365.com/x/cal.ics' })),
+      ).not.toThrow();
+    });
+
+    it('accepts the webcal scheme Outlook hands out', () => {
+      expect(() =>
+        validateConfig(withOutlook({ ics_url: 'webcal://outlook.office365.com/x/cal.ics' })),
+      ).not.toThrow();
+    });
+
+    it('accepts an empty feed url as not yet configured', () => {
+      expect(() => validateConfig(withOutlook({ ics_url: '' }))).not.toThrow();
+    });
+
+    it('rejects a plaintext feed url', () => {
+      expect(() =>
+        validateConfig(withOutlook({ ics_url: 'http://example.com/cal.ics' })),
+      ).toThrow();
+    });
+
+    it('loads a config written before the source existed', () => {
+      const legacy = { ...DEFAULTS, sources: { ...DEFAULTS.sources } };
+      delete legacy.sources.outlook;
+
+      expect(() => validateConfig(legacy)).not.toThrow();
+    });
+  });
 });

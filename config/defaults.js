@@ -15,6 +15,11 @@ const DEFAULTS = {
       default_log_calendar: '',
       google_account: '',
     },
+    outlook: {
+      enabled: false,
+      ics_url: '',
+      priority_keywords: ['urgent', 'deadline', 'release', 'deploy', 'critico'],
+    },
     jira: {
       enabled: true,
       instances: [],

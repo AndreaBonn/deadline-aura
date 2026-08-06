@@ -23,6 +23,19 @@ const configSchema = z.object({
         })
         .optional(),
     }),
+    // Feed ICS pubblicato da Outlook. Read-only e senza OAuth: l'unica
+    // credenziale è l'url stesso, che vale come segreto perché non autenticato.
+    // Optional perché le config scritte prima di questa source non lo hanno;
+    // il deepMerge con i default lo inietta al caricamento.
+    outlook: z
+      .object({
+        enabled: z.boolean(),
+        ics_url: z.string().refine((value) => value === '' || /^(https|webcal):\/\//i.test(value), {
+          message: 'ics_url must be an https or webcal url',
+        }),
+        priority_keywords: z.array(z.string()),
+      })
+      .optional(),
     jira: z.object({
       enabled: z.boolean(),
       instances: z
