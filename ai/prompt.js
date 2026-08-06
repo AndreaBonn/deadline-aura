@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const { isCalendarSource } = require('../core/calendar-sources');
 
 const MAX_TITLE_LENGTH = 150;
 const MAX_DESCRIPTION_LENGTH = 200;
@@ -84,7 +85,7 @@ function buildScoringPrompt(events, language = 'it') {
       }
     }
     const line = parts.join(' | ');
-    if (e.source === 'gcal') {
+    if (isCalendarSource(e.source)) {
       calendarEvents.push(line);
     } else {
       backlogTasks.push(line);

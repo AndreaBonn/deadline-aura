@@ -1,6 +1,7 @@
 'use strict';
 
 const { t } = require('../i18n');
+const { CALENDAR_SOURCES } = require('./calendar-sources');
 
 const POSTIT_WIDTH = 220;
 const POSTIT_HEIGHT = 100;
@@ -46,7 +47,11 @@ function formatCountdown(dueAt) {
 }
 
 function extractCode(taskId, title) {
-  if (taskId.startsWith('gcal_') || taskId.startsWith('gcal-')) {
+  if (
+    CALENDAR_SOURCES.some(
+      (source) => taskId.startsWith(`${source}_`) || taskId.startsWith(`${source}-`),
+    )
+  ) {
     return title || t('postit.calendar_fallback');
   }
   if (taskId.startsWith('jira_') || taskId.startsWith('jira-')) {

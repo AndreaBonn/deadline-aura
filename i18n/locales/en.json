@@ -219,7 +219,8 @@
     "others": "+ {n} more",
     "cal_badge": "CAL",
     "tasks_badge": "TASKS",
-    "jira_badge": "JIRA"
+    "jira_badge": "JIRA",
+    "outlook_badge": "OUTLOOK"
   },
   "bands": {
     "calm": "calm",

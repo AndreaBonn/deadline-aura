@@ -210,6 +210,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
       gcal: { label: t('wallpaper.cal_badge'), color: 'rgba(66, 133, 244, 0.5)' },
       gtasks: { label: t('wallpaper.tasks_badge'), color: 'rgba(52, 168, 83, 0.5)' },
       jira: { label: t('wallpaper.jira_badge'), color: 'rgba(255, 152, 0, 0.5)' },
+      outlook: { label: t('wallpaper.outlook_badge'), color: 'rgba(0, 120, 212, 0.5)' },
     };
     const badge = badgeMap[ev.source] || badgeMap.jira;
     const badgeLabel = badge.label;

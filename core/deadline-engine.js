@@ -1,6 +1,7 @@
 'use strict';
 
 const db = require('../store/db');
+const { isCalendarSource } = require('./calendar-sources');
 
 const DEFAULT_PRIORITY_WEIGHTS = [2.0, 1.5, 1.0, 0.5];
 const DEFAULT_K = 0.05;
@@ -137,7 +138,7 @@ function describeMechanicalScore(scored, priorityWeights) {
   const rawBase = totalWeight > 0 ? weightedSum / totalWeight : 0;
   let finalBase = rawBase;
 
-  const calendarCount = active.filter((t) => t.source === 'gcal').length;
+  const calendarCount = active.filter((t) => isCalendarSource(t.source)).length;
   const backlogCount = active.length - calendarCount;
   const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
 
