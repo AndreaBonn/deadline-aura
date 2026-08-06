@@ -12,6 +12,7 @@ const db = require('../../store/db');
 const gcal = require('../../integrations/google-calendar');
 const gtasks = require('../../integrations/google-tasks');
 const jira = require('../../integrations/jira');
+const outlook = require('../../integrations/outlook');
 const aiScorer = require('../../ai/ai-scorer');
 const { sync, computeEventsHash } = require('../../core/sync-daemon');
 
@@ -82,6 +83,81 @@ describe('sync-daemon — sync()', () => {
 
     expect(result.gcal).toBe(1);
     expect(result.errors).toHaveLength(0);
+  });
+
+  it('upserts outlook events and counts them separately', async () => {
+    const start = Date.now() + 3600000;
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    vi.spyOn(outlook, 'fetchEvents').mockResolvedValue([
+      {
+        id: 'outlook_abc_1',
+        source: 'outlook',
+        title: 'Standup',
+        due_at: start + 1800000,
+        start_at: start,
+        priority: 3,
+        is_done: 0,
+        web_url: null,
+        meet_url: null,
+        raw_json: '{}',
+        synced_at: Date.now(),
+      },
+    ]);
+
+    const result = await sync({
+      ...BASE_CONFIG,
+      sources: { ...BASE_CONFIG.sources, outlook: { enabled: true } },
+    });
+
+    expect(result.outlook).toBe(1);
+    expect(result.gcal).toBe(0);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('captures an outlook error without touching the other sources', async () => {
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    vi.spyOn(outlook, 'fetchEvents').mockRejectedValue(new Error('feed unreachable'));
+
+    const result = await sync({
+      ...BASE_CONFIG,
+      sources: { ...BASE_CONFIG.sources, outlook: { enabled: true } },
+    });
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].source).toBe('outlook');
+    expect(result.errors[0].message).toContain('feed unreachable');
+  });
+
+  it('leaves stored outlook events alone when the feed fails', async () => {
+    const start = Date.now() + 3600000;
+    const stored = {
+      id: 'outlook_kept_1',
+      source: 'outlook',
+      title: 'Riunione salvata',
+      due_at: start + 1800000,
+      start_at: start,
+      priority: 3,
+      is_done: 0,
+      web_url: null,
+      meet_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+    db.upsertTask(stored);
+
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    vi.spyOn(outlook, 'fetchEvents').mockRejectedValue(new Error('feed unreachable'));
+
+    await sync({
+      ...BASE_CONFIG,
+      sources: { ...BASE_CONFIG.sources, outlook: { enabled: true } },
+    });
+
+    const row = db.getDb().prepare("SELECT * FROM tasks WHERE id = 'outlook_kept_1'").get();
+    expect(row.is_stale).toBe(0);
   });
 
   it('captures gcal error in errors array without throwing', async () => {

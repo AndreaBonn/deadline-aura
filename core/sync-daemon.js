@@ -6,6 +6,7 @@ const db = require('../store/db');
 const gcal = require('../integrations/google-calendar');
 const gtasks = require('../integrations/google-tasks');
 const jira = require('../integrations/jira');
+const outlook = require('../integrations/outlook');
 const aiScorer = require('../ai/ai-scorer');
 const { PROMPT_VERSION } = require('../ai/prompt');
 const crypto = require('crypto');
@@ -41,6 +42,7 @@ async function sync(config) {
   let gcalCount = 0;
   let gtasksCount = 0;
   let jiraCount = 0;
+  let outlookCount = 0;
 
   const gcalEvents = await fetchWithErrorCapture(
     () => gcal.fetchEvents(config),
@@ -55,6 +57,12 @@ async function sync(config) {
   );
 
   const jiraIssues = await fetchWithErrorCapture(() => jira.fetchIssues(config), 'jira', errors);
+
+  const outlookEvents = await fetchWithErrorCapture(
+    () => outlook.fetchEvents(config),
+    'outlook',
+    errors,
+  );
 
   const database = db.getDb();
   const upsertMany = database.transaction((tasks, source) => {
@@ -85,13 +93,20 @@ async function sync(config) {
     jiraCount = upsertMany(jiraIssues, 'jira');
   }
 
-  const allTasks = [...gcalEvents, ...googleTasks, ...jiraIssues];
+  if (
+    !failedSources.has('outlook') &&
+    (outlookEvents.length > 0 || config.sources.outlook?.enabled)
+  ) {
+    outlookCount = upsertMany(outlookEvents, 'outlook');
+  }
+
+  const allTasks = [...gcalEvents, ...googleTasks, ...jiraIssues, ...outlookEvents];
 
   if (config.ai?.enabled && allTasks.length > 0) {
     await runAiScoring(allTasks, config, errors);
   }
 
-  return { gcal: gcalCount, gtasks: gtasksCount, jira: jiraCount, errors };
+  return { gcal: gcalCount, gtasks: gtasksCount, jira: jiraCount, outlook: outlookCount, errors };
 }
 
 async function runAiScoring(tasks, config, errors) {
@@ -159,7 +174,7 @@ if (require.main === module) {
   sync(loadConfig())
     .then((result) => {
       console.log(
-        `Sync complete: gcal=${result.gcal}, gtasks=${result.gtasks}, jira=${result.jira}`,
+        `Sync complete: gcal=${result.gcal}, gtasks=${result.gtasks}, jira=${result.jira}, outlook=${result.outlook}`,
       );
       if (result.errors.length > 0) {
         console.error('Errors:', result.errors);
