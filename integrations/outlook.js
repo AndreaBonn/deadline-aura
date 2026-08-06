@@ -163,22 +163,28 @@ function assignPriority(occurrence, priorityKeywords) {
  * Build the id of an occurrence.
  *
  * The UID alone would collide across every instance of a recurring series, so
- * the start time is part of the key. The UID is hashed because Outlook's are
+ * the start is part of the key. The UID is hashed because Outlook's are
  * hundreds of characters long and this value ends up in database keys and in
- * the renderer. Both inputs are stable, so the id survives across syncs and the
- * AI scores attached to the row are not lost every cycle.
+ * the renderer.
+ *
+ * The start comes from the calendar representation, not from an epoch: an
+ * all-day or floating event has no zone of its own and resolves through the
+ * machine's, so an epoch key would change the id of every all-day event as soon
+ * as the system time zone changes, dropping and reinserting the rows and losing
+ * the AI scores attached to them.
  *
  * @param {string} uid - Event UID.
- * @param {number} start - Occurrence start, epoch ms.
+ * @param {string} startKey - Occurrence start as written in the calendar.
  * @returns {string} Stable task id.
  */
-function buildTaskId(uid, start) {
+function buildTaskId(uid, startKey) {
   const digest = crypto
     .createHash('sha256')
     .update(String(uid))
     .digest('hex')
     .slice(0, ID_HASH_LENGTH);
-  return `outlook_${digest}_${start}`;
+  const slot = String(startKey).replace(/[^0-9TZ]/gi, '');
+  return `outlook_${digest}_${slot}`;
 }
 
 /**
@@ -190,7 +196,7 @@ function buildTaskId(uid, start) {
  */
 function normalizeOccurrence(occurrence, priorityKeywords) {
   return {
-    id: buildTaskId(occurrence.uid, occurrence.start),
+    id: buildTaskId(occurrence.uid, occurrence.startKey || occurrence.start),
     source: 'outlook',
     title: occurrence.title || '(no title)',
     start_at: occurrence.start,

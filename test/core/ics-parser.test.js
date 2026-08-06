@@ -137,6 +137,47 @@ describe('parseIcs', () => {
       }
     });
 
+    it('drops an exception that was moved out of the window', () => {
+      const moved = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:moved@example.com',
+        'SUMMARY:Weekly',
+        'DTSTART:20260805T080000Z',
+        'DTEND:20260805T090000Z',
+        'RRULE:FREQ=WEEKLY;COUNT=3',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:moved@example.com',
+        'RECURRENCE-ID:20260812T080000Z',
+        'SUMMARY:Weekly (pushed to next year)',
+        'DTSTART:20270812T080000Z',
+        'DTEND:20270812T090000Z',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+
+      const { events } = parseIcs(moved, WINDOW);
+
+      // The RRULE slot falls inside the window, but the exception moved the real
+      // meeting a year out: it must not be reported as upcoming.
+      expect(events.map((e) => e.title)).not.toContain('Weekly (pushed to next year)');
+      expect(events).toHaveLength(2);
+    });
+
+    it('exposes a start key that does not depend on the machine time zone', () => {
+      const { events } = parseSample();
+
+      const [ferragosto] = findByTitle(events, 'Ferragosto');
+      const [review] = findByTitle(events, 'Review architettura piattaforma');
+
+      // All-day events are floating: the epoch shifts with the system zone, the
+      // calendar representation does not.
+      expect(ferragosto.startKey).toBe('2026-08-15');
+      expect(review.startKey).toContain('2026-08-10');
+    });
+
     it('caps runaway series and reports it as a warning', () => {
       const endless = [
         'BEGIN:VCALENDAR',

@@ -120,16 +120,30 @@ describe('normalizeOccurrence', () => {
   });
 
   it('derives an id that is stable across runs but distinct per occurrence', () => {
-    const first = normalizeOccurrence(occurrence, []);
-    const same = normalizeOccurrence({ ...occurrence }, []);
-    const nextWeek = normalizeOccurrence(
-      { ...occurrence, start: occurrence.start + 7 * 86400000 },
-      [],
-    );
+    const first = normalizeOccurrence({ ...occurrence, startKey: '2026-08-10T08:00:00Z' }, []);
+    const same = normalizeOccurrence({ ...occurrence, startKey: '2026-08-10T08:00:00Z' }, []);
+    const nextWeek = normalizeOccurrence({ ...occurrence, startKey: '2026-08-17T08:00:00Z' }, []);
 
     expect(first.id).toBe(same.id);
     expect(first.id).not.toBe(nextWeek.id);
     expect(first.id.startsWith('outlook_')).toBe(true);
+  });
+
+  it('keys an all-day event on the calendar date, not on a zone-dependent epoch', () => {
+    const allDay = { ...occurrence, allDay: true, startKey: '2026-08-15' };
+
+    const inRome = normalizeOccurrence(
+      { ...allDay, start: Date.parse('2026-08-15T00:00+02:00') },
+      [],
+    );
+    const inTokyo = normalizeOccurrence(
+      { ...allDay, start: Date.parse('2026-08-15T00:00+09:00') },
+      [],
+    );
+
+    // Same calendar day, different system zone: the row must keep its identity
+    // so the AI scores attached to it survive.
+    expect(inRome.id).toBe(inTokyo.id);
   });
 
   it('never stores the feed url in raw_json', () => {

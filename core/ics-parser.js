@@ -9,8 +9,10 @@ const DEFAULT_MAX_INSTANCES_PER_SERIES = 500;
 // Hard stop on iterations, independent of how many occurrences land inside the
 // window. Outlook publishes series that started years ago, so the iterator has
 // to walk from the original DTSTART before it reaches today; without this an
-// endless RRULE that begins in the past would spin forever.
-const MAX_ITERATIONS_PER_SERIES = 10000;
+// endless RRULE that begins in the past would spin forever. Set high enough
+// that even an hourly series running for a decade reaches the window before the
+// cap: hitting it early would drop real occurrences, not just excess ones.
+const MAX_ITERATIONS_PER_SERIES = 100000;
 
 // Titles a feed published as "availability only" uses in place of the real
 // subject. Lowercase; matching is case-insensitive.
@@ -83,6 +85,11 @@ function toOccurrence(event, startTime, endTime) {
     location: event.location || '',
     start: startTime.toJSDate().getTime(),
     end: endTime.toJSDate().getTime(),
+    // Calendar representation of the start, straight from the document. Unlike
+    // `start`, it does not depend on the machine's time zone: an all-day or
+    // floating event resolves through the local zone in toJSDate(), so an epoch
+    // is not a stable identity for one.
+    startKey: startTime.toString(),
     allDay: Boolean(startTime.isDate),
     organizer: event.organizer || null,
     attendeesCount: Array.isArray(event.attendees) ? event.attendees.length : 0,
@@ -119,7 +126,10 @@ function expandRecurring(event, options, warnings) {
       continue;
     }
     const occurrence = toOccurrence(details.item, details.startDate, details.endDate);
-    if (occurrence.end < windowStart) {
+    // Checked again on the resolved occurrence, not only on the RRULE slot
+    // above: a RECURRENCE-ID exception can move an instance outside the window
+    // the original slot fell into, in either direction.
+    if (occurrence.end < windowStart || occurrence.start > windowEnd) {
       continue;
     }
     occurrences.push(occurrence);
