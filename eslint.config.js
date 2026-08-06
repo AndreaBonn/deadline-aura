@@ -23,6 +23,8 @@ module.exports = [
         URLSearchParams: 'readonly',
         fetch: 'readonly',
         AbortController: 'readonly',
+        AbortSignal: 'readonly',
+        Response: 'readonly',
         describe: 'readonly',
         it: 'readonly',
         expect: 'readonly',
