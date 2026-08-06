@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const dbBackup = require('./db-backup');
+const { CALENDAR_SOURCES_SQL } = require('../core/calendar-sources');
 
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const DB_PATH = path.join(DATA_DIR, 'db.sqlite');
@@ -149,15 +150,23 @@ function runMigrations(database) {
       database.pragma('foreign_keys = OFF');
     }
     try {
-      database.exec(`
-        ${newSchema}
-        INSERT INTO tasks_new SELECT ${columnList} FROM tasks;
-        DROP TABLE tasks;
-        ALTER TABLE tasks_new RENAME TO tasks;
-        CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
-        CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
-        CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
-      `);
+      // Wrapped in a transaction: exec() runs the statements one by one, so a
+      // crash between DROP and RENAME would leave the database with no tasks
+      // table at all. A leftover tasks_new from an interrupted rebuild is
+      // dropped rather than reused, which would otherwise silently copy rows
+      // into the previous schema.
+      database.transaction(() => {
+        database.exec(`
+          DROP TABLE IF EXISTS tasks_new;
+          ${newSchema}
+          INSERT INTO tasks_new SELECT ${columnList} FROM tasks;
+          DROP TABLE tasks;
+          ALTER TABLE tasks_new RENAME TO tasks;
+          CREATE INDEX IF NOT EXISTS idx_tasks_due_at ON tasks(due_at);
+          CREATE INDEX IF NOT EXISTS idx_tasks_is_done ON tasks(is_done);
+          CREATE INDEX IF NOT EXISTS idx_tasks_source ON tasks(source);
+        `);
+      })();
     } finally {
       if (fkWasOn) {
         database.pragma('foreign_keys = ON');
@@ -228,6 +237,65 @@ function runMigrations(database) {
       'mig-007-off-category',
     );
   }
+
+  // 008: extend source CHECK to include 'outlook' (idempotent)
+  //
+  // Unlike 006 and 007 the emptiness check reads the source CHECK alone rather
+  // than the whole CREATE TABLE statement: matching the raw SQL would give a
+  // false positive as soon as the word appears in another constraint or column,
+  // and the migration would then be skipped forever on a table that still
+  // rejects the value.
+  if (!sourceCheckAccepts(database, 'outlook')) {
+    rebuildTasksTable(
+      `CREATE TABLE tasks_new (
+        id          TEXT PRIMARY KEY,
+        source      TEXT NOT NULL CHECK(source IN ('gcal', 'jira', 'local', 'gtasks', 'outlook')),
+        title       TEXT NOT NULL,
+        due_at      INTEGER,
+        priority    INTEGER NOT NULL DEFAULT 3 CHECK(priority BETWEEN 1 AND 4),
+        is_done     INTEGER NOT NULL DEFAULT 0,
+        is_stale    INTEGER NOT NULL DEFAULT 0,
+        raw_json    TEXT,
+        synced_at   INTEGER NOT NULL,
+        ai_stress     INTEGER CHECK(ai_stress BETWEEN 1 AND 10),
+        ai_category   TEXT CHECK(ai_category IN ('work-critical', 'work-routine', 'personal', 'admin', 'off')),
+        ai_reasoning  TEXT,
+        ai_scored_at  INTEGER,
+        web_url     TEXT,
+        ai_cognitive_type TEXT CHECK(ai_cognitive_type IN ('analytical', 'creative', 'social', 'passive', 'administrative')),
+        start_at    INTEGER,
+        meet_url    TEXT
+      );`,
+      TASKS_COLUMNS,
+      'mig-008-outlook',
+    );
+  }
+}
+
+/**
+ * Report whether the tasks table already accepts a given source value.
+ *
+ * @param {object} database - Open better-sqlite3 handle.
+ * @param {string} value - Source value to look for.
+ * @returns {boolean} True when the source CHECK lists the value.
+ */
+function sourceCheckAccepts(database, value) {
+  const table = database
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='tasks'")
+    .get();
+  if (!table) {
+    return false;
+  }
+
+  const match = table.sql.match(/CHECK\s*\(\s*source\s+IN\s*\(([^)]*)\)/i);
+  if (!match) {
+    return false;
+  }
+
+  return match[1]
+    .split(',')
+    .map((entry) => entry.trim().replace(/^'|'$/g, ''))
+    .includes(value);
 }
 
 function getActiveTasks(lookaheadMs) {
@@ -264,7 +332,7 @@ function getUpcomingCalendarEvents(horizonMs) {
       `SELECT * FROM tasks
      WHERE is_done = 0
        AND is_stale = 0
-       AND source = 'gcal'
+       AND source IN (${CALENDAR_SOURCES_SQL})
        AND (
          (start_at IS NOT NULL AND start_at >= ? AND start_at <= ?)
          OR (start_at IS NULL AND due_at IS NOT NULL AND due_at >= ? AND due_at <= ?)
