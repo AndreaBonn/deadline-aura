@@ -2,7 +2,7 @@
 
 # Deadline Aura by Bonn
 
-Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo ambientale — una striscia colorata, uno sfondo cromatico e task su post-it che si aggiornano man mano che le scadenze si avvicinano.
+Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo ambientale: una striscia colorata, uno sfondo cromatico e task su post-it che si aggiornano man mano che le scadenze si avvicinano.
 
 <div align="center">
 
@@ -13,18 +13,20 @@ Widget desktop per Linux che traduce il carico di lavoro in un segnale visivo am
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 [![ESLint](https://img.shields.io/badge/lint-ESLint-4B32C3.svg)](https://eslint.org/)
 [![Prettier](https://img.shields.io/badge/code_style-Prettier-ff69b4.svg)](https://prettier.io/)
-[![Security Policy](https://img.shields.io/badge/security-policy-green.svg)](./SECURITY.md)
+[![Security Policy](https://img.shields.io/badge/security-policy-green.svg)](./SECURITY.it.md)
 [![GitHub stars](https://img.shields.io/github/stars/AndreaBonn/deadline-aura?style=social)](https://github.com/AndreaBonn/deadline-aura)
 
 </div>
 
 ## Cosa fa
 
-Deadline Aura recupera task da Google Calendar e Jira, calcola uno score di urgenza per ciascuno e riflette il carico complessivo come colore: verde calmo a bassa pressione, giallo in zona di attenzione, rosso intenso allo stato critico. Il colore appare su una striscia laterale persistente su ogni display, come tinta del wallpaper e, opzionalmente, come post-it renderizzati direttamente nello sfondo del desktop.
+Deadline Aura recupera task da Google Calendar, Google Tasks, Outlook e Jira, calcola uno score di urgenza per ciascuno e riflette il carico complessivo come colore: verde calmo a bassa pressione, giallo in zona di attenzione, rosso intenso allo stato critico. Il colore appare su una striscia laterale persistente su ogni display, come tinta del wallpaper e, opzionalmente, come post-it renderizzati direttamente nello sfondo del desktop.
 
 Un layer opzionale di AI scoring (Groq, Gemini, OpenAI o Anthropic) valuta il carico cognitivo ed emotivo sull'intera finestra di eventi e fonde quella valutazione (70%) con lo score meccanico basato sul tempo (30%). Se nessun provider AI è configurato, la formula meccanica viene usata da sola.
 
 Solo Linux/X11/GNOME.
+
+Se ti interessa soltanto installare l'app e usarla, la [guida utente](./docs/USER-GUIDE.it.md) accompagna passo per passo senza dare per scontate competenze tecniche. Il resto di questa pagina si rivolge a chi vuole anche compilare da sorgente.
 
 <div align="center">
 <img src="assets/img-readme/desktop.png" alt="Desktop Deadline Aura con wallpaper e post-it" width="800">
@@ -37,6 +39,8 @@ Solo Linux/X11/GNOME.
 %%{init: {'theme': 'neutral'}}%%
 graph LR
   gcal["Google Calendar"]
+  gtasks["Google Tasks"]
+  outlook["Outlook<br/>feed ICS pubblicato"]
   jira["Jira"]
   local["Task Locali"]
   sync["Sync Daemon"]
@@ -48,49 +52,55 @@ graph LR
   strip["Striscia Colore"]
   sidebar["Sidebar"]
   dock["Meeting Dock"]
+  flyby["Meeting Flyby"]
 
   gcal --> sync
+  gtasks --> sync
+  outlook --> sync
   jira --> sync
   local --> store
   sync --> store
   store --> engine
   ai -.->|"blend 70/30"| engine
   store -.-> ai
+  store --> dock
+  store --> flyby
   engine --> cmap
   cmap --> wallpaper
   cmap --> strip
   cmap --> sidebar
-  cmap --> dock
 
   classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
   classDef data fill:#d97706,stroke:#b45309,color:#fff
   classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
   classDef engine fill:#059669,stroke:#047857,color:#fff
 
-  class gcal,jira ext
+  class gcal,gtasks,outlook,jira ext
   class local,store data
   class sync,ai core
   class engine,cmap engine
-  class wallpaper,strip,sidebar,dock core
+  class wallpaper,strip,sidebar,dock,flyby core
 ```
 
 Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita task, IPC), vedi [docs/ARCHITECTURE.it.md](./docs/ARCHITECTURE.it.md).
 
 ## Funzionalità
 
-- Striscia da 20px persistente su ogni display connesso; il colore interpola su cinque bande di urgenza (calmo → normale → attenzione → urgente → critico)
+- Striscia da 10px persistente su ogni display connesso; il colore interpola su cinque bande di urgenza (calmo → normale → attenzione → urgente → critico)
 - Pannello sidebar con task ordinati per score di urgenza, attivato cliccando la striscia
 - Wallpaper generato come PNG composito che occupa tutti i display, con post-it per task in posizioni drag-and-drop salvate in percentuale
 - Urgency engine: formula a decadimento esponenziale con pesi di priorità e amplificazione del volume sopra 5 eventi contemporanei
 - AI scoring con failover tra provider (Groq → Gemini → OpenAI → Anthropic), cache basata su hash, intervallo di ricalcolo configurabile (default: 6 ore)
-- Sync Google Calendar via OAuth2 (scope: `calendar` per accesso completo in lettura e scrittura)
+- Sync Google Calendar via OAuth2 (scope: `calendar` per accesso completo in lettura e scrittura). Client ID e client secret si possono scrivere in Impostazioni → Sorgenti; le variabili d'ambiente `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` valgono solo quando quei campi restano vuoti
+- Sync Google Tasks, attivo non appena l'account Google è autorizzato: i task aperti compaiono in una sezione dedicata della sidebar
+- Sync Outlook da un feed ICS pubblicato: le serie ricorrenti vengono espanse occorrenza per occorrenza, le istanze spostate e cancellate vengono applicate, e gli eventi contano come impegni di calendario nell'urgency engine e nel prompt AI invece che come backlog
 - Sync Jira via API token con JQL configurabile
 - Supporto multi-monitor: una striscia per display, singolo PNG wallpaper spanned
 - Config validata con Zod all'avvio e ad ogni salvataggio delle impostazioni
 - Riserva dello strut X11 perché la striscia non si sovrapponga all'area di lavoro GNOME
 - Task locali: creazione, modifica, completamento e cancellazione di task personali direttamente dalla sidebar, senza sync esterno
 - Early warning burnout: analizza 7 giorni di storico AI su tre trigger indipendenti (stress sostenuto, recovery insufficiente, carico emotivo alto) e invia notifiche desktop a severità moderate/high
-- Clinical note AI: valutazione in linguaggio naturale da psicologo occupazionale simulato, con grafico di previsione stress a 5 giorni — visibili in pannello collassabile attivato cliccando la barra di urgenza
+- Clinical note AI: valutazione in linguaggio naturale da psicologo occupazionale simulato, con grafico di previsione stress a 5 giorni, visibili in un pannello collassabile attivato cliccando la barra di urgenza
 - Notifiche desktop via `notify-send` con soglia di score e cooldown configurabili; urgenza critica per alert burnout
 - Interfaccia bilingue (italiano/inglese) selezionabile dalle impostazioni; traduzioni caricate via IPC con chiavi dot-notation e interpolazione placeholder
 - Pannello impostazioni con 9 tab di configurazione (Generale, Sorgenti, AI, Wallpaper, Sidebar, Notifiche, Interfaccia, Turno, Avanzate) e reset per sezione
@@ -101,6 +111,8 @@ Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita
 - Time logging su Google Calendar: bottone orologio su qualsiasi task apre un form inline per creare un evento con data, ora, durata e calendario di destinazione; gli eventi sono formattati come `[CODICE-JIRA] - Titolo` per compatibilità con il tracciamento tempo di Tempo
 - Timer live: pulsante play/stop su qualsiasi task Jira o locale avvia un timer in tempo reale che crea un evento Google Calendar immediato e ne aggiorna l'orario di fine ogni 60 secondi; premendo stop l'evento viene finalizzato con la durata esatta. Lo stato del timer persiste in localStorage per il recupero da crash. Una sezione "In Corso" in cima alla sidebar evidenzia il task attualmente cronometrato
 - Meeting dock: barra trasparente flottante in basso su ogni display, mostra riunioni imminenti con link Meet/Teams/Zoom cliccabili. Le riunioni appaiono da 10 minuti prima a 5 minuti dopo l'orario di inizio, controllate ogni 30 secondi indipendentemente dal sync
+- Meeting flyby: 60 secondi prima dell'inizio di una riunione (`meeting_flyby.trigger_seconds`) un gatto in pixel art attraversa ogni display trainando uno striscione con titolo e countdown, poi esce di scena dopo 20 secondi. Il pulsante gatto nell'header della sidebar sospende gli avvisi per 1, 3 o 24 ore, li disattiva a tempo indeterminato oppure li riattiva
+- Spiegazione dello score: il pulsante di aiuto accanto al punteggio di urgenza apre un pannello che mostra come si è arrivati a quel numero, con la quota AI, la quota meccanica e i task che pesano di più. Gli eventi di ferie e assenza restano fuori dal conteggio, così una settimana di vacanza non viene letta come una settimana di pressione
 - Stato eventi calendario: gli eventi Google Calendar nella sidebar mostrano lo stato in tempo reale - "in corso" (azzurro) tra inizio e fine, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
 - Sync differenziato: i dati esterni (Google Calendar, Jira) si aggiornano ogni 10 minuti di default (`sync.data_interval_minutes`), l'AI ricalcola solo quando cambiano gli eventi o ogni 6 ore (`ai.recalc_hours`), e la UI si aggiorna ogni 60 secondi
 
@@ -195,7 +207,7 @@ Deadline Aura ha bisogno di credenziali OAuth 2.0 per leggere Google Calendar.
 3. Vai su **API e servizi → Credenziali** → **Crea credenziali → ID client OAuth**
 4. Scegli tipo applicazione: **App desktop**
 5. Nella sezione **URI di reindirizzamento autorizzati**, aggiungi esattamente: `http://localhost:34567/oauth/callback`
-6. Clicca Crea — annota il **Client ID** e il **Client Secret**
+6. Clicca Crea, poi annota il **Client ID** e il **Client Secret**
 
 ### Passo 5 — Crea il file .env
 
@@ -215,6 +227,8 @@ ANTHROPIC_API_KEYS=chiave1
 ```
 
 Compila come minimo `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`. Le chiavi AI sono opzionali.
+
+Il file `.env` non è l'unica strada. Client ID e client secret si possono inserire anche in **Impostazioni → Sorgenti**, e le chiavi AI in **Impostazioni → AI**; in entrambi i casi finiscono in `~/.config/deadlineaura/config.json`. I valori delle impostazioni hanno la precedenza, e le variabili d'ambiente vengono lette solo quando quei campi restano vuoti (`integrations/google-calendar.js:35`). Se hai installato dal pacchetto `.deb`, la finestra delle impostazioni è l'unica via, perché non esiste una directory di progetto in cui mettere un file `.env`.
 
 ### Passo 6 — Primo avvio e autorizzazione Google
 
@@ -236,9 +250,19 @@ Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ne
 - **API token**: generane uno su [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: filtro per le issue da tracciare (default: `assignee = currentUser() AND statusCategory != Done`)
 
-Le credenziali vengono salvate in `~/.config/deadlineaura/config.json`.
+Le credenziali vengono salvate in `~/.config/deadlineaura/config.json`, a cui vengono applicati i permessi `0600` a ogni salvataggio, così resta leggibile solo dal tuo account. È lo stesso modello di sicurezza usato per il token OAuth Google in `~/.config/deadlineaura/google-token.json`. Il file resta locale alla macchina e non viene mai trasmesso.
 
-### Passo 8 — Autostart (opzionale)
+### Passo 8 — Configura Outlook (opzionale)
+
+Deadline Aura legge Outlook attraverso il feed ICS che il calendario pubblica, quindi non servono account Microsoft, registrazione dell'app né consenso dell'amministratore.
+
+In Outlook sul web apri **Impostazioni → Calendario → Calendari condivisi → Pubblica un calendario**, scegli il calendario, imposta il permesso su **Tutti i dettagli** e pubblica. Copia il link ICS (la forma `webcal://` è accettata e convertita in `https://`).
+
+In Deadline Aura apri **Impostazioni → Sorgenti → Outlook**, attiva la sorgente e incolla il link.
+
+Tratta quel link come una password: chi lo possiede legge l'intero calendario senza autenticarsi. L'app lo salva in `config.json` insieme agli altri segreti, lo maschera nella finestra delle impostazioni e non lo scrive mai nei log. Microsoft aggiorna il feed pubblicato ogni poche ore, quindi una riunione aggiunta pochi minuti fa non compare subito.
+
+### Passo 9 — Autostart (opzionale)
 
 **Autostart GNOME — avvia il widget al login:**
 
@@ -282,14 +306,19 @@ Clicca la striscia per aprire la sidebar. I task sono raggruppati in sezioni:
 <br><em>Sidebar: nota clinica AI, previsione stress, sezioni task con score di urgenza e pulsanti azione</em>
 </div>
 
-1. **Locale** - task personali creati direttamente nell'app
-2. **Google Calendar** - eventi dai calendari sincronizzati, con stato in tempo reale: "in corso" (azzurro) durante l'evento, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
-3. **Preferiti Jira** - task Jira che hai stellato (visibile solo se hai preferiti)
-4. **Jira** - task corrispondenti al filtro JQL configurato
+1. **In Corso** - il task con il timer live attivo (compare solo mentre un timer è in funzione)
+2. **Locale** - task personali creati direttamente nell'app
+3. **Google Tasks** - task aperti del tuo account Google
+4. **Google Calendar** - eventi dai calendari sincronizzati, con stato in tempo reale: "in corso" (azzurro) durante l'evento, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
+5. **Outlook** - eventi dal feed ICS pubblicato, se ne hai configurato uno
+6. **Preferiti Jira** - task Jira che hai stellato (visibile solo se hai preferiti)
+7. **Jira** - task corrispondenti al filtro JQL configurato
 
-Ogni card mostra titolo, countdown alla scadenza, score di urgenza e badge della sorgente. Cliccando un task Jira o Google Calendar si apre nel browser.
+Le sezioni senza contenuto non vengono disegnate.
 
-In cima alla sidebar trovi i pulsanti per sync manuale, impostazioni (ingranaggio), layout post-it (griglia) e chiusura (X).
+Ogni card mostra titolo, countdown alla scadenza, score di urgenza e badge della sorgente. Cliccando un task Jira o Google Calendar si apre nel browser. Le card Outlook non hanno link: un feed pubblicato non porta con sé una pagina web per singolo evento.
+
+Il footer in fondo alla sidebar contiene i pulsanti impostazioni (ingranaggio), layout post-it, sync manuale e chiusura, oltre all'orario dell'ultimo sync. In alto, l'icona del gatto accanto all'orologio comanda il meeting flyby e il pulsante `?` accanto allo score di urgenza apre la spiegazione del punteggio.
 
 ### Task locali
 
@@ -305,7 +334,7 @@ Clicca la stella su qualsiasi card Jira per aggiungerla ai preferiti. I task ste
 
 Fissa qualsiasi task sul desktop cliccando l'icona pin sulla card. Il task appare come post-it renderizzato direttamente nel wallpaper.
 
-Per riposizionare i post-it: clicca l'icona layout (griglia) nell'header della sidebar. Si apre un overlay trasparente dove puoi trascinare ogni post-it nella posizione desiderata. Clicca "Salva" per applicare, o premi Escape per annullare. Le posizioni sono salvate in percentuale, quindi si adattano a qualsiasi risoluzione.
+Per riposizionare i post-it: clicca il pulsante Layout nel footer della sidebar. Si apre un overlay trasparente dove puoi trascinare ogni post-it nella posizione desiderata. Clicca "Salva" per applicare, o premi Escape per annullare. Le posizioni sono salvate in percentuale, quindi si adattano a qualsiasi risoluzione.
 
 ### Time logging su Google Calendar
 
@@ -344,6 +373,24 @@ Una barra trasparente flottante appare in basso su ogni display quando hai riuni
 
 La dock usa un effetto vetro traslucido (backdrop blur) e non riserva spazio sullo schermo: si sovrappone al desktop solo quando ci sono riunioni imminenti e si nasconde automaticamente quando non ce ne sono.
 
+### Meeting flyby
+
+Sessanta secondi prima che una riunione inizi, un gatto in pixel art attraversa ogni display trainando uno striscione con il titolo della riunione e il countdown ("Standup tra 1 minuto"). L'animazione dura una ventina di secondi, poi esce di scena. Serve a raggiungerti quando la meeting dock è coperta da una finestra a schermo intero e la notifica desktop è passata inosservata.
+
+Il comando è l'icona del gatto accanto all'orologio, in cima alla sidebar:
+
+| Voce di menu           | Effetto                                                                   |
+| ---------------------- | ------------------------------------------------------------------------- |
+| Sospendi 1h / 3h / 24h | Nessun flyby finché non è trascorso il tempo scelto, poi riprende da solo |
+| Per sempre             | Disattiva il flyby finché non lo riattivi                                 |
+| Riattiva               | Annulla subito una sospensione o una disattivazione                       |
+
+Mentre gli avvisi sono sospesi, l'icona del gatto viene disegnata sbarrata. Sia il momento in cui parte l'animazione sia la sua durata stanno sotto `meeting_flyby` in `config.json`.
+
+### Spiegazione dello score
+
+Accanto allo score di urgenza, in cima alla sidebar, c'è un pulsante `?`. Apre un pannello che racconta da dove arriva quel numero: la valutazione AI con il suo peso nel blend, la parte meccanica con l'amplificatore di volume e il numero di eventi di assenza esclusi, e i tre task che contribuiscono di più al totale. Quando nessun provider AI ha risposto, il pannello lo dichiara e riporta il solo score meccanico.
+
 ### Note AI e rilevamento burnout
 
 Clicca la barra di urgenza colorata in cima alla sidebar per espandere il pannello AI. Mostra:
@@ -362,17 +409,17 @@ Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ha
 <br><em>Pannello impostazioni: 9 tab di configurazione con reset per sezione</em>
 </div>
 
-| Tab         | Cosa puoi configurare                                                  |
-| ----------- | ---------------------------------------------------------------------- |
-| Generale    | Intervallo sync UI, intervallo sync dati, finestra lookahead           |
-| Sorgenti    | Calendari e keyword Google Calendar, istanze Jira e JQL                |
-| AI          | Ordine priorità provider, intervallo ricalcolo, timeout, temperatura   |
-| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it              |
-| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                        |
-| Notifiche   | Abilita/disabilita, soglia score, cooldown                             |
-| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown        |
-| Turno       | Giorni lavorativi, fasce orarie, ferie, modalità turno fisso/variabile |
-| Avanzate    | Costanti urgency engine e pesi per priorità                            |
+| Tab         | Cosa puoi configurare                                                                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Generale    | Intervallo sync UI, intervallo sync dati, finestra lookahead                                                |
+| Sorgenti    | Client ID e client secret Google, calendari e keyword Google Calendar, feed ICS Outlook, istanze Jira e JQL |
+| AI          | Chiavi API dei provider, ordine di priorità, intervallo ricalcolo, timeout, temperatura                     |
+| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it                                                   |
+| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                                                             |
+| Notifiche   | Abilita/disabilita, soglia score, cooldown, meeting dock e suo anticipo                                     |
+| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown                                             |
+| Turno       | Giorni lavorativi, fasce orarie, ferie, modalità turno fisso/variabile                                      |
+| Avanzate    | Costanti urgency engine e pesi per priorità                                                                 |
 
 Ogni tab ha un pulsante "Reset sezione" per ripristinare i default solo per quella sezione.
 
@@ -403,7 +450,22 @@ npm run test:coverage     # esegue con report di coverage v8
 npm run lint              # ESLint
 ```
 
-I test si trovano in `test/` e rispecchiano la struttura di `core/`, `store/`, `ai/` e `integrations/`.
+I test girano direttamente su Node 20, non dentro Electron. Se hai lanciato `npx electron-rebuild` per avviare l'app, i moduli nativi sono compilati per l'ABI di Electron e `npm test` fallisce con un errore di versione. Ricompila per Node 20 prima di eseguirli:
+
+```bash
+nvm use 20
+npm rebuild
+npm test
+```
+
+Per tornare a usare l'app dopo i test, ricompila di nuovo per Electron:
+
+```bash
+npx electron-rebuild
+npm start
+```
+
+I test si trovano in `test/` e rispecchiano la struttura di `core/`, `store/`, `ai/`, `integrations/` e `renderer/`.
 
 ## Contribuire
 

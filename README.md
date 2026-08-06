@@ -2,7 +2,7 @@
 
 # Deadline Aura by Bonn
 
-Desktop widget for Linux that maps your workload into an ambient visual signal — a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
+Desktop widget for Linux that maps your workload into an ambient visual signal: a colored strip, a tinted wallpaper, and sticky-note tasks that update as deadlines approach.
 
 <div align="center">
 
@@ -20,11 +20,13 @@ Desktop widget for Linux that maps your workload into an ambient visual signal �
 
 ## What it does
 
-Deadline Aura pulls tasks from Google Calendar and Jira, computes an urgency score for each one, and reflects the aggregate load as color: calm green at low pressure, through yellow, to deep red at critical. The color appears on a persistent sidebar strip on each display, as a wallpaper tint, and optionally as post-it notes rendered directly into the desktop background.
+Deadline Aura pulls tasks from Google Calendar, Google Tasks, Outlook and Jira, computes an urgency score for each one, and reflects the aggregate load as color: calm green at low pressure, through yellow, to deep red at critical. The color appears on a persistent sidebar strip on each display, as a wallpaper tint, and optionally as post-it notes rendered directly into the desktop background.
 
 An optional AI scoring layer (Groq, Gemini, OpenAI, or Anthropic) evaluates cognitive and emotional load across the full event window and blends that assessment (70%) with the time-based mechanical score (30%). If no AI provider is configured, the mechanical formula runs alone.
 
 Linux/X11/GNOME only.
+
+If you only want to install the app and use it, the [user guide](./docs/USER-GUIDE.md) walks through every step without assuming any technical background. The rest of this page is aimed at people who also want to build from source.
 
 <div align="center">
 <img src="assets/img-readme/desktop.png" alt="Deadline Aura desktop with wallpaper tint and post-it notes" width="800">
@@ -37,6 +39,8 @@ Linux/X11/GNOME only.
 %%{init: {'theme': 'neutral'}}%%
 graph LR
   gcal["Google Calendar"]
+  gtasks["Google Tasks"]
+  outlook["Outlook<br/>published ICS feed"]
   jira["Jira"]
   local["Local Tasks"]
   sync["Sync Daemon"]
@@ -48,49 +52,55 @@ graph LR
   strip["Strip Color"]
   sidebar["Sidebar"]
   dock["Meeting Dock"]
+  flyby["Meeting Flyby"]
 
   gcal --> sync
+  gtasks --> sync
+  outlook --> sync
   jira --> sync
   local --> store
   sync --> store
   store --> engine
   ai -.->|"70/30 blend"| engine
   store -.-> ai
+  store --> dock
+  store --> flyby
   engine --> cmap
   cmap --> wallpaper
   cmap --> strip
   cmap --> sidebar
-  cmap --> dock
 
   classDef core fill:#2563eb,stroke:#1d4ed8,color:#fff
   classDef data fill:#d97706,stroke:#b45309,color:#fff
   classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
   classDef engine fill:#059669,stroke:#047857,color:#fff
 
-  class gcal,jira ext
+  class gcal,gtasks,outlook,jira ext
   class local,store data
   class sync,ai core
   class engine,cmap engine
-  class wallpaper,strip,sidebar,dock core
+  class wallpaper,strip,sidebar,dock,flyby core
 ```
 
 For detailed technical diagrams (sync pipeline, database schema, task lifecycle, IPC), see [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
 ## Features
 
-- Persistent 20px strip on every connected display; color interpolates across five urgency bands (calm → normal → attention → urgent → critical)
+- Persistent 10px strip on every connected display; color interpolates across five urgency bands (calm → normal → attention → urgent → critical)
 - Sidebar panel with tasks sorted by urgency score, toggled by clicking the strip
 - Wallpaper generated as a composite PNG spanning all displays, with per-task post-it notes at drag-and-drop positions stored as percentages
 - Urgency engine: exponential decay formula with priority weights and volume amplification above 5 concurrent events
 - AI scoring with provider failover (Groq → Gemini → OpenAI → Anthropic), hash-based cache, configurable refresh interval (default: 6 hours)
-- Google Calendar sync via OAuth2 (scope: `calendar` for full read and write access)
+- Google Calendar sync via OAuth2 (scope: `calendar` for full read and write access). The client ID and secret can be typed into Settings → Sources; the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables are used when those fields are empty
+- Google Tasks sync, active as soon as the Google account is authorized: open tasks appear in their own sidebar section
+- Outlook sync from a published ICS feed: recurring series are expanded occurrence by occurrence, moved and cancelled instances are applied, and the events count as calendar commitments in the urgency engine and the AI prompt rather than as backlog
 - Jira sync via API token with configurable JQL
 - Multi-monitor support: one strip per display, single spanned wallpaper PNG
 - Config validated with Zod on startup and on every settings save
 - X11 strut reservation so the strip does not overlap the GNOME work area
-- Local tasks: create, edit, complete, and delete personal tasks directly from the sidebar — no external sync needed
+- Local tasks: create, edit, complete, and delete personal tasks directly from the sidebar, with no external sync needed
 - Burnout early warning: analyzes 7 days of AI scoring history across three independent triggers (sustained stress, insufficient recovery, high emotional load) and fires desktop notifications at moderate/high severity
-- AI clinical note: natural-language assessment from a simulated occupational psychologist, plus a 5-day stress forecast chart — both visible in a collapsible panel toggled by clicking the urgency bar
+- AI clinical note: natural-language assessment from a simulated occupational psychologist, plus a 5-day stress forecast chart, both visible in a collapsible panel toggled by clicking the urgency bar
 - Desktop notifications via `notify-send` with configurable score threshold and cooldown; critical urgency for burnout alerts
 - Bilingual interface (Italian/English) switchable from settings; translations loaded via IPC with dot-notation keys and placeholder interpolation
 - Settings panel with 9 configuration tabs (General, Sources, AI, Wallpaper, Sidebar, Notifications, Interface, Shift, Advanced) and per-section reset
@@ -101,6 +111,8 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - Time logging to Google Calendar: clock button on any task opens an inline form to create a calendar event with date, time, duration, and target calendar; events are formatted as `[JIRA-KEY] - Title` for compatibility with Tempo time tracking
 - Live timer: play/stop button on any Jira or local task starts a real-time timer that creates a Google Calendar event immediately and updates its end time every 60 seconds; pressing stop finalizes the event with the exact duration. Timer state persists in localStorage for crash recovery. An "In Progress" section at the top of the sidebar highlights the currently timed task
 - Meeting dock: a floating transparent bar at the bottom of each display shows upcoming meetings with clickable video call links (Meet, Teams, Zoom). Meetings appear from 10 minutes before to 5 minutes after the scheduled start time, checked every 30 seconds regardless of sync status
+- Meeting flyby: a pixel cat tows a banner with the meeting title and countdown across every display 60 seconds before the start (`meeting_flyby.trigger_seconds`), then flies off after 20 seconds. A cat button in the sidebar header snoozes the alerts for 1, 3 or 24 hours, switches them off indefinitely, or turns them back on
+- Score breakdown: a help button next to the urgency score opens a panel that shows how the number was reached, with the AI share, the mechanical share and the tasks driving the result. Out-of-office and holiday events are excluded from the count, so a week of leave does not read as a week of pressure
 - Calendar event status: Google Calendar events in the sidebar show real-time status - "ongoing" (blue) when between start and end time, "ended" (grey) after the event finishes, or start time with countdown for future events
 - Differentiated sync: external data (Google Calendar, Jira) refreshes every 10 minutes by default (`sync.data_interval_minutes`), AI scoring recalculates only when events change or every 6 hours (`ai.recalc_hours`), and the UI updates every 60 seconds
 
@@ -195,7 +207,7 @@ Deadline Aura needs OAuth 2.0 credentials to read your Google Calendar.
 3. Go to **APIs & Services → Credentials** → **Create Credentials → OAuth client ID**
 4. Choose application type: **Desktop app**
 5. Under **Authorized redirect URIs**, add exactly: `http://localhost:34567/oauth/callback`
-6. Click Create — note the **Client ID** and **Client Secret**
+6. Click Create, then note the **Client ID** and **Client Secret**
 
 ### Step 5 — Create the .env file
 
@@ -215,6 +227,8 @@ ANTHROPIC_API_KEYS=key1
 ```
 
 Fill in at minimum `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The AI keys are optional.
+
+The `.env` file is not the only option. The same OAuth client ID and secret can be typed into **Settings → Sources**, and the AI keys into **Settings → AI**; both are stored in `~/.config/deadlineaura/config.json`. The settings values win, and the environment variables are read only when those fields are left empty (`integrations/google-calendar.js:35`). If you installed from the `.deb` package, the settings window is the only route, since there is no project directory to put a `.env` file in.
 
 ### Step 6 — First run and Google authorization
 
@@ -236,9 +250,19 @@ Click the gear icon in the sidebar to open the settings panel. In the Jira secti
 - **API token**: generate one at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: filter for the issues you want to track (default: `assignee = currentUser() AND statusCategory != Done`)
 
-Credentials are stored in `~/.config/deadlineaura/config.json`, which is set to permissions `0600` on every save — readable only by your user account. This is the same security model used for the Google OAuth token at `~/.config/deadlineaura/google-token.json`. The file is local to the machine and is never transmitted.
+Credentials are stored in `~/.config/deadlineaura/config.json`, which is set to permissions `0600` on every save, so it is readable only by your user account. This is the same security model used for the Google OAuth token at `~/.config/deadlineaura/google-token.json`. The file is local to the machine and is never transmitted.
 
-### Step 8 — Autostart (optional)
+### Step 8 — Configure Outlook (optional)
+
+Deadline Aura reads Outlook through the ICS feed the calendar publishes, so it needs no Microsoft account, no app registration and no admin consent.
+
+In Outlook on the web, open **Settings → Calendar → Shared calendars → Publish a calendar**, pick the calendar, set the permission to **Can view all details**, and publish. Copy the ICS link (the `webcal://` form is accepted and converted to `https://`).
+
+In Deadline Aura, open **Settings → Sources → Outlook**, switch the source on and paste the link.
+
+Treat that link like a password: anyone who has it can read the whole calendar without logging in. The app stores it in `config.json` alongside the other secrets, masks it in the settings window, and never writes it to the logs. Microsoft refreshes the published feed every few hours, so a meeting added minutes ago will not appear immediately.
+
+### Step 9 — Autostart (optional)
 
 **GNOME autostart — launch the widget on login:**
 
@@ -282,14 +306,19 @@ Click the strip to open the sidebar. It shows your tasks grouped into sections:
 <br><em>Sidebar: AI clinical note, stress forecast, task sections with urgency scores, and action buttons</em>
 </div>
 
-1. **Local** - personal tasks you create directly in the app
-2. **Google Calendar** - upcoming events from your synced calendars, with real-time status: "ongoing" (blue) during the event, "ended" (grey) after it finishes, or start time with countdown for future events
-3. **Jira Favorites** - Jira tasks you have starred (appears only if you have favorites)
-4. **Jira** - tasks matching your configured JQL filter
+1. **In Progress** - the task whose live timer is running (appears only while a timer is active)
+2. **Local** - personal tasks you create directly in the app
+3. **Google Tasks** - open tasks from your Google account
+4. **Google Calendar** - upcoming events from your synced calendars, with real-time status: "ongoing" (blue) during the event, "ended" (grey) after it finishes, or start time with countdown for future events
+5. **Outlook** - events from the published ICS feed, if you configured one
+6. **Jira Favorites** - Jira tasks you have starred (appears only if you have favorites)
+7. **Jira** - tasks matching your configured JQL filter
 
-Each task card shows title, countdown to deadline, urgency score, and source badge. Click any Jira or Google Calendar task to open it in the browser.
+Sections with nothing in them are not drawn.
 
-At the top of the sidebar you will find buttons for manual sync, settings (gear icon), post-it layout (grid icon), and close (X).
+Each task card shows title, countdown to deadline, urgency score, and source badge. Click any Jira or Google Calendar task to open it in the browser. Outlook cards have no link: a published feed carries no per-event web page.
+
+The footer at the bottom of the sidebar holds the settings (gear), post-it layout, manual sync and close buttons, plus the timestamp of the last sync. At the top, the cat icon next to the clock controls the meeting flyby, and the `?` button next to the urgency score opens the breakdown.
 
 ### Local tasks
 
@@ -305,7 +334,7 @@ Click the star icon on any Jira task card to add it to your favorites. Starred t
 
 Pin any task to the desktop by clicking the pin icon on its card. The task appears as a post-it note rendered directly into the wallpaper.
 
-To reposition post-it notes: click the layout icon (grid) in the sidebar header. A transparent overlay opens where you can drag each post-it to the desired position. Click "Save" to apply, or press Escape to cancel. Positions are stored as percentages, so they adapt to any screen resolution.
+To reposition post-it notes: click the Layout button in the sidebar footer. A transparent overlay opens where you can drag each post-it to the desired position. Click "Save" to apply, or press Escape to cancel. Positions are stored as percentages, so they adapt to any screen resolution.
 
 ### Time logging to Google Calendar
 
@@ -344,6 +373,24 @@ A floating transparent bar appears at the bottom of each display when you have u
 
 The dock uses a translucent glass effect (backdrop blur) and does not reserve screen space - it overlays the desktop only when meetings are imminent and hides automatically when there are none.
 
+### Meeting flyby
+
+Sixty seconds before a meeting starts, a pixel cat walks across every display towing a banner with the meeting title and the countdown ("Standup in 1 minute"). The animation lasts about 20 seconds and then leaves the screen. It is meant to catch you when the meeting dock is behind a full-screen window and the desktop notification went unnoticed.
+
+The cat icon next to the clock, at the top of the sidebar, controls it:
+
+| Menu entry           | Effect                                                                |
+| -------------------- | --------------------------------------------------------------------- |
+| Snooze 1h / 3h / 24h | No flyby until the chosen time has passed, then it resumes on its own |
+| Forever              | Turns the flyby off until you turn it back on                         |
+| Reactivate           | Cancels a snooze or a shutdown straight away                          |
+
+While the alerts are suspended, the cat icon is drawn crossed out. Both the trigger time and the length of the animation live under `meeting_flyby` in `config.json`.
+
+### Score breakdown
+
+Next to the urgency score at the top of the sidebar there is a `?` button. It opens a panel that explains where the number came from: the AI assessment and its weight in the blend, the mechanical part with the volume amplifier and the count of out-of-office events excluded, and the three tasks contributing most to the total. When no AI provider has answered, the panel says so and reports the mechanical score alone.
+
 ### AI notes and burnout detection
 
 Click the colored urgency bar at the top of the sidebar to expand the AI panel. It shows:
@@ -362,17 +409,17 @@ Click the gear icon in the sidebar to open the settings panel. It has 9 tabs:
 <br><em>Settings panel: 9 configuration tabs with per-section reset</em>
 </div>
 
-| Tab           | What you can configure                                          |
-| ------------- | --------------------------------------------------------------- |
-| General       | UI sync interval, data sync interval, lookahead window          |
-| Sources       | Google Calendar calendars and keywords, Jira instances and JQL  |
-| AI            | Provider priority order, refresh interval, timeout, temperature |
-| Wallpaper     | Enable/disable, background images, post-it settings             |
-| Sidebar       | Position (left/right), width, opacity                           |
-| Notifications | Enable/disable, score threshold, cooldown                       |
-| Interface     | Language (Italian/English), max tasks shown, countdown format   |
-| Shift         | Work days, time slots, holidays, regular/variable shift modes   |
-| Advanced      | Urgency engine constants and priority weights                   |
+| Tab           | What you can configure                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| General       | UI sync interval, data sync interval, lookahead window                                                              |
+| Sources       | Google OAuth client ID and secret, Google Calendar calendars and keywords, Outlook ICS feed, Jira instances and JQL |
+| AI            | Provider API keys, provider priority order, refresh interval, timeout, temperature                                  |
+| Wallpaper     | Enable/disable, background images, post-it settings                                                                 |
+| Sidebar       | Position (left/right), width, opacity                                                                               |
+| Notifications | Enable/disable, score threshold, cooldown, meeting dock and its lead time                                           |
+| Interface     | Language (Italian/English), max tasks shown, countdown format                                                       |
+| Shift         | Work days, time slots, holidays, regular/variable shift modes                                                       |
+| Advanced      | Urgency engine constants and priority weights                                                                       |
 
 Each tab has a "Reset section" button to restore defaults for that section only.
 
