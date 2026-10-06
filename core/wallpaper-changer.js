@@ -209,7 +209,6 @@ async function update(
     displays,
     palette,
     score,
-    engineResult,
     pinnedByDisplay,
     calendarEvents: calendarEvents || allTasks,
     usageRows,
