@@ -74,7 +74,8 @@ describe('core/ai-usage-band — drawUsageBand (real canvas)', () => {
     drawUsageBand(ctx, [], WIDE_REGION, { nowMs: NOW_MS, lang: 'it' });
 
     const after = ctx.getImageData(0, 0, WIDE_REGION.width, WIDE_REGION.height).data;
-    expect(Buffer.from(after)).toEqual(Buffer.from(before));
+    // Buffer.equals is a native byte compare; toEqual walks 8 MB element by element.
+    expect(Buffer.from(after).equals(Buffer.from(before))).toBe(true);
     expect(canvas.width).toBe(WIDE_REGION.width);
   });
 
@@ -87,7 +88,7 @@ describe('core/ai-usage-band — drawUsageBand (real canvas)', () => {
     drawUsageBand(ctx, [claudeRow('delivery')], WIDE_REGION, { nowMs: NOW_MS, lang: 'it' });
 
     const after = ctx.getImageData(0, 0, WIDE_REGION.width, WIDE_REGION.height).data;
-    expect(Buffer.from(after)).not.toEqual(Buffer.from(before));
+    expect(Buffer.from(after).equals(Buffer.from(before))).toBe(false);
   });
 
   it('paints text pixels in the right half of the band when 4 cards fill the full width', () => {
