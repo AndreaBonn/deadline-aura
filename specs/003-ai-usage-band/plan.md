@@ -43,7 +43,7 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 
 - Misure: p95 23 ms per python3, 66 ms per Electron con `ELECTRON_RUN_AS_NODE`. `/usr/bin/node` è la v18, quindi fuori dagli engines, e non è garantito sul target.
 - Lo script vive solo finché esiste `/opt`. Se il `.deb` viene rimosso, la statusline di Claude Code si rompe su tutti i profili. Con python3 la copia in `~/.local/share` continua a inoltrare all'originale.
-- Shebang `#!/usr/bin/python3 -I -S`. `python3` va aggiunto a `deb.depends`.
+- Shebang `#!/usr/bin/python3 -IS` (un solo argomento: Linux passa lo shebang come stringa unica, e `-I -S` separati fanno fallire python3, misurato in T11). `python3` va aggiunto a `deb.depends`.
 - Deroga dichiarata dalla regola python-stack: niente uv e niente pyproject, perché è uno script standalone che gira sulla macchina dell'utente finale.
 - I test sono black-box in vitest, con `spawnSync('python3', ...)`: un solo runner.
 - Sorgente: `scripts/ai-usage/claude-capture.py`, distribuito via `extraResources`. All'avvio l'app lo copia in `~/.local/share/deadlineaura/bin/` quando l'hash differisce.
@@ -51,7 +51,7 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 ### ADR-2 Ridisegno guidato da una firma d'uso, non a ogni ciclo
 
 - Misure: render 82 ms, `toBuffer` PNG sincrono 697 ms sul main thread, file da 2,4 MB. Ridisegnare ogni minuto vorrebbe dire circa 3,4 GB scritti al giorno e una dissolvenza di GNOME ogni minuto.
-- Firma = per ogni riga, la % in bucket del 5%, gli attraversamenti di soglia (80/95/100), i reset avvenuti, più la granularità del countdown decisa in D1. Il tetto è un ridisegno ogni 15 minuti.
+- Firma = per ogni riga, la % in bucket del 5%, gli attraversamenti di soglia (70/90/100, le soglie warn/critical della spec §11, le stesse dei colori della barra), i reset avvenuti, più la granularità del countdown decisa in D1. Il tetto è un ridisegno ogni 15 minuti.
 - `shouldRerender(prevSig, nextSig, force)` è una funzione pura, che si aggiunge come secondo motivo di ridisegno accanto al delta di tonalità.
 - Va misurato `canvas.toBuffer` asincrono, che toglierebbe circa 0,7 s dal main thread. UNVERIFIED: che giri sul threadpool. Si tiene solo se la misura lo conferma (rule performance).
 
