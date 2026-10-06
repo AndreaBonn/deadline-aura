@@ -14,6 +14,7 @@ install / uninstall / status
 """
 
 import json
+import math
 import os
 import re
 import stat
@@ -158,8 +159,9 @@ def write_snapshot(path, account, merged):
 
 
 def format_pct(value):
-    """Render a clamped percentage as an integer string."""
-    return str(int(round(value)))
+    """Render a clamped percentage as an integer string, rounding half up."""
+    # Matches JS Math.round in the band; Python's round() is half-to-even.
+    return str(math.floor(value + 0.5))
 
 
 def format_fallback_text(merged):

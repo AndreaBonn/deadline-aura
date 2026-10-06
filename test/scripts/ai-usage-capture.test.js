@@ -244,3 +244,19 @@ describe('claude-capture.py capture mode', () => {
     expect(result.status).toBe(0);
   });
 });
+
+describe('claude-capture.py fallback percentage rounding', () => {
+  it('rounds half up like the wallpaper band, not to the nearest even integer', () => {
+    const home = makeHome();
+    const payload = JSON.stringify({
+      rate_limits: {
+        five_hour: { used_percentage: 68.5, resets_at: 1791324600 },
+        seven_day: { used_percentage: 67.4, resets_at: 1791378000 },
+      },
+    });
+
+    const result = runCapture({ home, configDir: path.join(home, 'acc'), input: payload });
+
+    expect(result.stdout.toString()).toBe('5h 69% | 7d 67%');
+  });
+});
