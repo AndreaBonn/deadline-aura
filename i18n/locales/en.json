@@ -138,6 +138,7 @@
     "min_score_delta": "Minimum score delta",
     "min_score_delta_hint": "Minimum change to update wallpaper",
     "show_text": "Show text",
+    "show_ai_usage": "Show Claude/Codex limit usage",
     "photo_backgrounds": "Photo backgrounds",
     "resolution": "Resolution",
     "auto": "Automatic",
@@ -224,7 +225,16 @@
     "cal_badge": "CAL",
     "tasks_badge": "TASKS",
     "jira_badge": "JIRA",
-    "outlook_badge": "OUTLOOK"
+    "outlook_badge": "OUTLOOK",
+    "ai_usage": {
+      "claude": "CLAUDE",
+      "codex": "CODEX",
+      "five_hour": "5h",
+      "seven_day": "7d",
+      "not_available": "n/a",
+      "free": "free",
+      "updated": "upd. {time}"
+    }
   },
   "bands": {
     "calm": "calm",

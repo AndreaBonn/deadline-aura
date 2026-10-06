@@ -362,6 +362,12 @@ function renderWallpaper() {
       }),
     ),
     createField(
+      t('settings.show_ai_usage'),
+      createToggle(config.wallpaper.show_ai_usage, (v) => {
+        config.wallpaper.show_ai_usage = v;
+      }),
+    ),
+    createField(
       t('settings.photo_backgrounds'),
       createToggle(config.wallpaper.use_backgrounds, (v) => {
         config.wallpaper.use_backgrounds = v;

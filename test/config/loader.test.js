@@ -102,6 +102,17 @@ describe('loadConfig', () => {
     expect(config).toHaveProperty('wallpaper');
     expect(config).toHaveProperty('notifications');
   });
+
+  it('defaults show_ai_usage to true for a config saved before the key existed', () => {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    const legacyWallpaper = { ...DEFAULTS.wallpaper };
+    delete legacyWallpaper.show_ai_usage;
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ wallpaper: legacyWallpaper }), 'utf-8');
+
+    const config = loadConfig();
+
+    expect(config.wallpaper.show_ai_usage).toBe(true);
+  });
 });
 
 describe('saveConfig', () => {

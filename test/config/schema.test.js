@@ -61,6 +61,14 @@ describe('config schema', () => {
     expect(() => validateConfig(valid)).not.toThrow();
   });
 
+  it('rejects a non-boolean show_ai_usage', () => {
+    const invalid = {
+      ...DEFAULTS,
+      wallpaper: { ...DEFAULTS.wallpaper, show_ai_usage: 'yes' },
+    };
+    expect(() => validateConfig(invalid)).toThrow();
+  });
+
   it('rejects empty calendars array', () => {
     const invalid = {
       ...DEFAULTS,

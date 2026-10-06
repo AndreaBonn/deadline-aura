@@ -48,6 +48,7 @@ const DEFAULTS = {
     enabled: true,
     min_score_delta: 0.02,
     resolution: 'auto',
+    show_ai_usage: true,
     show_text: true,
     use_backgrounds: true,
     postit: {

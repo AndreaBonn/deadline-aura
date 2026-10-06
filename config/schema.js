@@ -81,6 +81,7 @@ const configSchema = z.object({
     enabled: z.boolean(),
     min_score_delta: z.number().min(0).max(0.5),
     resolution: z.union([z.literal('auto'), z.string().regex(/^\d+x\d+$/)]),
+    show_ai_usage: z.boolean(),
     show_text: z.boolean(),
     use_backgrounds: z.boolean(),
     postit: z.object({
