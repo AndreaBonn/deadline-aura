@@ -8,4 +8,7 @@ contextBridge.exposeInMainWorld('settingsApi', {
   saveConfig: (config) => ipcRenderer.invoke('settings:save-config', config),
   getDefaults: () => ipcRenderer.invoke('settings:get-defaults'),
   close: () => ipcRenderer.send('settings:close'),
+  captureStatus: () => ipcRenderer.invoke('ai-usage:capture-status'),
+  captureInstall: () => ipcRenderer.invoke('ai-usage:capture-install'),
+  captureUninstall: () => ipcRenderer.invoke('ai-usage:capture-uninstall'),
 });

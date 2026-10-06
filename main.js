@@ -16,6 +16,7 @@
 const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
 const { execFile } = require('child_process');
 const path = require('path');
+const os = require('os');
 const {
   setX11Strut,
   getDisplaysWithWindows,
@@ -41,6 +42,12 @@ const { maskConfigForRenderer, restoreTokens } = require('./config/secret-maskin
 const i18n = require('./i18n');
 const { cleanupPastHolidays, cleanupExpiredMonths } = require('./core/work-shift');
 const { collectUsage } = require('./core/ai-usage');
+const {
+  sourceDir: captureSourceDir,
+  binDir: captureBinDir,
+  syncCaptureBin,
+  runCaptureCommand,
+} = require('./core/ai-usage-capture-bin');
 let config = loadConfig();
 i18n.setLanguage(config.language || 'it');
 
@@ -483,6 +490,22 @@ function initSidebar() {
   });
 }
 
+/** Refresh the stable copy of the capture scripts; a failure never blocks the app. */
+function syncCaptureBinSafely() {
+  try {
+    syncCaptureBin({
+      source: captureSourceDir({
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        appDir: __dirname,
+      }),
+      dest: captureBinDir(os.homedir()),
+    });
+  } catch (err) {
+    console.warn('[ai-usage-capture] sync failed:', err.message);
+  }
+}
+
 async function runUpdateCycle({ force = false } = {}) {
   if (isUpdateCycleRunning) {
     return;
@@ -611,6 +634,8 @@ app.whenReady().then(() => {
         'Place a PNG (1024x1024 recommended) there.',
     );
   }
+
+  syncCaptureBinSafely();
 
   initSidebar();
 
@@ -827,6 +852,20 @@ app.whenReady().then(() => {
       sidebarWindow.webContents.send('config-changed', config);
     }
     return { ok: true };
+  });
+
+  ipcMain.handle('ai-usage:capture-status', () =>
+    runCaptureCommand('status', { home: os.homedir() }),
+  );
+
+  ipcMain.handle('ai-usage:capture-install', () => {
+    syncCaptureBinSafely();
+    return runCaptureCommand('install', { home: os.homedir() });
+  });
+
+  ipcMain.handle('ai-usage:capture-uninstall', () => {
+    syncCaptureBinSafely();
+    return runCaptureCommand('uninstall', { home: os.homedir() });
   });
 
   ipcMain.on('settings:close', () => {

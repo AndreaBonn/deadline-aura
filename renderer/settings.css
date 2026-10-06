@@ -682,3 +682,31 @@ input[type='range'] {
   gap: 6px;
   justify-content: flex-end;
 }
+
+/* --- AI usage: Claude Code statusline capture --- */
+
+.ai-capture {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+
+.ai-capture-status {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.ai-capture-message {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-capture-message--success {
+  color: rgba(120, 220, 140, 0.9);
+}
+
+.ai-capture-message--error {
+  color: rgba(255, 110, 110, 0.9);
+}

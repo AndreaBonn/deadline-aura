@@ -3,7 +3,8 @@
 /* global settingsApi, createToggle, createNumberInput, createRangeWithValue,
    createSelect, createTextInput, createTagInput, createPriorityList,
    createField, createFieldGroup, createCheckboxGroup, createDateList,
-   createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t */
+   createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t,
+   renderCaptureControl */
 
 let config = {};
 let defaults = {};
@@ -367,6 +368,11 @@ function renderWallpaper() {
         config.wallpaper.show_ai_usage = v;
       }),
     ),
+  );
+  const captureContainer = document.createElement('div');
+  renderCaptureControl(captureContainer, settingsApi, t);
+  group.append(
+    captureContainer,
     createField(
       t('settings.photo_backgrounds'),
       createToggle(config.wallpaper.use_backgrounds, (v) => {
