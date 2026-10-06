@@ -1,11 +1,15 @@
 'use strict';
 
 const { createCanvas, loadImage } = require('canvas');
-const { t } = require('../i18n');
+const { t, getLanguage } = require('../i18n');
 const fs = require('fs');
 const path = require('path');
 const { renderPostits } = require('./postit-renderer');
 const { computeCanvasGeometry } = require('./display-manager');
+const { truncateText } = require('./canvas-text');
+const { bandTop, drawUsageBand } = require('./ai-usage-band');
+
+const AGENDA_BAND_GAP = 10;
 
 // node-canvas reads image files in native C++, bypassing Electron's asar fs
 // shim. Inside a packaged app the assets live in app.asar.unpacked (declared in
@@ -17,18 +21,6 @@ function resolveUnpackedDir(dir) {
 }
 
 const BACKGROUNDS_DIR = resolveUnpackedDir(path.join(__dirname, '..', 'assets', 'backgrounds'));
-
-function truncateText(ctx, text, maxWidth) {
-  if (ctx.measureText(text).width <= maxWidth) {
-    return text;
-  }
-  const ellipsis = '…';
-  let truncated = text;
-  while (truncated.length > 0 && ctx.measureText(truncated + ellipsis).width > maxWidth) {
-    truncated = truncated.slice(0, -1);
-  }
-  return truncated + ellipsis;
-}
 
 const SUPPORTED_EXTS = ['.png', '.jpg', '.jpeg', '.webp'];
 
@@ -150,15 +142,7 @@ function filterUpcomingEvents(allTasks) {
     .sort((a, b) => (a.start_at || a.due_at) - (b.start_at || b.due_at));
 }
 
-function mentalLoadBlockTop(engineResult, region) {
-  if (!engineResult) {
-    return region.y + region.height;
-  }
-  const margin = 60;
-  return region.y + region.height - margin - 10;
-}
-
-function drawDailyAgenda(ctx, allTasks, region, engineResult) {
+function drawDailyAgenda(ctx, allTasks, region, agendaBottom) {
   const todayEvents = filterUpcomingEvents(allTasks);
   if (todayEvents.length === 0) {
     return;
@@ -170,8 +154,7 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   const lineHeight = 28;
   const headerHeight = 28;
   const gapToUrgency = 20;
-  const availableHeight =
-    mentalLoadBlockTop(engineResult, region) - startY - headerHeight - gapToUrgency;
+  const availableHeight = agendaBottom - AGENDA_BAND_GAP - startY - headerHeight - gapToUrgency;
   const maxItems = Math.max(1, Math.floor(availableHeight / lineHeight));
 
   // Header
@@ -241,31 +224,15 @@ function drawDailyAgenda(ctx, allTasks, region, engineResult) {
   }
 }
 
-function drawMentalLoad(ctx, engineResult, region) {
-  if (!engineResult) {
-    return;
-  }
-
-  const margin = 60;
-  const pct = (engineResult.global_score * 100).toFixed(0);
-  const y = region.y + region.height - margin;
-
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-
-  // Percentage — large and prominent
-  ctx.font = '700 32px "Ubuntu", system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-  ctx.fillText(`${pct}%`, region.x + margin, y);
-
-  // Label
-  const pctWidth = ctx.measureText(`${pct}%`).width;
-  ctx.font = '400 16px "Ubuntu", system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  ctx.fillText(t('wallpaper.mental_load'), region.x + margin + pctWidth + 12, y - 5);
-}
-
-async function render({ displays, palette, score, engineResult, pinnedByDisplay, calendarEvents }) {
+async function render({
+  displays,
+  palette,
+  score,
+  pinnedByDisplay,
+  calendarEvents,
+  usageRows = [],
+  nowMs = Date.now(),
+}) {
   const geometry = computeCanvasGeometry(displays);
   const { totalWidth, totalHeight, regions } = geometry;
 
@@ -278,6 +245,7 @@ async function render({ displays, palette, score, engineResult, pinnedByDisplay,
 
   const bgFile = getBackgroundFile(score);
   const bgImage = await loadBackgroundImage(bgFile);
+  const lang = getLanguage();
 
   for (const region of regions) {
     // Background image or fallback gradient
@@ -288,12 +256,15 @@ async function render({ displays, palette, score, engineResult, pinnedByDisplay,
       drawFallbackGradient(ctx, palette, region);
     }
 
-    // Daily agenda (top-left) — all tasks with due_at today, only future
+    // Daily agenda (top-left) — all tasks with due_at today, only future,
+    // bounded below by the AI usage band (or the region bottom when empty)
     const allTasks = calendarEvents || [];
-    drawDailyAgenda(ctx, allTasks, region, engineResult);
+    drawDailyAgenda(ctx, allTasks, region, bandTop(usageRows, region));
 
-    // Mental load indicator (bottom-left)
-    drawMentalLoad(ctx, engineResult, region);
+    // AI usage band (bottom, full width)
+    if (usageRows.length > 0) {
+      drawUsageBand(ctx, usageRows, region, { nowMs, lang });
+    }
 
     // Pinned post-it tasks
     const pinned = pinnedByDisplay ? pinnedByDisplay[region.displayId] || [] : [];

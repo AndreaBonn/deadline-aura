@@ -56,7 +56,7 @@ describe('wallpaper-renderer — render()', () => {
     expect(canvas.height).toBe(600);
   });
 
-  it('renders mental load indicator when engineResult provided', async () => {
+  it('renders without error when engineResult is provided (no mental-load indicator anymore)', async () => {
     const engineResult = {
       global_score: 0.75,
       tasks: [{ id: 't1', title: 'Task 1', urgency_score: 0.8, priority: 1, source: 'gcal' }],

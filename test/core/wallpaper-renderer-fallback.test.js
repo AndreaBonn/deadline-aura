@@ -66,7 +66,7 @@ describe('wallpaper-renderer — fallback gradient (no background images)', () =
     expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
   });
 
-  it('renders agenda + fallback gradient + mental load together', async () => {
+  it('renders agenda + fallback gradient together', async () => {
     const now = Date.now();
     const events = [
       {
