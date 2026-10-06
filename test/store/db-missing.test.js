@@ -143,7 +143,9 @@ describe('db — getLatestAiScore', () => {
 describe('db — cleanupOldRecords', () => {
   it('deletes scores older than 7 days', () => {
     const oldTs = Date.now() - 8 * 24 * 3600000;
-    db.getDb().prepare('INSERT INTO scores (global_score, computed_at) VALUES (?,?)').run(0.5, oldTs);
+    db.getDb()
+      .prepare('INSERT INTO scores (global_score, computed_at) VALUES (?,?)')
+      .run(0.5, oldTs);
 
     db.cleanupOldRecords();
 

@@ -56,16 +56,12 @@ function updateLocalTask({ id, title, dueAt, priority }) {
 
 function deleteLocalTask(id) {
   unpinTaskFromAll(id);
-  return getDb()
-    .prepare("DELETE FROM tasks WHERE id = ? AND source = 'local'")
-    .run(id);
+  return getDb().prepare("DELETE FROM tasks WHERE id = ? AND source = 'local'").run(id);
 }
 
 function completeLocalTask(id) {
   unpinTaskFromAll(id);
-  return getDb()
-    .prepare("UPDATE tasks SET is_done = 1 WHERE id = ? AND source = 'local'")
-    .run(id);
+  return getDb().prepare("UPDATE tasks SET is_done = 1 WHERE id = ? AND source = 'local'").run(id);
 }
 
 function getAllLocalTasks() {

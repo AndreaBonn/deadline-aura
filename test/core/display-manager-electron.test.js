@@ -51,7 +51,9 @@ describe('display-manager — detectDisplaysFromElectron', () => {
 
   it('marks display as primary when bounds.x and bounds.y are both 0', () => {
     const mockScreen = {
-      getAllDisplays: () => [makeElectronDisplay({ bounds: { x: 0, y: 0, width: 1920, height: 1080 } })],
+      getAllDisplays: () => [
+        makeElectronDisplay({ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }),
+      ],
     };
 
     const [display] = detectDisplaysFromElectron(mockScreen);

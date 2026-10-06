@@ -20,9 +20,9 @@ vi.mock('../../core/wallpaper-renderer', () => ({
 }));
 
 vi.mock('../../core/display-manager', () => ({
-  detectDisplays: vi.fn().mockReturnValue([
-    { id: 'eDP-1', width: 1920, height: 1080, x: 0, y: 0, primary: true },
-  ]),
+  detectDisplays: vi
+    .fn()
+    .mockReturnValue([{ id: 'eDP-1', width: 1920, height: 1080, x: 0, y: 0, primary: true }]),
 }));
 
 const {
@@ -82,9 +82,9 @@ describe('wallpaper-changer — setWallpaper', () => {
 
   it('returns "feh" when gsettings fails but feh succeeds', () => {
     vi.spyOn(childProcess, 'spawnSync')
-      .mockReturnValueOnce({ status: 0 })  // gsettings picture-uri
-      .mockReturnValueOnce({ status: 0 })  // gsettings picture-uri-dark
-      .mockReturnValueOnce({ status: 1 })  // gsettings picture-options — fails
+      .mockReturnValueOnce({ status: 0 }) // gsettings picture-uri
+      .mockReturnValueOnce({ status: 0 }) // gsettings picture-uri-dark
+      .mockReturnValueOnce({ status: 1 }) // gsettings picture-options — fails
       .mockReturnValueOnce({ status: 0 }); // feh succeeds
 
     const result = setWallpaper('/tmp/fake.png');

@@ -12,9 +12,7 @@ function favoriteTask(taskId) {
 }
 
 function unfavoriteTask(taskId) {
-  return getDb()
-    .prepare('DELETE FROM jira_favorites WHERE task_id = ?')
-    .run(taskId);
+  return getDb().prepare('DELETE FROM jira_favorites WHERE task_id = ?').run(taskId);
 }
 
 function getAllFavoriteIds() {
@@ -25,9 +23,7 @@ function getAllFavoriteIds() {
 }
 
 function isFavorite(taskId) {
-  const row = getDb()
-    .prepare('SELECT 1 FROM jira_favorites WHERE task_id = ? LIMIT 1')
-    .get(taskId);
+  const row = getDb().prepare('SELECT 1 FROM jira_favorites WHERE task_id = ? LIMIT 1').get(taskId);
   return !!row;
 }
 

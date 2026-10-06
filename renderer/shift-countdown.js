@@ -119,8 +119,7 @@ function updateShiftCountdown() {
 
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const currentMs =
-    now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
+  const currentMs = now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
 
   const todaySlots = shiftGetSlotsForDate(now, _shiftConfig);
 

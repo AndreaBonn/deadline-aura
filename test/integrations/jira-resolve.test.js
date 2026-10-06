@@ -113,9 +113,7 @@ describe('jira — fetchFromInstance error handling', () => {
       sources: {
         jira: {
           enabled: true,
-          instances: [
-            { domain: 'bad.atlassian.net', email: 'u@c.com', apiToken: 't', jql: 'x' },
-          ],
+          instances: [{ domain: 'bad.atlassian.net', email: 'u@c.com', apiToken: 't', jql: 'x' }],
           jql: 'default',
         },
       },

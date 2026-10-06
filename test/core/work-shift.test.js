@@ -92,16 +92,16 @@ describe('cleanupExpiredMonths', () => {
 
   it('removes months before current', () => {
     const months = {
-      '2026-03': { '1': [{ start: '09:00', end: '17:00' }] },
-      '2026-05': { '11': [{ start: '09:00', end: '17:00' }] },
-      '2026-06': { '1': [{ start: '08:00', end: '14:00' }] },
+      '2026-03': { 1: [{ start: '09:00', end: '17:00' }] },
+      '2026-05': { 11: [{ start: '09:00', end: '17:00' }] },
+      '2026-06': { 1: [{ start: '08:00', end: '14:00' }] },
     };
     const result = cleanupExpiredMonths(months, ref);
     expect(Object.keys(result)).toEqual(['2026-05', '2026-06']);
   });
 
   it('returns empty object when all expired', () => {
-    const months = { '2025-12': { '1': [{ start: '09:00', end: '17:00' }] } };
+    const months = { '2025-12': { 1: [{ start: '09:00', end: '17:00' }] } };
     expect(cleanupExpiredMonths(months, ref)).toEqual({});
   });
 });
@@ -154,8 +154,8 @@ describe('getSlotsForDate', () => {
       variable: {
         months: {
           '2026-05': {
-            '11': [{ start: '06:00', end: '14:00' }],
-            '12': [{ start: '14:00', end: '22:00' }],
+            11: [{ start: '06:00', end: '14:00' }],
+            12: [{ start: '14:00', end: '22:00' }],
           },
         },
       },
@@ -169,7 +169,7 @@ describe('getSlotsForDate', () => {
       enabled: true,
       mode: 'variable',
       regular: regularConfig.regular,
-      variable: { months: { '2026-05': { '12': [{ start: '08:00', end: '16:00' }] } } },
+      variable: { months: { '2026-05': { 12: [{ start: '08:00', end: '16:00' }] } } },
     };
     const may11 = new Date(2026, 4, 11);
     expect(getSlotsForDate(may11, variableConfig)).toEqual([]);
@@ -273,7 +273,7 @@ describe('getShiftStatus', () => {
       variable: {
         months: {
           '2026-05': {
-            '11': [{ start: '06:00', end: '14:00' }],
+            11: [{ start: '06:00', end: '14:00' }],
           },
         },
       },
@@ -294,7 +294,7 @@ describe('getShiftStatus', () => {
       variable: {
         months: {
           '2026-05': {
-            '11': [{ start: '06:00', end: '14:00' }],
+            11: [{ start: '06:00', end: '14:00' }],
           },
         },
       },

@@ -236,9 +236,24 @@ describe('burnout-detector', () => {
 
     it('returns severity "high" when 2+ triggers active', () => {
       const rows = [
-        makeAiCacheRow({ date: '2026-05-01', stress: 8, recovery: 'insufficient', emotional: 'high' }),
-        makeAiCacheRow({ date: '2026-05-02', stress: 9, recovery: 'insufficient', emotional: 'high' }),
-        makeAiCacheRow({ date: '2026-05-03', stress: 8, recovery: 'insufficient', emotional: 'high' }),
+        makeAiCacheRow({
+          date: '2026-05-01',
+          stress: 8,
+          recovery: 'insufficient',
+          emotional: 'high',
+        }),
+        makeAiCacheRow({
+          date: '2026-05-02',
+          stress: 9,
+          recovery: 'insufficient',
+          emotional: 'high',
+        }),
+        makeAiCacheRow({
+          date: '2026-05-03',
+          stress: 8,
+          recovery: 'insufficient',
+          emotional: 'high',
+        }),
       ];
       const result = detectBurnoutRisk(rows, {});
       expect(result.severity).toBe('high');
