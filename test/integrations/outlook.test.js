@@ -154,7 +154,14 @@ describe('normalizeOccurrence', () => {
 });
 
 describe('fetchEvents', () => {
+  // The fixture event is dated: pin the clock before it so the lookahead window always contains it.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-09T08:00:00Z'));
+  });
+
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
