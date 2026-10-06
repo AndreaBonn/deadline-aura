@@ -20,40 +20,35 @@ def our_command():
     return os.path.realpath(os.path.abspath(sys.argv[0]))
 
 
+def _candidate_paths(home):
+    """List ``~/.claude/settings.json`` and every Cloak profile settings path."""
+    profiles_dir = os.path.join(home, ".cloak", "profiles")
+    candidates = [os.path.join(home, ".claude", "settings.json")]
+    try:
+        for name in sorted(os.listdir(profiles_dir)):
+            candidates.append(os.path.join(profiles_dir, name, "settings.json"))
+    except OSError:
+        pass
+    return candidates
+
+
 def discover_targets(create_if_missing):
-    """Return the deduplicated realpaths of every settings.json target.
+    """Return the sorted, deduplicated realpaths of every settings.json target.
 
     Collects ``~/.claude/settings.json`` plus every
     ``~/.cloak/profiles/*/settings.json`` that exists. If none exist
     at all and ``create_if_missing`` is set, creates an empty
     ``~/.claude/settings.json`` so there is always one target.
     """
-    home = common.home_dir()
-    claude_settings = os.path.join(home, ".claude", "settings.json")
-    profiles_dir = os.path.join(home, ".cloak", "profiles")
-
-    candidates = [claude_settings]
-    try:
-        for name in sorted(os.listdir(profiles_dir)):
-            candidates.append(os.path.join(profiles_dir, name, "settings.json"))
-    except OSError:
-        pass
-
+    candidates = _candidate_paths(common.home_dir())
     existing = [path for path in candidates if os.path.exists(path)]
     if not existing and create_if_missing:
+        claude_settings = candidates[0]
         common.ensure_dir(os.path.dirname(claude_settings), common.DIR_MODE)
         with open(claude_settings, "w", encoding="utf-8") as handle:
             handle.write("{}")
         existing = [claude_settings]
-
-    seen = set()
-    realpaths = []
-    for path in existing:
-        real = os.path.realpath(path)
-        if real not in seen:
-            seen.add(real)
-            realpaths.append(real)
-    return sorted(realpaths)
+    return sorted({os.path.realpath(path) for path in existing})
 
 
 def load_capture_targets():
@@ -127,6 +122,31 @@ def _load_targets_or_abort(targets):
     return parsed
 
 
+def _is_our_status_line(current, command):
+    """Return True when ``current`` is the statusLine this tool installed."""
+    return (
+        isinstance(current, dict)
+        and current.get("type") == "command"
+        and current.get("command") == command
+    )
+
+
+def _install_target(path, data, mode, command, capture_targets):
+    """Point one target at the capture, recording its previous statusLine first.
+
+    ``capture.json`` is saved before ``settings.json`` is written, so an
+    interruption on a later target never loses the statusLine to restore.
+    """
+    current = data.get("statusLine")
+    backup_target(path)
+    capture_targets[path] = current
+    save_capture_targets(capture_targets)
+    new_status = dict(current) if isinstance(current, dict) else {}
+    new_status["type"] = "command"
+    new_status["command"] = command
+    common.atomic_write_json(path, {**data, "statusLine": new_status}, mode)
+
+
 def run_install():
     """Install the chain command on every discovered settings target."""
     targets = discover_targets(create_if_missing=True)
@@ -137,30 +157,43 @@ def run_install():
     capture_targets = load_capture_targets()
     changed, unchanged = [], []
     command = our_command()
-
     for path in targets:
         data, mode = parsed[path]
-        current = data.get("statusLine")
-        already_ours = (
-            isinstance(current, dict)
-            and current.get("type") == "command"
-            and current.get("command") == command
-        )
-        if already_ours:
+        if _is_our_status_line(data.get("statusLine"), command):
             unchanged.append(path)
             continue
-        backup_target(path)
-        capture_targets[path] = current
-        new_status = dict(current) if isinstance(current, dict) else {}
-        new_status["type"] = "command"
-        new_status["command"] = command
-        data["statusLine"] = new_status
-        common.atomic_write_json(path, data, mode)
+        _install_target(path, data, mode, command, capture_targets)
         changed.append(path)
 
-    save_capture_targets(capture_targets)
     _print_result(changed, unchanged, [])
     return 0
+
+
+def _uninstall_target(path, data, mode, capture_targets):
+    """Restore one target, then drop its record from ``capture.json``.
+
+    The record is removed only after ``settings.json`` is written, so a
+    failed write leaves it available for the next uninstall.
+    """
+    backup_target(path)
+    previous = capture_targets[path]
+    restored = {key: value for key, value in data.items() if key != "statusLine"}
+    if previous is not None:
+        restored["statusLine"] = previous
+    common.atomic_write_json(path, restored, mode)
+    del capture_targets[path]
+    save_capture_targets(capture_targets)
+
+
+def _uninstall_warning(path, data, command, capture_targets):
+    """Explain why a target is left untouched, or return None when it is not ours."""
+    if not _is_our_status_line(data.get("statusLine"), command):
+        if path in capture_targets:
+            return f"{path}: statusLine was changed by the user, left untouched"
+        return None
+    if path not in capture_targets:
+        return f"{path}: no recorded statusLine to restore, left untouched (see backups)"
+    return None
 
 
 def run_uninstall():
@@ -173,30 +206,18 @@ def run_uninstall():
     capture_targets = load_capture_targets()
     changed, unchanged, warnings = [], [], []
     command = our_command()
-
     for path in targets:
         data, mode = parsed[path]
-        current = data.get("statusLine")
-        is_ours = (
-            isinstance(current, dict)
-            and current.get("type") == "command"
-            and current.get("command") == command
-        )
-        if not is_ours:
+        restorable = _is_our_status_line(data.get("statusLine"), command) and path in capture_targets
+        if not restorable:
             unchanged.append(path)
-            if path in capture_targets:
-                warnings.append(f"{path}: statusLine was changed by the user, left untouched")
+            warning = _uninstall_warning(path, data, command, capture_targets)
+            if warning:
+                warnings.append(warning)
             continue
-        backup_target(path)
-        previous = capture_targets.pop(path, None)
-        if previous is None:
-            data.pop("statusLine", None)
-        else:
-            data["statusLine"] = previous
-        common.atomic_write_json(path, data, mode)
+        _uninstall_target(path, data, mode, capture_targets)
         changed.append(path)
 
-    save_capture_targets(capture_targets)
     _print_result(changed, unchanged, warnings)
     return 0
 
@@ -213,12 +234,7 @@ def run_status():
         except (OSError, ValueError):
             result[path] = {"installed": False, "error": "invalid_json"}
             continue
-        current = data.get("statusLine")
-        is_ours = (
-            isinstance(current, dict)
-            and current.get("type") == "command"
-            and current.get("command") == command
-        )
+        is_ours = _is_our_status_line(data.get("statusLine"), command)
         result[path] = {"installed": is_ours}
         installed_any = installed_any or is_ours
     print(json.dumps({"installed": installed_any, "targets": result}))
