@@ -91,6 +91,13 @@
       {
         "from": ".env.example",
         "to": ".env.example"
+      },
+      {
+        "from": "scripts/ai-usage",
+        "to": "ai-usage",
+        "filter": [
+          "*.py"
+        ]
       }
     ],
     "directories": {
@@ -131,7 +138,8 @@
         "libpangocairo-1.0-0",
         "libjpeg-turbo8 | libjpeg8",
         "libgif7",
-        "librsvg2-2"
+        "librsvg2-2",
+        "python3"
       ]
     }
   }
