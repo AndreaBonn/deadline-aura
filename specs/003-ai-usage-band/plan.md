@@ -22,7 +22,7 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 3. Una finestra con `resets_at` già passato viene mostrata come `~0%`. Uno snapshot più vecchio di `STALE_AFTER` viene marcato come vecchio, con l'ora del dato.
 4. Codex: le finestre vengono assegnate in base a `window_minutes` (300 → 5h, 10080 → 7d). Gli eventi `limit_id != "codex"` o con finestre null vengono ignorati. `CODEX_HOME` viene rispettato.
 5. Una fonte assente o corrotta produce "n/d" sulla sua riga e un WARNING nel log. Le altre righe e il wallpaper vengono resi comunque.
-6. Con tonalità invariata e firma d'uso cambiata, il wallpaper viene ridisegnato entro un ciclo. Con firma invariata, il ridisegno viene saltato.
+6. Con tonalità invariata e firma d'uso cambiata, il wallpaper viene ridisegnato entro un ciclo. Con firma invariata il ridisegno viene saltato, salvo il tetto di 15 minuti. Tolleranza dichiarata: dentro lo stesso scatto del 5% la percentuale mostrata può restare indietro fino a 15 minuti (per esempio 20% mostrato mentre il valore è 24%). È il prezzo di non ridisegnare a ogni punto percentuale.
 7. Cattura: lo snapshot viene scritto in modo atomico e contiene solo i campi della whitelist (spec §9.1). Lo stdout è identico a quello della statusline originale. Se la catena fallisce o supera 2s, lo stdout è il testo di fallback. L'exit code è sempre 0.
 8. Installer: due install producono una sola modifica e il backup esiste. La scrittura avviene sul realpath e il symlink dei profili resta un symlink. Dopo l'uninstall, `statusLine` è deep-equal all'originale.
 9. Nel `.deb` lo script sta in `resources/`, fuori da `app.asar`, e `python3` compare in `deb.depends`.
@@ -65,6 +65,8 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 | Mai loggare il payload grezzo: solo lunghezza e hash troncato                                                                                                                                                                       | P2       | T13           |
 | Estrazione per path esplicito, mai merge generico su JSON esterni (prototype pollution)                                                                                                                                             | P2       | T02, T04      |
 | `backups/` a 0600, conservati al massimo `MAX_BACKUPS`                                                                                                                                                                              | nota     | T14           |
+
+Respinto anche il lock sullo snapshot (rilievo del `code-reviewer`). Lo scenario: due sessioni dello stesso account, di cui una con payload parziale; la finestra torna al valore precedente fino al render successivo, cioè pochi secondi, e si corregge da sola. Il lock aggiungerebbe codice nel percorso critico della statusline per un guadagno marginale.
 
 Respinto: l'allowlist di interpreti per la catena. Romperebbe statusline legittime arbitrarie, e chi ha lo stesso UID può comunque modificare direttamente `settings.json`, quindi non aggiunge una barriera reale.
 
