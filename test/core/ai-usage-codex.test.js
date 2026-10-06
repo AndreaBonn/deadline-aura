@@ -271,3 +271,28 @@ describe('readCodexUsage', () => {
     }
   });
 });
+
+describe('listRecentRolloutFiles', () => {
+  const { listRecentRolloutFiles, MAX_FILES } = require('../../core/ai-usage-codex-fs');
+
+  it('returns the newest files by mtime even when a day holds more than MAX_FILES', () => {
+    const sessions = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-many-'));
+    const dayDir = path.join(sessions, '2026', '10', '06');
+    fs.mkdirSync(dayDir, { recursive: true });
+    const fileCount = MAX_FILES * 3;
+    const baseSeconds = 1_791_000_000;
+    const created = [];
+    for (let i = 0; i < fileCount; i += 1) {
+      const name = `rollout-2026-10-06T${String(i).padStart(2, '0')}-00-00-x.jsonl`;
+      const filePath = path.join(dayDir, name);
+      fs.writeFileSync(filePath, '');
+      fs.utimesSync(filePath, baseSeconds + i, baseSeconds + i);
+      created.push(filePath);
+    }
+    const newestByMtime = created.slice(-MAX_FILES).reverse();
+
+    const result = listRecentRolloutFiles(sessions);
+
+    expect(result).toEqual(newestByMtime);
+  });
+});

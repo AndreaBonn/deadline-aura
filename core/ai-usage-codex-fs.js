@@ -62,10 +62,9 @@ function walkMostRecentFirst(dir, files) {
     return;
   }
 
+  // Take every rollout of this directory: readdir order is arbitrary, so
+  // cutting here would drop recent files. Trimming happens after the mtime sort.
   for (const entry of rolloutEntries(entries)) {
-    if (files.length >= MAX_FILES) {
-      return;
-    }
     files.push(path.join(dir, entry.name));
   }
   for (const subdir of sortedSubdirs(entries)) {
@@ -77,12 +76,12 @@ function walkMostRecentFirst(dir, files) {
 }
 
 /**
- * Collect up to MAX_FILES rollout-*.jsonl paths under the sessions
- * directory, descending into the most recent YYYY/MM/DD subdirectories
- * first (by descending name order).
+ * Collect rollout-*.jsonl paths under the sessions directory, descending
+ * into the most recent YYYY/MM/DD subdirectories first (by descending name
+ * order). Whole directories are taken until at least MAX_FILES are found.
  *
  * @param {string} sessionsDir - Absolute path to the sessions directory.
- * @returns {string[]} Absolute file paths, at most MAX_FILES.
+ * @returns {string[]} Absolute file paths, unsorted, possibly more than MAX_FILES.
  */
 function collectRolloutFiles(sessionsDir) {
   const files = [];
@@ -134,10 +133,10 @@ function readTailLines(filePath) {
  * by mtime descending.
  *
  * @param {string} sessionsDir - Absolute path to the sessions directory.
- * @returns {string[]} Absolute file paths, most recent first.
+ * @returns {string[]} Absolute file paths, most recent first, at most MAX_FILES.
  */
 function listRecentRolloutFiles(sessionsDir) {
-  return sortByMtimeDesc(collectRolloutFiles(sessionsDir));
+  return sortByMtimeDesc(collectRolloutFiles(sessionsDir)).slice(0, MAX_FILES);
 }
 
 module.exports = {
