@@ -194,3 +194,23 @@ describe('claude-capture.py install interrupted between targets', () => {
     }
   });
 });
+
+describe('claude-capture.py preserves the settings file layout', () => {
+  it('restores the original bytes after install and uninstall', () => {
+    const home = makeHome();
+    const realPath = claudeSettingsPath(home);
+    fs.mkdirSync(path.dirname(realPath), { recursive: true });
+    // Claude Code writes settings.json indented by 2 with a trailing newline,
+    // and statusLine sits between other keys: both must survive a round trip.
+    const originalText = `${JSON.stringify(ORIGINAL_SETTINGS, null, 2)}\n`;
+    fs.writeFileSync(realPath, originalText);
+
+    run(home, ['install']);
+    const installedText = fs.readFileSync(realPath, 'utf8');
+    run(home, ['uninstall']);
+
+    expect(Object.keys(JSON.parse(installedText))).toEqual(Object.keys(ORIGINAL_SETTINGS));
+    expect(installedText.endsWith('}\n')).toBe(true);
+    expect(fs.readFileSync(realPath, 'utf8')).toBe(originalText);
+  });
+});

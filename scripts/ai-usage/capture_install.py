@@ -144,7 +144,7 @@ def _install_target(path, data, mode, command, capture_targets):
     new_status = dict(current) if isinstance(current, dict) else {}
     new_status["type"] = "command"
     new_status["command"] = command
-    common.atomic_write_json(path, {**data, "statusLine": new_status}, mode)
+    common.atomic_write_settings(path, {**data, "statusLine": new_status}, mode)
 
 
 def run_install():
@@ -177,10 +177,12 @@ def _uninstall_target(path, data, mode, capture_targets):
     """
     backup_target(path)
     previous = capture_targets[path]
-    restored = {key: value for key, value in data.items() if key != "statusLine"}
-    if previous is not None:
-        restored["statusLine"] = previous
-    common.atomic_write_json(path, restored, mode)
+    # Replacing the value in place keeps statusLine at its original position.
+    if previous is None:
+        restored = {key: value for key, value in data.items() if key != "statusLine"}
+    else:
+        restored = {**data, "statusLine": previous}
+    common.atomic_write_settings(path, restored, mode)
     del capture_targets[path]
     save_capture_targets(capture_targets)
 

@@ -120,21 +120,12 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
-def atomic_write_json(path, payload, mode):
-    """Write ``payload`` as JSON to ``path`` atomically with explicit ``mode``.
+def atomic_write_text(path, text, mode):
+    """Write ``text`` to ``path`` atomically with explicit ``mode``.
 
     Writes a sibling temp file created with ``O_CREAT|O_EXCL``, fsyncs
     it, then ``os.replace``s it onto ``path``. ``os.replace`` swaps the
     directory entry itself, so it never follows a symlink at ``path``.
-
-    Parameters
-    ----------
-    path : str
-        Destination file path.
-    payload : dict
-        JSON-serializable content.
-    mode : int
-        Octal permission bits for the final file.
     """
     directory = os.path.dirname(path)
     tmp_path = os.path.join(
@@ -143,7 +134,7 @@ def atomic_write_json(path, payload, mode):
     fd = os.open(tmp_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, mode)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False)
+            handle.write(text)
             handle.flush()
             os.fsync(handle.fileno())
         os.chmod(tmp_path, mode)
@@ -154,6 +145,16 @@ def atomic_write_json(path, payload, mode):
                 os.remove(tmp_path)
             except OSError:
                 pass
+
+
+def atomic_write_json(path, payload, mode):
+    """Write ``payload`` as compact JSON to ``path`` atomically (see atomic_write_text)."""
+    atomic_write_text(path, json.dumps(payload, ensure_ascii=False), mode)
+
+
+def atomic_write_settings(path, payload, mode):
+    """Write a Claude Code settings file in its own layout: 2-space indent, final newline."""
+    atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n", mode)
 
 
 def load_json_file(path):
