@@ -40,6 +40,7 @@ const { configSchema } = require('./config/schema');
 const { maskConfigForRenderer, restoreTokens } = require('./config/secret-masking');
 const i18n = require('./i18n');
 const { cleanupPastHolidays, cleanupExpiredMonths } = require('./core/work-shift');
+const { collectUsage } = require('./core/ai-usage');
 let config = loadConfig();
 i18n.setLanguage(config.language || 'it');
 
@@ -498,11 +499,20 @@ async function runUpdateCycle({ force = false } = {}) {
 
     if (config.wallpaper.enabled) {
       const calendarEvents = db.getUpcomingCalendarEvents(ONE_DAY_MS);
+      let usageRows = [];
+      if (config.wallpaper.show_ai_usage) {
+        try {
+          usageRows = collectUsage({ nowMs: Date.now(), lang: i18n.getLanguage() });
+        } catch (err) {
+          console.warn('runUpdateCycle: failed to collect AI usage:', err.message);
+        }
+      }
       await wallpaperChanger.update(palette, {
         engineResult,
         force,
         electronScreen: screen,
         calendarEvents,
+        usageRows,
       });
     }
 

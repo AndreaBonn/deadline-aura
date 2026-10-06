@@ -7,13 +7,101 @@ const childProcess = require('child_process');
 const wallpaperRenderer = require('./wallpaper-renderer');
 const { detectDisplays } = require('./display-manager');
 const pinnedQueries = require('../store/pinned-queries');
+const { usageSignature } = require('./ai-usage');
 
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const WALLPAPER_PATH = path.join(DATA_DIR, 'wallpaper.png');
 const MIN_SCORE_DELTA = 0.02;
+const MAX_REDRAW_INTERVAL_MS = 15 * 60 * 1000;
 
 let lastScore = null;
+let lastSignature = null;
+let lastRenderAt = null;
 let overlayOpen = false;
+
+/**
+ * Decide whether a redraw is warranted (ADR-2): on an explicit force, a
+ * visible hue change, a changed usage signature, or — only when the usage
+ * signature is non-empty — a render staler than MAX_REDRAW_INTERVAL_MS.
+ * Pure function: no module state, no I/O.
+ *
+ * @param {{force: boolean, hueChanged: boolean, prevSignature: string|null, nextSignature: string, lastRenderAt: number|null, nowMs: number}} args
+ * @returns {boolean} True when a redraw should happen.
+ */
+function shouldRerender({ force, hueChanged, prevSignature, nextSignature, lastRenderAt, nowMs }) {
+  if (force || hueChanged || nextSignature !== prevSignature) {
+    return true;
+  }
+  if (nextSignature === '' || lastRenderAt === null) {
+    return false;
+  }
+  return nowMs - lastRenderAt >= MAX_REDRAW_INTERVAL_MS;
+}
+
+/**
+ * Encode a canvas as a PNG buffer using node-canvas's async callback form,
+ * which runs the encode off the main thread (measured: ~0ms added main-
+ * thread blocking vs ~235ms for the sync form on a 3840x1080 canvas).
+ *
+ * @param {import('canvas').Canvas} canvas - Canvas to encode.
+ * @returns {Promise<Buffer>} Resolves with the PNG-encoded buffer.
+ */
+function encodePng(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBuffer((err, buffer) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve(buffer);
+    }, 'image/png');
+  });
+}
+
+/**
+ * Render the wallpaper and write it to a fresh timestamped path (GNOME
+ * caches by URI, so a stable path would not force a reload).
+ *
+ * @param {object} renderArgs - Forwarded verbatim to wallpaperRenderer.render.
+ * @returns {Promise<string>} The absolute path the PNG was written to.
+ */
+async function renderAndWriteWallpaper(renderArgs) {
+  const canvas = await wallpaperRenderer.render(renderArgs);
+  const buffer = await encodePng(canvas);
+  const timestampedPath = path.join(DATA_DIR, `wallpaper-${Date.now()}.png`);
+  await fs.promises.writeFile(timestampedPath, buffer);
+  return timestampedPath;
+}
+
+/**
+ * Best-effort removal of every stale wallpaper PNG, keeping only the one
+ * just written.
+ *
+ * @param {string} keepPath - Absolute path of the wallpaper to keep.
+ */
+function cleanupOldWallpapers(keepPath) {
+  try {
+    const files = fs
+      .readdirSync(DATA_DIR)
+      .filter((f) => f.startsWith('wallpaper-') && f !== path.basename(keepPath));
+    for (const old of files) {
+      fs.unlinkSync(path.join(DATA_DIR, old));
+    }
+  } catch {
+    // cleanup is best-effort
+  }
+}
+
+/**
+ * Reset module-level render state. Test-only: lets each test start from a
+ * clean slate instead of inheriting lastScore/lastSignature/lastRenderAt
+ * left behind by a previous test.
+ */
+function resetState() {
+  lastScore = null;
+  lastSignature = null;
+  lastRenderAt = null;
+}
 
 function buildPinnedByDisplay(allPinned, displays) {
   if (!displays.length || !allPinned.length) {
@@ -76,13 +164,33 @@ function setWallpaper(filePath) {
 
 async function update(
   palette,
-  { engineResult = null, force = false, electronScreen = null, calendarEvents = null } = {},
+  {
+    engineResult = null,
+    force = false,
+    electronScreen = null,
+    calendarEvents = null,
+    usageRows = [],
+    nowMs = Date.now(),
+  } = {},
 ) {
   if (overlayOpen) {
     return { changed: false, reason: 'overlay open' };
   }
 
-  if (!force && lastScore !== null && Math.abs(palette.hsl.h - lastScore) < MIN_SCORE_DELTA * 160) {
+  const hueChanged =
+    lastScore === null || Math.abs(palette.hsl.h - lastScore) >= MIN_SCORE_DELTA * 160;
+  const nextSignature = usageSignature(usageRows, nowMs);
+
+  if (
+    !shouldRerender({
+      force,
+      hueChanged,
+      prevSignature: lastSignature,
+      nextSignature,
+      lastRenderAt,
+      nowMs,
+    })
+  ) {
     return { changed: false, reason: 'delta below threshold' };
   }
 
@@ -97,36 +205,23 @@ async function update(
 
   const allTasks = engineResult ? engineResult.tasks : [];
 
-  const canvas = await wallpaperRenderer.render({
+  const timestampedPath = await renderAndWriteWallpaper({
     displays,
     palette,
     score,
     engineResult,
     pinnedByDisplay,
     calendarEvents: calendarEvents || allTasks,
+    usageRows,
+    nowMs,
   });
 
-  const buffer = canvas.toBuffer('image/png');
-
-  // GNOME caches wallpaper by URI — use timestamped path to force reload
-  const timestampedPath = path.join(DATA_DIR, `wallpaper-${Date.now()}.png`);
-  fs.writeFileSync(timestampedPath, buffer);
-
   const method = setWallpaper(timestampedPath);
-
-  // Cleanup old wallpapers
-  try {
-    const files = fs
-      .readdirSync(DATA_DIR)
-      .filter((f) => f.startsWith('wallpaper-') && f !== path.basename(timestampedPath));
-    for (const old of files) {
-      fs.unlinkSync(path.join(DATA_DIR, old));
-    }
-  } catch {
-    // cleanup is best-effort
-  }
+  cleanupOldWallpapers(timestampedPath);
 
   lastScore = palette.hsl.h;
+  lastSignature = nextSignature;
+  lastRenderAt = nowMs;
 
   return { changed: true, method, path: timestampedPath };
 }
@@ -137,5 +232,7 @@ module.exports = {
   setOverlayOpen,
   isOverlayOpen,
   buildPinnedByDisplay,
+  shouldRerender,
+  resetState,
   WALLPAPER_PATH,
 };
