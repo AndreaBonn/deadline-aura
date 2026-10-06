@@ -1,12 +1,7 @@
 'use strict';
 
 const { createCanvas } = require('canvas');
-const {
-  bandHeight,
-  bandTop,
-  drawUsageBand,
-  WIDE_LAYOUT_MIN_WIDTH,
-} = require('../../core/ai-usage-band');
+const { bandHeight, bandTop, drawUsageBand } = require('../../core/ai-usage-band');
 const { formatReset } = require('../../core/ai-usage-format');
 
 const NOW_MS = new Date('2026-10-06T12:00:00.000Z').getTime();
@@ -46,15 +41,15 @@ describe('core/ai-usage-band — bandHeight / bandTop', () => {
     expect(bandHeight([], WIDE_REGION)).toBe(0);
   });
 
-  it('grows with the number of rows', () => {
-    const one = bandHeight([claudeRow('a')], WIDE_REGION);
-    const five = bandHeight(FIVE_ROWS, WIDE_REGION);
+  it('grows with the number of rows once cards wrap onto more card-rows', () => {
+    const one = bandHeight([claudeRow('a')], NARROW_REGION);
+    const five = bandHeight(FIVE_ROWS, NARROW_REGION);
     expect(five).toBeGreaterThan(one);
   });
 
-  it('is taller on a narrow region than a wide one for the same rows (2-line layout)', () => {
-    const wide = bandHeight(FIVE_ROWS, { ...WIDE_REGION, width: 1920 });
-    const narrow = bandHeight(FIVE_ROWS, { ...NARROW_REGION, width: 1366 });
+  it('is taller on a narrow region than a wide one for the same rows (more wrapped card-rows)', () => {
+    const wide = bandHeight(FIVE_ROWS, WIDE_REGION);
+    const narrow = bandHeight(FIVE_ROWS, NARROW_REGION);
     expect(narrow).toBeGreaterThan(wide);
   });
 
@@ -66,10 +61,6 @@ describe('core/ai-usage-band — bandHeight / bandTop', () => {
     const rows = [claudeRow('a')];
     const height = bandHeight(rows, WIDE_REGION);
     expect(bandTop(rows, WIDE_REGION)).toBe(WIDE_REGION.y + WIDE_REGION.height - height);
-  });
-
-  it('exports the wide-layout width threshold used by bandHeight', () => {
-    expect(typeof WIDE_LAYOUT_MIN_WIDTH).toBe('number');
   });
 });
 
@@ -97,6 +88,31 @@ describe('core/ai-usage-band — drawUsageBand (real canvas)', () => {
 
     const after = ctx.getImageData(0, 0, WIDE_REGION.width, WIDE_REGION.height).data;
     expect(Buffer.from(after)).not.toEqual(Buffer.from(before));
+  });
+
+  it('paints text pixels in the right half of the band when 4 cards fill the full width', () => {
+    const { ctx } = newCtx(WIDE_REGION);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, WIDE_REGION.width, WIDE_REGION.height);
+
+    const rows = [claudeRow('alpha'), claudeRow('beta'), claudeRow('gamma'), claudeRow('delta')];
+    drawUsageBand(ctx, rows, WIDE_REGION, { nowMs: NOW_MS, lang: 'it' });
+
+    const height = bandHeight(rows, WIDE_REGION);
+    const top = bandTop(rows, WIDE_REGION);
+    const halfWidth = Math.floor(WIDE_REGION.width / 2);
+    const rightHalf = ctx.getImageData(halfWidth, top, WIDE_REGION.width - halfWidth, height).data;
+
+    let nonVeilPixelFound = false;
+    for (let i = 0; i < rightHalf.length; i += 4) {
+      const [r, g, b] = [rightHalf[i], rightHalf[i + 1], rightHalf[i + 2]];
+      // The veil is a uniform translucent black; text pixels are near-white.
+      if (r > 100 || g > 100 || b > 100) {
+        nonVeilPixelFound = true;
+        break;
+      }
+    }
+    expect(nonVeilPixelFound).toBe(true);
   });
 
   it('draws the percentage, the inferred-prefixed percentage, the formatted reset and n/a', () => {
