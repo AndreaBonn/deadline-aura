@@ -224,6 +224,60 @@ function drawDailyAgenda(ctx, allTasks, region, agendaBottom) {
   }
 }
 
+/**
+ * Draw one display region: background, daily agenda, AI usage band, and
+ * pinned post-its, in back-to-front order.
+ *
+ * @param {import('canvas').CanvasRenderingContext2D} ctx
+ * @param {object} region - A single entry from computeCanvasGeometry().regions.
+ * @param {object} opts - Everything the region draw needs, forwarded from render().
+ */
+function drawRegion(
+  ctx,
+  region,
+  { bgImage, palette, score, allTasks, usageRows, pinnedByDisplay, nowMs, lang },
+) {
+  // Background image or fallback gradient
+  if (bgImage) {
+    drawBackground(ctx, bgImage, region);
+    drawTintOverlay(ctx, palette, score, region);
+  } else {
+    drawFallbackGradient(ctx, palette, region);
+  }
+
+  // Daily agenda (top-left) — all tasks with due_at today, only future,
+  // bounded below by the AI usage band (or the region bottom when empty)
+  drawDailyAgenda(ctx, allTasks, region, bandTop(usageRows, region));
+
+  // AI usage band (bottom, full width)
+  if (usageRows.length > 0) {
+    drawUsageBand(ctx, usageRows, region, { nowMs, lang });
+  }
+
+  // Pinned post-it tasks
+  const pinned = pinnedByDisplay ? pinnedByDisplay[region.displayId] || [] : [];
+  renderPostits(ctx, pinned, region);
+}
+
+/**
+ * Create the canvas for the full virtual desktop and paint the black base
+ * that shows through wherever a region's background does not cover it.
+ *
+ * @param {number} totalWidth
+ * @param {number} totalHeight
+ * @returns {{canvas: import('canvas').Canvas, ctx: import('canvas').CanvasRenderingContext2D}}
+ */
+function createBaseCanvas(totalWidth, totalHeight) {
+  const canvas = createCanvas(totalWidth, totalHeight);
+  const ctx = canvas.getContext('2d');
+
+  // Black base
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+  return { canvas, ctx };
+}
+
 async function render({
   displays,
   palette,
@@ -235,40 +289,24 @@ async function render({
 }) {
   const geometry = computeCanvasGeometry(displays);
   const { totalWidth, totalHeight, regions } = geometry;
-
-  const canvas = createCanvas(totalWidth, totalHeight);
-  const ctx = canvas.getContext('2d');
-
-  // Black base
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, totalWidth, totalHeight);
+  const { canvas, ctx } = createBaseCanvas(totalWidth, totalHeight);
 
   const bgFile = getBackgroundFile(score);
   const bgImage = await loadBackgroundImage(bgFile);
   const lang = getLanguage();
+  const allTasks = calendarEvents || [];
 
   for (const region of regions) {
-    // Background image or fallback gradient
-    if (bgImage) {
-      drawBackground(ctx, bgImage, region);
-      drawTintOverlay(ctx, palette, score, region);
-    } else {
-      drawFallbackGradient(ctx, palette, region);
-    }
-
-    // Daily agenda (top-left) — all tasks with due_at today, only future,
-    // bounded below by the AI usage band (or the region bottom when empty)
-    const allTasks = calendarEvents || [];
-    drawDailyAgenda(ctx, allTasks, region, bandTop(usageRows, region));
-
-    // AI usage band (bottom, full width)
-    if (usageRows.length > 0) {
-      drawUsageBand(ctx, usageRows, region, { nowMs, lang });
-    }
-
-    // Pinned post-it tasks
-    const pinned = pinnedByDisplay ? pinnedByDisplay[region.displayId] || [] : [];
-    renderPostits(ctx, pinned, region);
+    drawRegion(ctx, region, {
+      bgImage,
+      palette,
+      score,
+      allTasks,
+      usageRows,
+      pinnedByDisplay,
+      nowMs,
+      lang,
+    });
   }
 
   return canvas;

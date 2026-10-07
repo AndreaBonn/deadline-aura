@@ -162,6 +162,81 @@ function setWallpaper(filePath) {
   return null;
 }
 
+/**
+ * Decide whether `update()` should proceed to a render: closes over the
+ * overlay flag and the lastScore/lastSignature/lastRenderAt module state.
+ *
+ * @param {object} palette - Current palette, as passed to update().
+ * @param {{force: boolean, usageRows: Array, nowMs: number}} args
+ * @returns {{proceed: false, reason: string}|{proceed: true, nextSignature: string}}
+ */
+function decideRerender(palette, { force, usageRows, nowMs }) {
+  if (overlayOpen) {
+    return { proceed: false, reason: 'overlay open' };
+  }
+
+  const hueChanged =
+    lastScore === null || Math.abs(palette.hsl.h - lastScore) >= MIN_SCORE_DELTA * 160;
+  const nextSignature = usageSignature(usageRows, nowMs);
+
+  const proceed = shouldRerender({
+    force,
+    hueChanged,
+    prevSignature: lastSignature,
+    nextSignature,
+    lastRenderAt,
+    nowMs,
+  });
+
+  return proceed
+    ? { proceed: true, nextSignature }
+    : { proceed: false, reason: 'delta below threshold' };
+}
+
+/**
+ * Collect everything render() needs beyond palette/calendarEvents/usageRows:
+ * the data directory, the displays, the score, and the pinned tasks grouped
+ * by display.
+ *
+ * @param {object|null} engineResult - Deadline-engine run result, or null.
+ * @param {object|null} electronScreen - Electron's `screen` module, or null.
+ * @returns {{displays: Array, score: number, pinnedByDisplay: object, allTasks: Array}}
+ */
+function gatherRenderInputs(engineResult, electronScreen) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+
+  const displays = detectDisplays(electronScreen);
+  const score = engineResult ? engineResult.global_score : 0;
+
+  // Group pinned tasks by display, remapping stale IDs to primary
+  const allPinned = pinnedQueries.getAllPinned();
+  const pinnedByDisplay = buildPinnedByDisplay(allPinned, displays);
+  const allTasks = engineResult ? engineResult.tasks : [];
+
+  return { displays, score, pinnedByDisplay, allTasks };
+}
+
+/**
+ * Apply the freshly rendered wallpaper to the desktop, clean up stale PNGs,
+ * and persist the module-level render state.
+ *
+ * @param {string} timestampedPath - Absolute path of the PNG just written.
+ * @param {number} hue - Palette hue to remember as lastScore.
+ * @param {string} nextSignature - Usage signature to remember as lastSignature.
+ * @param {number} nowMs - Timestamp to remember as lastRenderAt.
+ * @returns {{changed: true, method: string|null, path: string}}
+ */
+function applyRenderResult(timestampedPath, hue, nextSignature, nowMs) {
+  const method = setWallpaper(timestampedPath);
+  cleanupOldWallpapers(timestampedPath);
+
+  lastScore = hue;
+  lastSignature = nextSignature;
+  lastRenderAt = nowMs;
+
+  return { changed: true, method, path: timestampedPath };
+}
+
 async function update(
   palette,
   {
@@ -173,37 +248,15 @@ async function update(
     nowMs = Date.now(),
   } = {},
 ) {
-  if (overlayOpen) {
-    return { changed: false, reason: 'overlay open' };
+  const decision = decideRerender(palette, { force, usageRows, nowMs });
+  if (!decision.proceed) {
+    return { changed: false, reason: decision.reason };
   }
 
-  const hueChanged =
-    lastScore === null || Math.abs(palette.hsl.h - lastScore) >= MIN_SCORE_DELTA * 160;
-  const nextSignature = usageSignature(usageRows, nowMs);
-
-  if (
-    !shouldRerender({
-      force,
-      hueChanged,
-      prevSignature: lastSignature,
-      nextSignature,
-      lastRenderAt,
-      nowMs,
-    })
-  ) {
-    return { changed: false, reason: 'delta below threshold' };
-  }
-
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-
-  const displays = detectDisplays(electronScreen);
-  const score = engineResult ? engineResult.global_score : 0;
-
-  // Group pinned tasks by display, remapping stale IDs to primary
-  const allPinned = pinnedQueries.getAllPinned();
-  const pinnedByDisplay = buildPinnedByDisplay(allPinned, displays);
-
-  const allTasks = engineResult ? engineResult.tasks : [];
+  const { displays, score, pinnedByDisplay, allTasks } = gatherRenderInputs(
+    engineResult,
+    electronScreen,
+  );
 
   const timestampedPath = await renderAndWriteWallpaper({
     displays,
@@ -215,14 +268,7 @@ async function update(
     nowMs,
   });
 
-  const method = setWallpaper(timestampedPath);
-  cleanupOldWallpapers(timestampedPath);
-
-  lastScore = palette.hsl.h;
-  lastSignature = nextSignature;
-  lastRenderAt = nowMs;
-
-  return { changed: true, method, path: timestampedPath };
+  return applyRenderResult(timestampedPath, palette.hsl.h, decision.nextSignature, nowMs);
 }
 
 module.exports = {
