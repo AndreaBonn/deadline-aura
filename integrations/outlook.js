@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 
 const { parseIcs } = require('../core/ics-parser');
+const { isPrivateHost } = require('../core/url-safety');
 const { getLookaheadEnd } = require('../core/deadline-engine');
 
 const FETCH_TIMEOUT_MS = 20000;
@@ -18,23 +19,6 @@ const OUTLOOK_HIGH_IMPORTANCE = 2;
 const PRIORITY_HIGH = 1;
 const PRIORITY_KEYWORD = 2;
 const PRIORITY_DEFAULT = 3;
-
-// Hostnames and literal addresses that must never be fetched. The feed url is
-// pasted by the user, who may well be pasting something they received from
-// someone else, so a link pointing at a service on their own machine or LAN is
-// worth refusing. This is a literal-address check, not a DNS resolution: a
-// hostname that resolves to a private address still gets through, which is an
-// accepted limit for a single-user desktop app.
-const PRIVATE_HOST_PATTERNS = [
-  /^localhost$/i,
-  /^127\./,
-  /^10\./,
-  /^192\.168\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^169\.254\./,
-  /^\[?::1\]?$/,
-  /^\[?f[cd][0-9a-f]{2}:/i,
-];
 
 /**
  * Validate and normalize a feed url before it is fetched.
@@ -59,7 +43,12 @@ function validateFeedUrl(rawUrl) {
     throw new Error('the calendar feed url must use https');
   }
 
-  if (PRIVATE_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname))) {
+  // The feed url is pasted by the user, who may well be pasting something they
+  // received from someone else, so a link pointing at a service on their own
+  // machine or LAN is worth refusing. This is a literal-address check, not a DNS
+  // resolution: a hostname that resolves to a private address still gets
+  // through, which is an accepted limit for a single-user desktop app.
+  if (isPrivateHost(url.hostname)) {
     throw new Error('the calendar feed url points at a private or loopback address');
   }
 

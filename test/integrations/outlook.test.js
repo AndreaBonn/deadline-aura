@@ -62,6 +62,20 @@ describe('validateFeedUrl', () => {
     );
   });
 
+  it.each([
+    'https://[fe80::1]/cal.ics',
+    'https://[::ffff:127.0.0.1]/cal.ics',
+    'https://[::ffff:169.254.169.254]/cal.ics',
+    'https://[::]/cal.ics',
+    'https://localhost./cal.ics',
+  ])('rejects IPv6 link-local, mapped-private and trailing-dot address %s', (url) => {
+    expect(() => validateFeedUrl(url)).toThrow(/private|loopback/i);
+  });
+
+  it('accepts a public IPv6 feed address', () => {
+    expect(validateFeedUrl('https://[2001:db8::1]/cal.ics')).toBe('https://[2001:db8::1]/cal.ics');
+  });
+
   it('rejects a url that is not a url at all', () => {
     expect(() => validateFeedUrl('not a url')).toThrow();
   });
@@ -276,5 +290,18 @@ describe('fetchEvents', () => {
     const logged = errorSpy.mock.calls.flat().join(' ');
     expect(logged).toMatch(/outlook\.office365\.com/);
     expect(logged).not.toMatch(/reachcalendar/);
+  });
+
+  it('logs unknown host without exposing malformed feed input', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const rawUrl = 'not a url at all';
+
+    const promise = fetchEvents(configWith({ ics_url: rawUrl }));
+
+    await expect(promise).rejects.toThrow('the calendar feed url is not a valid url');
+    expect(errorSpy.mock.calls).toEqual([
+      ['Outlook [unknown host]: the calendar feed url is not a valid url'],
+    ]);
+    expect(errorSpy.mock.calls.flat().join(' ')).not.toContain(rawUrl);
   });
 });

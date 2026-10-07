@@ -170,10 +170,22 @@ function renderPostits(ctx, pinnedTasks, region) {
   }
 }
 
+/**
+ * Attach the post-it header label to each pinned task, so a renderer that
+ * cannot require this module (the overlay) shows the same label the wallpaper draws.
+ *
+ * @param {Array<{task_id: string, title?: string}>} tasks - Pinned tasks.
+ * @returns {Array<object>} New task objects with a `code` field; the input is not mutated.
+ */
+function withPostitCodes(tasks) {
+  return tasks.map((task) => ({ ...task, code: extractCode(task.task_id, task.title) }));
+}
+
 module.exports = {
   renderPostit,
   renderPostits,
   extractCode,
+  withPostitCodes,
   POSTIT_WIDTH,
   POSTIT_HEIGHT,
 };

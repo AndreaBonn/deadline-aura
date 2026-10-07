@@ -27,11 +27,6 @@ function formatCountdown(dueAt) {
   return Math.round(hoursRemaining / 24) + t('countdown.days_short');
 }
 
-function extractCode(taskId) {
-  const match = taskId.match(/^(?:jira-|gcal-)?(.+)/);
-  return match ? match[1] : taskId;
-}
-
 function createPostitGhost(task) {
   const el = document.createElement('div');
   el.className = task.is_stale ? 'postit-ghost stale' : 'postit-ghost';
@@ -40,7 +35,7 @@ function createPostitGhost(task) {
   el.style.top = task.y_pct + '%';
 
   const pClass = 'p' + (task.priority || 3);
-  const code = extractCode(task.task_id);
+  const code = task.code || task.task_id;
   const countdown = formatCountdown(task.due_at);
 
   el.innerHTML =

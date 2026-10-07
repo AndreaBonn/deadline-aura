@@ -34,8 +34,18 @@ const gcal = require('./integrations/google-calendar');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
 const { applyFlybyAction } = require('./core/flyby-snooze');
+const { isSafeExternalUrl } = require('./core/url-safety');
+const {
+  validateLocalTaskCreate,
+  validateLocalTaskUpdate,
+} = require('./core/local-task-validation');
+const {
+  validateCalendarLogTime,
+  validateCalendarUpdateEvent,
+} = require('./core/calendar-ipc-validation');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
+const { withPostitCodes } = require('./core/postit-renderer');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
 const { maskConfigForRenderer, restoreTokens } = require('./config/secret-masking');
@@ -607,7 +617,7 @@ function openOverlay(displayId) {
   overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
 
   overlayWindow.webContents.once('did-finish-load', () => {
-    const pinned = pinnedQueries.getByDisplay(displayId);
+    const pinned = withPostitCodes(pinnedQueries.getByDisplay(displayId));
     overlayWindow.webContents.send('overlay-init', {
       pinnedTasks: pinned,
       displayId,
@@ -672,31 +682,6 @@ app.whenReady().then(() => {
       notifier.sendBurnoutWarning(warning, config);
     }
   }, burnoutIntervalMs);
-
-  function isSafeExternalUrl(url) {
-    try {
-      const parsed = new URL(url);
-      if (!['https:', 'http:'].includes(parsed.protocol)) {
-        return false;
-      }
-      if (parsed.username || parsed.password) {
-        return false;
-      }
-      const host = parsed.hostname.toLowerCase();
-      if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
-        return false;
-      }
-      if (host.startsWith('10.') || host.startsWith('192.168.')) {
-        return false;
-      }
-      if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) {
-        return false;
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }
 
   ipcMain.on('sidebar:toggle', () => {
     toggleSidebar();
@@ -924,30 +909,20 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('local-task:create', (_event, { title, dueAt, priority }) => {
-    if (!title || typeof title !== 'string' || !title.trim()) {
-      return { ok: false, error: 'INVALID_TITLE' };
+    const error = validateLocalTaskCreate({ title, priority });
+    if (error) {
+      return { ok: false, error };
     }
     const p = priority !== undefined ? Number(priority) : 3;
-    if (!Number.isInteger(p) || p < 1 || p > 4) {
-      return { ok: false, error: 'INVALID_PRIORITY' };
-    }
     const id = localQueries.createLocalTask({ title: title.trim(), dueAt, priority: p });
     runUpdateCycle({ force: true });
     return { ok: true, id };
   });
 
   ipcMain.handle('local-task:update', (_event, { id, title, dueAt, priority }) => {
-    if (!id || typeof id !== 'string') {
-      return { ok: false, error: 'INVALID_ID' };
-    }
-    if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
-      return { ok: false, error: 'INVALID_TITLE' };
-    }
-    if (priority !== undefined) {
-      const p = Number(priority);
-      if (!Number.isInteger(p) || p < 1 || p > 4) {
-        return { ok: false, error: 'INVALID_PRIORITY' };
-      }
+    const error = validateLocalTaskUpdate({ id, title, priority });
+    if (error) {
+      return { ok: false, error };
     }
     localQueries.updateLocalTask({
       id,
@@ -1003,11 +978,9 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'calendar:log-time',
     async (_event, { summary, startTime, durationMinutes, calendarId }) => {
-      if (!summary || typeof summary !== 'string') {
-        return { ok: false, error: 'INVALID_SUMMARY' };
-      }
-      if (!startTime || typeof durationMinutes !== 'number' || durationMinutes < 1) {
-        return { ok: false, error: 'INVALID_TIME' };
+      const error = validateCalendarLogTime({ summary, startTime, durationMinutes });
+      if (error) {
+        return { ok: false, error };
       }
       const targetCalendar = calendarId || config.sources.google_calendar.default_log_calendar;
       if (!targetCalendar) {
@@ -1029,14 +1002,9 @@ app.whenReady().then(() => {
   );
 
   ipcMain.handle('calendar:update-event', async (_event, { calendarId, eventId, endTime }) => {
-    if (!calendarId || typeof calendarId !== 'string') {
-      return { ok: false, error: 'INVALID_CALENDAR_ID' };
-    }
-    if (!eventId || typeof eventId !== 'string') {
-      return { ok: false, error: 'INVALID_EVENT_ID' };
-    }
-    if (!endTime) {
-      return { ok: false, error: 'INVALID_END_TIME' };
+    const error = validateCalendarUpdateEvent({ calendarId, eventId, endTime });
+    if (error) {
+      return { ok: false, error };
     }
     try {
       const result = await gcal.updateEvent(config, {
