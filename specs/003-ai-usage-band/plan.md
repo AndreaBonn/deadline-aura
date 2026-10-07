@@ -21,10 +21,10 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 2. Esempio: dato `latest/delivery.json` con 5h al 23% e reset fra 2h 15m, e 7d al 41% con reset venerdì alle 14:00, la riga "delivery" mostra i quattro valori nel formato deciso in D1.
 3. Una finestra con `resets_at` già passato viene mostrata come `~0%`. Uno snapshot più vecchio di `STALE_AFTER` viene marcato come vecchio, con l'ora del dato.
 4. Codex: le finestre vengono assegnate in base a `window_minutes` (300 → 5h, 10080 → 7d). Gli eventi `limit_id != "codex"` o con finestre null vengono ignorati. `CODEX_HOME` viene rispettato.
-5. Una fonte assente o corrotta produce "n/d" sulla sua riga e un WARNING nel log. Le altre righe e il wallpaper vengono resi comunque.
+5. Una fonte corrotta o illeggibile produce "n/d" sulla sua riga e un WARNING nel log; uno snapshot Claude assente produce "n/d" senza WARNING; senza `~/.codex/sessions` la riga Codex non compare (chi non usa Codex non deve vederla). Le altre righe e il wallpaper vengono resi comunque.
 6. Con tonalità invariata e firma d'uso cambiata, il wallpaper viene ridisegnato entro un ciclo. Con firma invariata il ridisegno viene saltato, salvo il tetto di 15 minuti. Tolleranza dichiarata: dentro lo stesso scatto del 5% la percentuale mostrata può restare indietro fino a 15 minuti (per esempio 20% mostrato mentre il valore è 24%). È il prezzo di non ridisegnare a ogni punto percentuale.
 7. Cattura: lo snapshot viene scritto in modo atomico e contiene solo i campi della whitelist (spec §9.1). Lo stdout è identico a quello della statusline originale. Se la catena fallisce o supera 2s, lo stdout è il testo di fallback. L'exit code è sempre 0.
-8. Installer: due install producono una sola modifica e il backup esiste. La scrittura avviene sul realpath e il symlink dei profili resta un symlink. Dopo l'uninstall, `statusLine` è deep-equal all'originale.
+8. Installer: due install producono una sola modifica e il backup esiste. La scrittura avviene sul realpath e il symlink dei profili resta un symlink. Dopo l'uninstall il file è identico byte per byte all'originale, se l'originale usa il layout di Claude Code (indentazione a 2 spazi e newline finale); un file con layout diverso viene riscritto in quel layout, con contenuto e ordine delle chiavi invariati.
 9. Nel `.deb` lo script sta in `resources/`, fuori da `app.asar`, e `python3` compare in `deb.depends`.
 10. `npm test`, `npm run lint` e `npm run format:check` sono verdi. Nessun file nuovo supera 300 righe e nessuna funzione supera 30.
 
@@ -33,7 +33,7 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 - A1 (bloccante solo per la Fase B): il payload della statusline contiene `rate_limits.five_hour|seven_day.{used_percentage,resets_at}`. Si verifica in T11.
 - A2: le righe dei rollout Codex hanno un timestamp per evento. Se manca, si usa l'mtime del file.
 - A3: la catena inoltra lo stdout intero, perché la statusline attuale può occupare più righe.
-- A4: la catena viene eseguita con `/bin/sh -c`, con la stessa semantica con cui Claude Code esegue la statusline. È una deroga dichiarata a "no shell=True": la stringa è dell'utente e il file che la contiene è 0600 e di sua proprietà.
+- A4: la catena viene eseguita con `/bin/sh -c`, con la stessa semantica con cui Claude Code esegue la statusline. L'utente ha approvato il 2026-10-07 (finding A1 di `/analyze`) un'eccezione nominata alla regola `shell=True`, registrata in `~/.claude/rules/security.md`: la stringa è dell'utente, il file che la contiene è 0600, non è un symlink ed è di sua proprietà, c'è un timeout.
 - A5: esiste un solo `settings.json` reale, condiviso dai profili Cloak tramite symlink. Install e uninstall valgono quindi per tutti i profili insieme, e la UI lo dichiara.
 - A6: nuova chiave `wallpaper.show_ai_usage`, con default `true`.
 
@@ -64,7 +64,7 @@ Sul wallpaper sparisce la scritta "carico mentale" e compare una fascia a tutta 
 | Directory a 0700, file a 0600; `lstat` prima di scrivere ed eseguire, per non seguire symlink piazzati                                                                                                                              | P2       | T13, T14, T15 |
 | Mai loggare il payload grezzo: solo lunghezza e hash troncato                                                                                                                                                                       | P2       | T13           |
 | Estrazione per path esplicito, mai merge generico su JSON esterni (prototype pollution)                                                                                                                                             | P2       | T02, T04      |
-| `backups/` a 0600, conservati al massimo `MAX_BACKUPS`                                                                                                                                                                              | nota     | T14           |
+| `backups/statusline/` (0700, separata dai backup del DB dell'app), file a 0600, conservati al massimo `MAX_BACKUPS`                                                                                                                 | nota     | T14           |
 
 Respinto anche il lock sullo snapshot (rilievo del `code-reviewer`). Lo scenario: due sessioni dello stesso account, di cui una con payload parziale; la finestra torna al valore precedente fino al render successivo, cioè pochi secondi, e si corregge da sola. Il lock aggiungerebbe codice nel percorso critico della statusline per un guadagno marginale.
 
