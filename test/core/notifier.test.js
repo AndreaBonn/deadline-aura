@@ -1,3 +1,4 @@
+const childProcess = require('child_process');
 const {
   shouldNotify,
   findMostUrgentTask,
@@ -151,6 +152,10 @@ describe('notifier', () => {
       _resetForTest();
     });
 
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     it('returns sent: false when notifications disabled', () => {
       const config = makeConfig({ enabled: false });
       const warning = { isAtRisk: true, triggers: ['Test trigger'], severity: 'moderate' };
@@ -160,11 +165,16 @@ describe('notifier', () => {
     it('returns sent: false during cooldown', () => {
       const config = { ...makeConfig(), burnout: { cooldown_hours: 24 } };
       const warning = { isAtRisk: true, triggers: ['Test trigger'], severity: 'moderate' };
-      // First call succeeds (or fails due to notify-send not available)
-      sendBurnoutWarning(warning, config);
-      // Second call within cooldown
+      // Stubbed so the suite never pops a real desktop notification.
+      const spawn = vi
+        .spyOn(childProcess, 'spawnSync')
+        .mockReturnValue({ status: 0, error: undefined });
+
+      expect(sendBurnoutWarning(warning, config).sent).toBe(true);
       const result = sendBurnoutWarning(warning, config);
-      expect(result.sent).toBe(false);
+
+      expect(result).toEqual({ sent: false, reason: 'cooldown' });
+      expect(spawn).toHaveBeenCalledTimes(1);
     });
   });
 });
