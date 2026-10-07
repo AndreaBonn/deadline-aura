@@ -93,8 +93,25 @@ describe('core/ai-usage-claude', () => {
   });
 
   describe('readSnapshot', () => {
-    it('returns null when the snapshot file is absent', () => {
+    it('returns null when the snapshot file is absent, without warning', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
       expect(readSnapshot('ghost', { home: tmpHome })).toBeNull();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('returns null and warns when the snapshot path is a directory (EISDIR)', () => {
+      const dir = snapshotDir(tmpHome);
+      fs.mkdirSync(path.join(dir, 'notafile.json'), { recursive: true });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const snapshot = readSnapshot('notafile', { home: tmpHome });
+
+      expect(snapshot).toBeNull();
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
 
     it('reads a valid snapshot into the normalized shape', () => {

@@ -163,6 +163,28 @@ function normalizeSnapshotWindow(rawWindow) {
 }
 
 /**
+ * Read the raw snapshot file contents. Returns null when the file is
+ * absent (ENOENT, silent — not yet captured) or on any other read error
+ * (logged with the error code and account, never the file content).
+ *
+ * @param {string} filePath - Absolute path to the account's snapshot file.
+ * @param {string} account - Account id, for the warning message only.
+ * @returns {string|null}
+ */
+function readSnapshotFile(filePath, account) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn(
+        `ai-usage-claude: failed to read snapshot for account "${account}" (${err.code})`,
+      );
+    }
+    return null;
+  }
+}
+
+/**
  * Read and normalize the snapshot file for a single account.
  * Returns null when the file is absent (not yet captured), or when it
  * exists but is corrupted or has an unsupported schema version, in
@@ -174,11 +196,8 @@ function normalizeSnapshotWindow(rawWindow) {
  */
 function readSnapshot(account, { home = os.homedir() } = {}) {
   const filePath = path.join(snapshotDir(home), `${account}.json`);
-
-  let raw;
-  try {
-    raw = fs.readFileSync(filePath, 'utf8');
-  } catch {
+  const raw = readSnapshotFile(filePath, account);
+  if (raw === null) {
     return null;
   }
 
