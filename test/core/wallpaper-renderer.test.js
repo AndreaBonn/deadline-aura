@@ -81,15 +81,3 @@ describe('wallpaper-renderer — resolveUnpackedDir', () => {
     expect(resolveUnpackedDir(unpacked)).toBe(unpacked);
   });
 });
-
-describe('wallpaper-renderer — filterUpcomingEvents (via render internals)', () => {
-  // filterUpcomingEvents is not exported — test its behavior through observable
-  // render() output is not feasible without canvas.
-  // We document this as a known gap (canvas dependency).
-  it('SKIP: filterUpcomingEvents is not exported and requires canvas to test through render()', () => {
-    // This test serves as documentation of the gap.
-    // Coverage for lines 127-140 requires either exporting the function
-    // or an integration test with a real canvas environment.
-    expect(true).toBe(true);
-  });
-});
