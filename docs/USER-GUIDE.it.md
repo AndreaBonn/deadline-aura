@@ -131,7 +131,7 @@ La visualizzazione si aggiorna ogni 60 secondi. I dati vengono recuperati ogni 1
 
 In fondo allo sfondo c'è una fascia larga quanto lo schermo, con una scheda per ogni account Claude presente sul computer e una per Codex. Se usi più account Claude con Cloak, vedi una scheda per ogni profilo; senza Cloak, una sola per l'account normale.
 
-Ogni scheda ha due righe:
+Sotto il nome dell'account, ogni scheda ha due righe:
 
 - **5h**: quanto hai usato del limite di 5 ore e quando si azzera, per esempio `14:30 (~2h 15m)`.
 - **7g**: quanto hai usato del limite settimanale e quando si azzera, per esempio `ven 09:00 (3g 4h)`.
@@ -142,11 +142,11 @@ La barretta è bianca sotto il 70 per cento, ambra fino all'89 e rossa dal 90 in
 | ------------ | ------------------------------------------------------------------------------ |
 | `~0%` libera | La finestra è già scaduta: il valore è stimato finché non arriva un dato nuovo |
 | `n/d`        | Il dato non c'è ancora                                                         |
-| `agg. 01:06` | L'ultimo dato ha più di 30 minuti: l'account non è stato usato da allora       |
+| `agg. 01:06` | L'ultimo dato ha più di 30 minuti: da allora non ne è arrivato uno nuovo       |
 
-I dati di Codex arrivano da soli, dai log che Codex scrive sul tuo computer. Per Claude serve un passaggio una volta sola: in **Impostazioni → Wallpaper** premi **Installa cattura**. L'app aggiunge un piccolo script davanti alla statusline di Claude Code, che continua a funzionare come prima. Lo script salva solo le percentuali e gli orari di reset, non legge mai le credenziali, e richiede `python3`. La modifica riguarda `~/.claude/settings.json` e quindi tutti i profili Cloak, che condividono quel file; prima di scriverlo l'app ne salva una copia in `~/.local/share/deadlineaura/backups/statusline`.
+I dati di Codex arrivano da soli, dai log che Codex scrive sul tuo computer. Per Claude serve un passaggio una volta sola: in **Impostazioni → Wallpaper** premi **Installa cattura**. L'app aggiunge un piccolo script davanti alla statusline di Claude Code, che continua a funzionare come prima. Lo script salva solo le percentuali e gli orari di reset, non legge mai le credenziali e richiede `python3`. La modifica riguarda `~/.claude/settings.json` e quindi tutti i profili Cloak, che condividono quel file; prima di scriverlo l'app ne salva una copia in `~/.local/share/deadlineaura/backups/statusline`.
 
-Un account si aggiorna solo quando hai una sessione di Claude Code aperta su quell'account. Lo sfondo si ridisegna quando cambia qualcosa di visibile e comunque almeno ogni 15 minuti, quindi una percentuale può restare indietro di qualche punto per un quarto d'ora.
+Un account si aggiorna solo quando hai una sessione di Claude Code aperta su quell'account. Lo sfondo si ridisegna quando cambia qualcosa di visibile e comunque almeno ogni 15 minuti, quindi una percentuale può restare indietro di qualche punto, al massimo per un quarto d'ora.
 
 Se la fascia non ti serve, spegnila da **Impostazioni → Wallpaper → Mostra consumo limiti Claude/Codex**.
 
@@ -271,7 +271,7 @@ Per rimuoverla:
 sudo apt remove deadlineaura
 ```
 
-Se hai installato la cattura dei limiti di Claude, premi prima **Rimuovi cattura** in **Impostazioni → Wallpaper**: rimette la statusline com'era. Se te ne dimentichi non si rompe niente, perché lo script resta in `~/.local/share/deadlineaura/bin` e continua a passare i dati alla tua statusline; per toglierlo dopo, esegui `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
+Se hai installato la cattura dei limiti di Claude, premi prima **Rimuovi cattura** in **Impostazioni → Wallpaper**: rimette la statusline com'era. Se te ne dimentichi, non si rompe niente: lo script resta in `~/.local/share/deadlineaura/bin` e continua a passare i dati alla tua statusline; per toglierlo dopo, esegui `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
 
 Impostazioni e database restano al loro posto, quindi reinstallando più avanti ritrovi tutto. Per cancellare anche quelli, elimina `~/.config/deadlineaura` e `~/.local/share/deadlineaura`.
 

@@ -131,22 +131,22 @@ The display refreshes every 60 seconds. The underlying data is fetched every 10 
 
 At the bottom of the wallpaper a band runs across the whole screen, with one card for every Claude account on the computer and one for Codex. If you use several Claude accounts through Cloak, you get one card per profile; without Cloak, a single card for your regular account.
 
-Each card has two lines:
+Under the account name, each card has two lines:
 
 - **5h**: how much of the 5-hour limit you have used and when it resets, for example `14:30 (~2h 15m)`.
 - **7d**: how much of the weekly limit you have used and when it resets, for example `Fri 09:00 (3d 4h)`.
 
 The bar is white below 70 percent, amber up to 89 and red from 90 up. A few markers to know:
 
-| What you see | What it means                                                                     |
-| ------------ | --------------------------------------------------------------------------------- |
-| `~0%` free   | The window has already reset: the value is an estimate until fresh data arrives   |
-| `n/a`        | There is no data yet                                                              |
-| `upd. 01:06` | The last reading is more than 30 minutes old: the account has not been used since |
+| What you see | What it means                                                                   |
+| ------------ | ------------------------------------------------------------------------------- |
+| `~0%` free   | The window has already reset: the value is an estimate until fresh data arrives |
+| `n/a`        | There is no data yet                                                            |
+| `upd. 01:06` | The last reading is more than 30 minutes old: no newer one has arrived since    |
 
 Codex data arrives on its own, from the logs Codex writes on your computer. Claude needs a one-time step: in **Settings → Wallpaper** press **Install capture**. The app places a small script in front of the Claude Code statusline, which keeps working as before. The script stores only percentages and reset times, never reads your credentials, and needs `python3`. The change goes into `~/.claude/settings.json`, so it applies to every Cloak profile sharing that file; before writing it the app saves a copy in `~/.local/share/deadlineaura/backups/statusline`.
 
-An account updates only while a Claude Code session on that account is open. The wallpaper is redrawn when something visible changes and at least every 15 minutes, so a percentage can lag a few points behind for up to a quarter of an hour.
+An account updates only while a Claude Code session on that account is open. The wallpaper is redrawn when something visible changes and at least every 15 minutes, so a percentage can lag a few points behind, for at most a quarter of an hour.
 
 If you do not need the band, turn it off in **Settings → Wallpaper → Show Claude/Codex limit usage**.
 
@@ -269,7 +269,7 @@ To remove it:
 sudo apt remove deadlineaura
 ```
 
-If you installed the Claude limit capture, press **Remove capture** in **Settings → Wallpaper** first: it puts your statusline back as it was. If you forget, nothing breaks, because the script stays in `~/.local/share/deadlineaura/bin` and keeps passing the data to your statusline; to remove it afterwards, run `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
+If you installed the Claude limit capture, press **Remove capture** in **Settings → Wallpaper** first: it puts your statusline back as it was. If you forget, nothing breaks: the script stays in `~/.local/share/deadlineaura/bin` and keeps passing the data to your statusline; to remove it afterwards, run `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
 
 Your settings and database are left in place, so reinstalling later picks up where you left off. To erase those too, delete `~/.config/deadlineaura` and `~/.local/share/deadlineaura`.
 
