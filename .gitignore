@@ -65,6 +65,7 @@ coverage/
 
 # Project docs (local only)
 doc_progetto/
+assets/claude-limits-monitor-spec.md
 
 # Electron specific
 app/node_modules/
