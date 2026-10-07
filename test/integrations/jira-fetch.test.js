@@ -125,3 +125,76 @@ describe('jira fetchIssues', () => {
     expect(url).toContain('jql=project');
   });
 });
+
+describe('jira fetchIssues HTTP retries', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('retries a 429 response and returns the issues from the successful response', async () => {
+    const issue = { id: 'retry', key: 'PROJ-2', fields: { summary: 'Retry issue' } };
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ status: 429, ok: false })
+      .mockResolvedValueOnce(mockJiraResponse([issue]));
+
+    const promise = fetchIssues(makeConfig());
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await promise;
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'jira_retry', title: 'PROJ-2 · Retry issue' }),
+    ]);
+  });
+
+  it('logs the rate limit and returns no issues after three persistent 429 responses', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ status: 429, ok: false });
+
+    const promise = fetchIssues(makeConfig());
+    await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000);
+    const result = await promise;
+
+    expect({ result, logged: errorSpy.mock.calls[0] }).toEqual({
+      result: [],
+      logged: ['Jira [test.atlassian.net]: fetch error:', 'Jira API 429: rate limited'],
+    });
+  });
+
+  it('stops after three attempts when every response is a 429', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ status: 429, ok: false });
+
+    const promise = fetchIssues(makeConfig());
+    await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000);
+    await promise;
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('logs the domain and HTTP 500 status and returns no issues for the failed instance', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    });
+
+    const promise = fetchIssues(makeConfig());
+    await vi.advanceTimersByTimeAsync(2000 + 4000);
+    const result = await promise;
+
+    expect(result).toEqual([]);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Jira [test.atlassian.net]: fetch error:',
+      'Jira API 500: Internal Server Error',
+    );
+  });
+});

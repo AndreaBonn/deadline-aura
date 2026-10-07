@@ -33,6 +33,8 @@ async function fetchWithRetry(url, options) {
       const response = await fetch(url, options);
 
       if (response.status === 429) {
+        // Without an Error here a persistent 429 ends the loop throwing null.
+        lastError = new Error('Jira API 429: rate limited');
         const delay = RETRY_DELAYS[attempt] || 8000;
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
