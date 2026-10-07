@@ -693,6 +693,18 @@ input[type='range'] {
   margin: 8px 0 12px;
 }
 
+/* The shared title and hint tones measure 2.6:1 and 2.2:1 here; this control
+   needs to be read before it edits settings.json, so it uses an AA tone. */
+.ai-capture > .field-group-title,
+.ai-capture-note,
+.ai-capture .btn--secondary {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ai-capture-note {
+  font-size: 11px;
+}
+
 .ai-capture-status {
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.7);
