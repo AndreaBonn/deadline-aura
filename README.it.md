@@ -94,8 +94,11 @@ Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita
 - Sync Google Calendar via OAuth2 (scope: `calendar` per accesso completo in lettura e scrittura). Client ID e client secret si possono scrivere in Impostazioni → Sorgenti; le variabili d'ambiente `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` valgono solo quando quei campi restano vuoti
 - Sync Google Tasks, attivo non appena l'account Google è autorizzato: i task aperti compaiono in una sezione dedicata della sidebar
 - Sync Outlook da un feed ICS pubblicato: le serie ricorrenti vengono espanse occorrenza per occorrenza, le istanze spostate e cancellate vengono applicate, e gli eventi contano come impegni di calendario nell'urgency engine e nel prompt AI invece che come backlog
-- Sync Jira via API token con JQL configurabile
+- Priorità dalle keyword: un evento Google Calendar colorato di rosso è P1, un evento che contiene nel titolo o nella descrizione una delle keyword di priorità (default: `urgent`, `deadline`, `release`, `deploy`, `critico`) è P2, il resto è P3. Outlook applica la stessa regola dopo i flag di priorità e importanza alta del feed. Le due liste di keyword si modificano in Impostazioni → Sorgenti
+- Sync Jira via API token con JQL configurabile, su una o più istanze, ognuna con dominio, email, token e JQL propri. Una risposta 429 viene ritentata dopo 2, 4 e 8 secondi; un'istanza che continua a fallire viene registrata nel log e saltata, mentre le altre si sincronizzano lo stesso
 - Supporto multi-monitor: una striscia per display, singolo PNG wallpaper spanned
+- Agenda del giorno sul wallpaper: l'angolo in alto a sinistra di ogni display elenca eventi e task delle prossime 24 ore, con orario, badge della sorgente e titolo, e una riga "+ N altri" quando non ci stanno
+- Countdown del turno sotto l'orologio della sidebar: quanto manca alla fine del turno in corso, o all'inizio del prossimo. I turni si definiscono come settimana regolare (giorni lavorativi, fasce orarie, ferie) o come calendario variabile con le fasce impostate giorno per giorno per ogni mese. Ferie e mesi già passati vengono tolti dalla config all'avvio. Il countdown non influisce sullo score di urgenza
 - Fascia dei limiti Claude e Codex in fondo al wallpaper, al posto della scritta del carico mentale; il punteggio continua a guidare sfondo e colore. C'è una scheda per ogni account Claude della macchina (profili Cloak in `~/.cloak/profiles/<nome>`, altrimenti `~/.claude`) e una per Codex. Ogni scheda mostra la percentuale usata del limite di 5 ore e di quello settimanale, con l'orario del reset e il tempo che manca (`14:30 (~2h 15m)`, `ven 09:00 (3g 4h)`). Codex si legge dai log di sessione locali. Per Claude si installa da Impostazioni → Wallpaper una cattura che si mette davanti alla statusline di Claude Code e salva solo percentuali e orari di reset; richiede `python3`
 - Config validata con Zod all'avvio e ad ogni salvataggio delle impostazioni
 - Riserva dello strut X11 perché la striscia non si sovrapponga all'area di lavoro GNOME
@@ -111,7 +114,9 @@ Per diagrammi tecnici dettagliati (pipeline sync, schema database, ciclo di vita
 - Preferiti Jira: stella su qualsiasi task Jira per fissarlo in una sezione "Preferiti" dedicata tra Google Calendar e Jira nella sidebar; i preferiti persistono tra i riavvii
 - Time logging su Google Calendar: bottone orologio su qualsiasi task apre un form inline per creare un evento con data, ora, durata e calendario di destinazione; gli eventi sono formattati come `[CODICE-JIRA] - Titolo` per compatibilità con il tracciamento tempo di Tempo
 - Timer live: pulsante play/stop su qualsiasi task Jira o locale avvia un timer in tempo reale che crea un evento Google Calendar immediato e ne aggiorna l'orario di fine ogni 60 secondi; premendo stop l'evento viene finalizzato con la durata esatta. Lo stato del timer persiste in localStorage per il recupero da crash. Una sezione "In Corso" in cima alla sidebar evidenzia il task attualmente cronometrato
-- Meeting dock: barra trasparente flottante in basso su ogni display, mostra riunioni imminenti con link Meet/Teams/Zoom cliccabili. Le riunioni appaiono da 10 minuti prima a 5 minuti dopo l'orario di inizio, controllate ogni 30 secondi indipendentemente dal sync
+- Meeting dock: barra trasparente flottante in basso su ogni display, mostra riunioni imminenti con link Meet/Teams/Zoom cliccabili. Le riunioni appaiono da 10 minuti prima a 5 minuti dopo l'orario di inizio, controllate ogni 30 secondi indipendentemente dal sync. La × su una riunione la nasconde solo su quel display. I link Meet si aprono con l'account Google impostato in Impostazioni → Sorgenti (parametro `authuser`), così la riunione non parte col profilo sbagliato
+- Post-it obsoleti: quando un task fissato sparisce dalla sorgente (chiuso in Jira, cancellato dal calendario), il suo post-it resta sul desktop con il bordo rosso invece di sparire. I task obsoleti vengono cancellati dopo 48 ore, e la × su ogni post-it nell'overlay di layout lo toglie dal desktop al salvataggio
+- Snapshot del database prima di ogni migrazione che ricostruisce la tabella dei task, salvato in `~/.local/share/deadlineaura/backups/` tenendo gli ultimi 3. Se lo snapshot fallisce, la migrazione viene interrotta
 - Meeting flyby: 60 secondi prima dell'inizio di una riunione (`meeting_flyby.trigger_seconds`) un gatto in pixel art attraversa ogni display trainando uno striscione con titolo e countdown, poi esce di scena dopo 20 secondi. Il pulsante gatto nell'header della sidebar sospende gli avvisi per 1, 3 o 24 ore, li disattiva a tempo indeterminato oppure li riattiva
 - Spiegazione dello score: il pulsante di aiuto accanto al punteggio di urgenza apre un pannello che mostra come si è arrivati a quel numero, con la quota AI, la quota meccanica e i task che pesano di più. Gli eventi di ferie e assenza restano fuori dal conteggio, così una settimana di vacanza non viene letta come una settimana di pressione
 - Stato eventi calendario: gli eventi Google Calendar nella sidebar mostrano lo stato in tempo reale - "in corso" (azzurro) tra inizio e fine, "terminato" (grigio) dopo la fine, oppure orario di inizio con countdown per eventi futuri
@@ -321,6 +326,19 @@ Ogni card mostra titolo, countdown alla scadenza, score di urgenza e badge della
 
 Il footer in fondo alla sidebar contiene i pulsanti impostazioni (ingranaggio), layout post-it, sync manuale e chiusura, oltre all'orario dell'ultimo sync. In alto, l'icona del gatto accanto all'orologio comanda il meeting flyby e il pulsante `?` accanto allo score di urgenza apre la spiegazione del punteggio.
 
+### Countdown del turno
+
+Sotto l'orologio in cima alla sidebar, un countdown mostra quanto manca alla fine del turno mentre lavori, o quanto manca all'inizio del prossimo quando sei fuori turno. Si configura in Impostazioni → Turno:
+
+- **Regolare**: la stessa settimana ogni settimana, con giorni lavorativi, una o più fasce orarie al giorno (default 09:00-13:00 e 14:00-18:00, dal lunedì al venerdì) e un elenco di ferie
+- **Variabile**: una griglia mensile in cui imposti le fasce giorno per giorno, per turni a rotazione o irregolari
+
+Ferie e mesi già passati vengono rimossi da `config.json` al successivo avvio. Il countdown è informativo e non cambia lo score di urgenza.
+
+### Agenda del giorno sul wallpaper
+
+L'angolo in alto a sinistra di ogni display mostra l'elenco "PROSSIME 24H" disegnato nel wallpaper: orario di inizio o di scadenza, badge della sorgente (`CAL`, `TASKS`, `JIRA`, `OUTLOOK`) e titolo. Quando l'elenco non ci sta sopra la fascia dei limiti, l'ultima riga riporta "+ N altri".
+
 ### Task locali
 
 Clicca il pulsante **+** nell'header della sezione "Locale" per creare un task personale. Compila titolo, data di scadenza e priorità (P1-P4). Premi Invio o clicca "Aggiungi" per salvare.
@@ -335,7 +353,9 @@ Clicca la stella su qualsiasi card Jira per aggiungerla ai preferiti. I task ste
 
 Fissa qualsiasi task sul desktop cliccando l'icona pin sulla card. Il task appare come post-it renderizzato direttamente nel wallpaper.
 
-Per riposizionare i post-it: clicca il pulsante Layout nel footer della sidebar. Si apre un overlay trasparente dove puoi trascinare ogni post-it nella posizione desiderata. Clicca "Salva" per applicare, o premi Escape per annullare. Le posizioni sono salvate in percentuale, quindi si adattano a qualsiasi risoluzione.
+Per riposizionare i post-it: clicca il pulsante Layout nel footer della sidebar. Si apre un overlay trasparente dove puoi trascinare ogni post-it nella posizione desiderata. Clicca "Salva" per applicare, o premi Escape per annullare. Le posizioni sono salvate in percentuale, quindi si adattano a qualsiasi risoluzione. La × nell'angolo di un post-it nell'overlay lo toglie dal desktop al salvataggio.
+
+Se un task fissato sparisce dalla sorgente, per esempio perché la issue Jira è stata chiusa o l'evento cancellato dal calendario, il post-it non viene tolto: resta sul desktop con il bordo rosso, così ti accorgi del cambiamento. Il task viene cancellato dal database locale 48 ore dopo e il post-it sparisce con lui.
 
 ### Time logging su Google Calendar
 
@@ -374,6 +394,8 @@ Una barra trasparente flottante appare in basso su ogni display quando hai riuni
 
 La dock usa un effetto vetro traslucido (backdrop blur) e non riserva spazio sullo schermo: si sovrappone al desktop solo quando ci sono riunioni imminenti e si nasconde automaticamente quando non ce ne sono.
 
+La × su una riunione la nasconde su quel display; gli altri display continuano a mostrarla. Se nel browser usi più account Google, scrivi quello giusto in Impostazioni → Sorgenti → Account Google: i link Meet si aprono con quell'account invece che col profilo predefinito del browser.
+
 ### Meeting flyby
 
 Sessanta secondi prima che una riunione inizi, un gatto in pixel art attraversa ogni display trainando uno striscione con il titolo della riunione e il countdown ("Standup tra 1 minuto"). L'animazione dura una ventina di secondi, poi esce di scena. Serve a raggiungerti quando la meeting dock è coperta da una finestra a schermo intero e la notifica desktop è passata inosservata.
@@ -410,17 +432,17 @@ Clicca l'icona ingranaggio nella sidebar per aprire il pannello impostazioni. Ha
 <br><em>Pannello impostazioni: 9 tab di configurazione con reset per sezione</em>
 </div>
 
-| Tab         | Cosa puoi configurare                                                                                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------- |
-| Generale    | Intervallo sync UI, intervallo sync dati, finestra lookahead                                                |
-| Sorgenti    | Client ID e client secret Google, calendari e keyword Google Calendar, feed ICS Outlook, istanze Jira e JQL |
-| AI          | Chiavi API dei provider, ordine di priorità, intervallo ricalcolo, timeout, temperatura                     |
-| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it                                                   |
-| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                                                             |
-| Notifiche   | Abilita/disabilita, soglia score, cooldown, meeting dock e suo anticipo                                     |
-| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown                                             |
-| Turno       | Giorni lavorativi, fasce orarie, ferie, modalità turno fisso/variabile                                      |
-| Avanzate    | Costanti urgency engine e pesi per priorità                                                                 |
+| Tab         | Cosa puoi configurare                                                                                                                                             |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Generale    | Intervallo sync UI, intervallo sync dati, finestra lookahead                                                                                                      |
+| Sorgenti    | Client ID e client secret Google, calendari e keyword di priorità Google Calendar, account Google per i link Meet, feed ICS Outlook e keyword, istanze Jira e JQL |
+| AI          | Chiavi API dei provider, ordine di priorità, intervallo ricalcolo, timeout, temperatura                                                                           |
+| Wallpaper   | Abilita/disabilita, immagini sfondo, impostazioni post-it                                                                                                         |
+| Sidebar     | Posizione (sinistra/destra), larghezza, opacità                                                                                                                   |
+| Notifiche   | Abilita/disabilita, soglia score, cooldown, meeting dock e suo anticipo                                                                                           |
+| Interfaccia | Lingua (italiano/inglese), max task mostrati, formato countdown                                                                                                   |
+| Turno       | Giorni lavorativi, fasce orarie, ferie, modalità turno fisso/variabile                                                                                            |
+| Avanzate    | Costanti urgency engine e pesi per priorità                                                                                                                       |
 
 Ogni tab ha un pulsante "Reset sezione" per ripristinare i default solo per quella sezione.
 
@@ -434,15 +456,16 @@ npm run sync
 
 ### Posizioni dei file
 
-| Percorso                                          | Contenuto                                            |
-| ------------------------------------------------- | ---------------------------------------------------- |
-| `~/.config/deadlineaura/config.json`              | Configurazione utente                                |
-| `~/.config/deadlineaura/google-token.json`        | Token OAuth Google (0600)                            |
-| `~/.local/share/deadlineaura/db.sqlite`           | Database SQLite                                      |
-| `~/.local/share/deadlineaura/wallpaper.png`       | Wallpaper generato                                   |
-| `~/.local/share/deadlineaura/ai-usage/latest/`    | Ultimi limiti Claude per account                     |
-| `~/.local/share/deadlineaura/bin/`                | Copia dello script di cattura usata dalla statusline |
-| `~/.local/share/deadlineaura/backups/statusline/` | Backup di `~/.claude/settings.json` (0600)           |
+| Percorso                                          | Contenuto                                               |
+| ------------------------------------------------- | ------------------------------------------------------- |
+| `~/.config/deadlineaura/config.json`              | Configurazione utente                                   |
+| `~/.config/deadlineaura/google-token.json`        | Token OAuth Google (0600)                               |
+| `~/.local/share/deadlineaura/db.sqlite`           | Database SQLite                                         |
+| `~/.local/share/deadlineaura/wallpaper.png`       | Wallpaper generato                                      |
+| `~/.local/share/deadlineaura/ai-usage/latest/`    | Ultimi limiti Claude per account                        |
+| `~/.local/share/deadlineaura/bin/`                | Copia dello script di cattura usata dalla statusline    |
+| `~/.local/share/deadlineaura/backups/*.bak`       | Snapshot del database prima delle migrazioni (ultimi 3) |
+| `~/.local/share/deadlineaura/backups/statusline/` | Backup di `~/.claude/settings.json` (0600)              |
 
 Lo schema completo con i valori di default è in `config/defaults.js`.
 
@@ -470,6 +493,12 @@ npm start
 ```
 
 I test si trovano in `test/` e rispecchiano la struttura di `core/`, `store/`, `ai/`, `integrations/` e `renderer/`.
+
+Per provare l'interfaccia senza collegare alcuna sorgente, `node scripts/seed-demo.js` riempie il database con 6 task demo. Prima cancella tutti i task e gli score esistenti, quindi non lanciarlo sul database che usi tutti i giorni.
+
+## Decisioni architetturali
+
+Per i diagrammi tecnici (pipeline di sync, schema del database, ciclo di vita dei task, comunicazione IPC), consulta [docs/ARCHITECTURE.it.md](./docs/ARCHITECTURE.it.md).
 
 ## Contribuire
 

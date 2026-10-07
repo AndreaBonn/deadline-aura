@@ -79,6 +79,10 @@ L'app chiede accesso al calendario in lettura e scrittura, non in sola lettura. 
 
 Dopo la conferma, la sidebar comincia a riempirsi con i tuoi impegni.
 
+**Quali eventi contano come importanti.** Un evento che hai colorato di rosso in Google Calendar ha la priorità massima. Subito dopo vengono gli eventi che contengono nel titolo o nella descrizione una delle keyword di priorità (di default `urgent`, `deadline`, `release`, `deploy`, `critico`); tutto il resto ha priorità normale. L'elenco delle keyword si cambia in **Impostazioni → Sorgenti**, e Outlook ha il suo elenco nella stessa scheda.
+
+**Se nel browser usi più di un account Google**, scrivi quello legato al calendario di lavoro nel campo **Account Google** della stessa scheda. I link Meet della dock si aprono allora con quell'account, invece che con il profilo scelto dal browser.
+
 ## Collegare Outlook
 
 Outlook non richiede account, password né permessi dal reparto IT. Deadline Aura legge il calendario attraverso il link pubblico che Outlook stesso sa pubblicare.
@@ -103,6 +107,8 @@ Apri **Impostazioni → Sorgenti → Jira** e compila:
 - **API token**: creane uno su [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: quali issue portare dentro. Il valore predefinito, `assignee = currentUser() AND statusCategory != Done`, vuol dire "tutto quello che è assegnato a me e non è finito"
 
+Se lavori su più siti Jira, clicca **+ Aggiungi istanza** e compila un secondo gruppo di campi. Ogni sito può avere il suo filtro. Quando un sito è lento o rifiuta le richieste per un po', l'app ritenta qualche volta e poi lo salta per quel giro: gli altri siti si aggiornano comunque.
+
 ## Attivare l'AI scoring
 
 Questo passaggio è facoltativo e l'app funziona anche senza. Quando è attivo, un modello AI legge i titoli dei tuoi impegni in arrivo e stima quanto pesa il carico, di solito avvicinandosi alla realtà più di quanto faccia il semplice conteggio delle scadenze.
@@ -126,6 +132,8 @@ Striscia, tinta del wallpaper e barra di urgenza mostrano tutte lo stesso numero
 Il colore nasce da una miscela: la valutazione AI pesa il 70 per cento, il calcolo meccanico su date e priorità il 30. Senza un provider AI, la parte meccanica è l'intero punteggio.
 
 La visualizzazione si aggiorna ogni 60 secondi. I dati vengono recuperati ogni 10 minuti e l'AI ricalcola quando cambiano gli eventi oppure ogni 6 ore, a seconda di cosa arriva prima. Tutti e tre gli intervalli sono configurabili.
+
+Lo sfondo porta anche una breve agenda nell'angolo in alto a sinistra, intitolata **PROSSIME 24H**: orario, sorgente e titolo di ogni evento o task in scadenza nelle prossime 24 ore. Quando l'elenco è troppo lungo per lo spazio disponibile, l'ultima riga dice quanti altri ce ne sono.
 
 ## Vedere i limiti di Claude e Codex
 
@@ -168,7 +176,9 @@ Ogni card mostra titolo, countdown, punteggio di urgenza e un badge con la sorge
 
 **Agire su un task.** Le icone su ogni card permettono di modificarlo, segnarlo come fatto, eliminarlo, stellarlo (solo Jira), fissarlo sul desktop, registrare tempo o avviare un timer.
 
-**Fissare sul desktop.** L'icona a puntina trasforma un task in un post-it disegnato dentro lo sfondo, così lo vedi senza aprire niente. Per risistemare i biglietti clicca **Layout** in fondo alla sidebar: si apre un livello trasparente dove trascini ogni post-it dove preferisci. Clicca Salva, oppure premi Esc per buttare via le modifiche. Le posizioni sono salvate in percentuale, quindi sopravvivono a un cambio di risoluzione o di monitor.
+**Fissare sul desktop.** L'icona a puntina trasforma un task in un post-it disegnato dentro lo sfondo, così lo vedi senza aprire niente. Per risistemare i biglietti clicca **Layout** in fondo alla sidebar: si apre un livello trasparente dove trascini ogni post-it dove preferisci. Clicca Salva, oppure premi Esc per buttare via le modifiche. Le posizioni sono salvate in percentuale, quindi sopravvivono a un cambio di risoluzione o di monitor. Per togliere un biglietto dal desktop dal livello trasparente, clicca la × nel suo angolo e poi Salva.
+
+**Quando un task fissato sparisce.** Se una issue fissata viene chiusa in Jira o un evento fissato viene cancellato dal calendario, il post-it non sparisce: prende un bordo rosso, così te ne accorgi. Dopo 48 ore il task viene rimosso definitivamente, e il post-it con lui.
 
 ## Tracciare il tempo
 
@@ -184,7 +194,7 @@ Per un task locale che non ha un codice Jira nel titolo ti viene chiesto di asso
 
 Tre cose distinte ti avvisano di una riunione, dalla più discreta alla più insistente.
 
-**La dock.** Una barra traslucida in fondo a ogni schermo che elenca le riunioni in partenza entro 10 minuti, con il link cliccabile per Meet, Teams o Zoom. Compare quando c'è qualcosa da mostrare e sparisce quando non c'è, e non ruba mai spazio alle tue finestre.
+**La dock.** Una barra traslucida in fondo a ogni schermo che elenca le riunioni in partenza entro 10 minuti, con il link cliccabile per Meet, Teams o Zoom. Compare quando c'è qualcosa da mostrare e sparisce quando non c'è, e non ruba mai spazio alle tue finestre. La × su una riunione la nasconde solo su quello schermo, se l'hai già vista e vuoi recuperare lo spazio.
 
 **Il flyby.** Sessanta secondi prima dell'inizio, un gatto in pixel art attraversa ogni schermo trainando uno striscione con il titolo della riunione e il countdown, poi se ne va dopo una ventina di secondi. Esiste per il caso in cui la dock sia nascosta dietro una finestra a schermo intero.
 
@@ -224,7 +234,12 @@ Clicca l'ingranaggio in fondo alla sidebar. Ogni tab ha il suo pulsante **Reset 
 | Turno       | I tuoi giorni e orari di lavoro, e le ferie                                                         |
 | Avanzate    | Le costanti dietro il calcolo dell'urgenza                                                          |
 
-Il tab **Turno** alimenta il countdown mostrato sotto l'orologio: quanto manca alla fine del turno, o quando comincia il prossimo. Non modifica il punteggio di urgenza.
+Il tab **Turno** alimenta il countdown mostrato sotto l'orologio: quanto manca alla fine del turno, o quando comincia il prossimo. Non modifica il punteggio di urgenza. Gli orari si possono descrivere in due modi:
+
+- **Regolare**: la stessa settimana tutte le settimane. Scegli i giorni lavorativi, una o più fasce orarie (in partenza 09:00-13:00 e 14:00-18:00, dal lunedì al venerdì) e i giorni di ferie.
+- **Variabile**: un calendario per ogni mese in cui imposti gli orari giorno per giorno, per turni a rotazione o irregolari.
+
+Non serve fare pulizia dopo: ferie e mesi già passati vengono tolti da soli al successivo avvio dell'app.
 
 I segreti già salvati vengono mostrati come pallini invece del valore vero. Lasciare i pallini così com'è conserva il valore salvato; scriverci sopra lo sostituisce.
 
@@ -232,14 +247,15 @@ I segreti già salvati vengono mostrati come pallini invece del valore vero. Las
 
 Resta tutto sul tuo computer.
 
-| Percorso                                    | Cosa contiene                                              |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| `~/.config/deadlineaura/config.json`        | Le tue impostazioni, token e chiavi compresi               |
-| `~/.config/deadlineaura/google-token.json`  | L'autorizzazione Google                                    |
-| `~/.local/share/deadlineaura/db.sqlite`     | Task e storico dei punteggi                                |
-| `~/.local/share/deadlineaura/wallpaper.png` | Lo sfondo generato                                         |
-| `~/.local/share/deadlineaura/ai-usage/`     | Percentuali e orari di reset degli account Claude          |
-| `~/.local/share/deadlineaura/bin/`          | Lo script di cattura usato dalla statusline di Claude Code |
+| Percorso                                    | Cosa contiene                                                                                                                                                                 |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.config/deadlineaura/config.json`        | Le tue impostazioni, token e chiavi compresi                                                                                                                                  |
+| `~/.config/deadlineaura/google-token.json`  | L'autorizzazione Google                                                                                                                                                       |
+| `~/.local/share/deadlineaura/db.sqlite`     | Task e storico dei punteggi                                                                                                                                                   |
+| `~/.local/share/deadlineaura/wallpaper.png` | Lo sfondo generato                                                                                                                                                            |
+| `~/.local/share/deadlineaura/ai-usage/`     | Percentuali e orari di reset degli account Claude                                                                                                                             |
+| `~/.local/share/deadlineaura/bin/`          | Lo script di cattura usato dalla statusline di Claude Code                                                                                                                    |
+| `~/.local/share/deadlineaura/backups/`      | Copie del database fatte prima che un aggiornamento ne cambi la struttura (le ultime 3), e di `~/.claude/settings.json` prima di ogni installazione o rimozione della cattura |
 
 I due file sotto `.config` sono scritti in modo che li possa leggere solo il tuo account. Non sono cifrati, quindi qualsiasi cosa giri a tuo nome può leggerli. Il quadro completo è nella [security policy](../SECURITY.it.md).
 

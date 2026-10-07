@@ -79,6 +79,10 @@ The app asks for read and write access to the calendar, not read-only. Reading i
 
 After you confirm, the sidebar starts filling with your upcoming events.
 
+**Which events count as important.** An event you coloured red in Google Calendar is treated as top priority. An event whose title or description contains one of the priority keywords (by default `urgent`, `deadline`, `release`, `deploy`, `critico`) comes next, and everything else is normal. You can change the keyword list in **Settings → Sources**, and Outlook has its own list in the same tab.
+
+**If you use more than one Google account in your browser**, type the one tied to your work calendar in the **Google Account** field of the same tab. Meet links from the dock then open with that account instead of whichever profile the browser picks.
+
 ## Connect Outlook
 
 Outlook needs no account, no password and no permission from your IT department. Deadline Aura reads the calendar through the public link that Outlook itself can publish.
@@ -103,6 +107,8 @@ Open **Settings → Sources → Jira** and fill in:
 - **API token**: create one at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
 - **JQL**: which issues to pull in. The default, `assignee = currentUser() AND statusCategory != Done`, means "everything assigned to me that is not finished"
 
+If you work on more than one Jira site, click **+ Add instance** and fill in a second set of fields. Each site can have its own filter. When a site is slow or refuses requests for a while, the app retries a few times and then skips it for that round: the other sites still update.
+
 ## Turn on AI scoring
 
 This step is optional and the app works without it. When enabled, an AI model reads the titles of your upcoming commitments and estimates how heavy the load is, which usually tracks reality better than counting deadlines does.
@@ -126,6 +132,8 @@ The strip, the wallpaper tint and the urgency bar all show the same number, mapp
 The colour comes from a blend: the AI assessment weighs 70 percent, the mechanical calculation on dates and priorities 30 percent. Without an AI provider, the mechanical part is the whole score.
 
 The display refreshes every 60 seconds. The underlying data is fetched every 10 minutes, and the AI recalculates when your events change or every 6 hours, whichever comes first. All three intervals are configurable.
+
+The wallpaper also carries a short agenda in its top-left corner, headed **NEXT 24H**: the time, the source and the title of every event or task due in the next 24 hours. When the list is too long for the space, the last line says how many more there are.
 
 ## Seeing your Claude and Codex limits
 
@@ -168,7 +176,9 @@ Each card shows the title, a countdown, the urgency score and a badge for the so
 
 **Act on a task.** The icons on each card let you edit it, mark it done, delete it, star it (Jira only), pin it to the desktop, log time against it, or start a timer.
 
-**Pin to the desktop.** The pin icon turns a task into a post-it drawn straight into your wallpaper, so you see it without opening anything. To rearrange the notes, click **Layout** at the bottom of the sidebar: a transparent overlay opens where you drag each note where you want it. Click Save, or press Escape to discard. Positions are stored as percentages, so they survive a change of resolution or monitor.
+**Pin to the desktop.** The pin icon turns a task into a post-it drawn straight into your wallpaper, so you see it without opening anything. To rearrange the notes, click **Layout** at the bottom of the sidebar: a transparent overlay opens where you drag each note where you want it. Click Save, or press Escape to discard. Positions are stored as percentages, so they survive a change of resolution or monitor. To take a note off the desktop from the overlay, click the × in its corner and then Save.
+
+**When a pinned task disappears.** If a pinned issue is closed in Jira or a pinned event is deleted from the calendar, the post-it does not vanish: it gets a red border so you notice. After 48 hours the task is removed for good, and the post-it with it.
 
 ## Tracking your time
 
@@ -184,7 +194,7 @@ For a local task with no Jira key in its title, you are asked to associate one f
 
 Three separate things warn you about a meeting, from quietest to loudest.
 
-**The dock.** A translucent bar at the bottom of each screen listing meetings that start within the next 10 minutes, with a clickable link for Meet, Teams or Zoom. It appears when there is something to show and disappears when there is not, and it never steals space from your windows.
+**The dock.** A translucent bar at the bottom of each screen listing meetings that start within the next 10 minutes, with a clickable link for Meet, Teams or Zoom. It appears when there is something to show and disappears when there is not, and it never steals space from your windows. The × on a meeting hides it on that screen only, if you have already seen it and want the space back.
 
 **The flyby.** Sixty seconds before the start, a pixel cat walks across every screen towing a banner with the meeting title and countdown, then leaves after about 20 seconds. It exists for the case where the dock is hidden behind a full-screen window.
 
@@ -222,7 +232,12 @@ Click the gear at the bottom of the sidebar. Each tab has its own **Reset sectio
 | Shift         | Your working days and hours, and your holidays                                                              |
 | Advanced      | The constants behind the urgency calculation                                                                |
 
-The **Shift** tab drives the countdown shown under the clock: how long until your shift ends, or when the next one starts. It does not change the urgency score.
+The **Shift** tab drives the countdown shown under the clock: how long until your shift ends, or when the next one starts. It does not change the urgency score. There are two ways to describe your hours:
+
+- **Regular**: the same week every week. You pick the working days, one or more time slots (09:00-13:00 and 14:00-18:00, Monday to Friday, out of the box) and your days off.
+- **Variable**: a calendar for each month where you set the hours day by day, for rotating or irregular shifts.
+
+You do not need to tidy up afterwards: holidays and months that are over are removed by themselves the next time the app starts.
 
 Secrets you have already saved are shown as dots rather than their real value. Leaving those dots alone keeps the stored value; typing over them replaces it.
 
@@ -230,14 +245,15 @@ Secrets you have already saved are shown as dots rather than their real value. L
 
 Everything stays on your machine.
 
-| Path                                        | What it holds                                         |
-| ------------------------------------------- | ----------------------------------------------------- |
-| `~/.config/deadlineaura/config.json`        | Your settings, including the tokens and keys          |
-| `~/.config/deadlineaura/google-token.json`  | The Google authorization                              |
-| `~/.local/share/deadlineaura/db.sqlite`     | Tasks and score history                               |
-| `~/.local/share/deadlineaura/wallpaper.png` | The generated wallpaper                               |
-| `~/.local/share/deadlineaura/ai-usage/`     | Percentages and reset times of your Claude accounts   |
-| `~/.local/share/deadlineaura/bin/`          | The capture script used by the Claude Code statusline |
+| Path                                        | What it holds                                                                                                                                                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `~/.config/deadlineaura/config.json`        | Your settings, including the tokens and keys                                                                                                                          |
+| `~/.config/deadlineaura/google-token.json`  | The Google authorization                                                                                                                                              |
+| `~/.local/share/deadlineaura/db.sqlite`     | Tasks and score history                                                                                                                                               |
+| `~/.local/share/deadlineaura/wallpaper.png` | The generated wallpaper                                                                                                                                               |
+| `~/.local/share/deadlineaura/ai-usage/`     | Percentages and reset times of your Claude accounts                                                                                                                   |
+| `~/.local/share/deadlineaura/bin/`          | The capture script used by the Claude Code statusline                                                                                                                 |
+| `~/.local/share/deadlineaura/backups/`      | Copies of the database taken before an update changes its structure (the last 3), and of `~/.claude/settings.json` from before each install or removal of the capture |
 
 Both files under `.config` are written readable by your account only. They are not encrypted, so anything running as you can read them. For the full picture, see the [security policy](../SECURITY.md).
 
