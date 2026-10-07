@@ -34,20 +34,25 @@ function createCaptureElements(t) {
   return { title, status, note, button, message };
 }
 
+const STATUS_KEYS = {
+  on: 'settings.ai_capture.status_on',
+  off: 'settings.ai_capture.status_off',
+  unknown: 'settings.ai_capture.status_unknown',
+};
+
 /**
- * Show the installed state on the status line and the button label.
+ * Show the installed state on the status line and the button label. An
+ * 'unknown' state (captureStatus() rejected) renders as its own message,
+ * distinct from 'off', but the button still offers install.
  *
  * @param {ReturnType<typeof createCaptureElements>} els
- * @param {boolean} installed
+ * @param {'on'|'off'|'unknown'} installedState
  * @param {(key: string) => string} t
  */
-function renderCaptureStatus(els, installed, t) {
-  els.status.textContent = installed
-    ? t('settings.ai_capture.status_on')
-    : t('settings.ai_capture.status_off');
-  els.button.textContent = installed
-    ? t('settings.ai_capture.uninstall')
-    : t('settings.ai_capture.install');
+function renderCaptureStatus(els, installedState, t) {
+  els.status.textContent = t(STATUS_KEYS[installedState]);
+  els.button.textContent =
+    installedState === 'on' ? t('settings.ai_capture.uninstall') : t('settings.ai_capture.install');
 }
 
 /**
@@ -95,17 +100,19 @@ function describeCaptureResult(result, t) {
 }
 
 /**
- * Read the installed state, treating any failure as not installed.
+ * Read the installed state. A rejected captureStatus() call is logged and
+ * mapped to 'unknown', distinct from the confirmed-absent 'off' state.
  *
  * @param {object} api - `window.settingsApi`.
- * @returns {Promise<boolean>}
+ * @returns {Promise<'on'|'off'|'unknown'>}
  */
 async function readCaptureInstalled(api) {
   try {
     const result = await api.captureStatus();
-    return Boolean(result && result.installed);
-  } catch {
-    return false;
+    return result && result.installed ? 'on' : 'off';
+  } catch (err) {
+    console.error('settings-ai-capture: captureStatus failed', err);
+    return 'unknown';
   }
 }
 
@@ -125,8 +132,9 @@ function renderCaptureControl(container, api, t) {
   container.append(els.title, els.status, els.note, els.button, els.message);
 
   const refresh = async () => {
-    state.installed = await readCaptureInstalled(api);
-    renderCaptureStatus(els, state.installed, t);
+    const installedState = await readCaptureInstalled(api);
+    state.installed = installedState === 'on';
+    renderCaptureStatus(els, installedState, t);
   };
   els.button.addEventListener('click', () => runCaptureAction({ els, api, t, state, refresh }));
   refresh();
@@ -157,4 +165,11 @@ async function runCaptureAction({ els, api, t, state, refresh }) {
     els.button.disabled = false;
     await refresh();
   }
+}
+
+// CommonJS export for Node.js / test environment (readCaptureInstalled has no
+// DOM dependency). In the browser this file is loaded via <script src>, where
+// module is undefined.
+if (typeof module !== 'undefined') {
+  module.exports = { readCaptureInstalled };
 }
