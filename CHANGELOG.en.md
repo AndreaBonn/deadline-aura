@@ -1,3 +1,18 @@
+## What's Changed in v1.7.1
+
+> This release fixes private IPv6 host blocking, a Jira sync failure caused by a single rate-limited instance, and the post-it labels in the overlay.
+
+### Bug fixes
+
+- Block private IPv6 hosts (loopback, link-local, unique-local, IPv4-mapped) and trailing-dot `localhost.` for both external links and the Outlook feed, through a single check in `core/url-safety.js` (5097971)
+- Keep syncing the other Jira instances when one answers 429 on every retry (3c58185)
+- Show the same post-it label in the overlay as on the wallpaper instead of the raw id (5097971)
+
+### Maintenance
+
+- Move the IPC payload validation of local tasks and calendar events into pure modules, with unchanged error codes (5097971)
+- Export the pure logic of four renderer scripts for testing; raise coverage to 95% and rewrite weak or tautological tests (529494c)
+
 ## What's Changed in v1.7.0
 
 > This release replaces the mental load label on the wallpaper with a band showing Claude and Codex usage limits, fed by a Claude Code statusline capture you can install from the settings window.

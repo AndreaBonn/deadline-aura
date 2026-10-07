@@ -4,7 +4,7 @@
 
 ## Supported Versions
 
-The current release is `1.7.0`. Security fixes are applied to the latest release and to the `main` branch. Older releases are not patched: the upgrade path is to install the newest `.deb`, which keeps existing data.
+The current release is `1.7.1`. Security fixes are applied to the latest release and to the `main` branch. Older releases are not patched: the upgrade path is to install the newest `.deb`, which keeps existing data.
 
 | Version | Supported                         |
 | ------- | --------------------------------- |

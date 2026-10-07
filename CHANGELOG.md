@@ -1,3 +1,18 @@
+## Versione 1.7.1
+
+> La release v1.7.1 corregge il blocco degli indirizzi IPv6 privati, l'interruzione della sincronizzazione Jira su un'istanza limitata e le etichette dei post-it nell'overlay.
+
+### Correzioni
+
+- Gli indirizzi IPv6 privati (loopback, link-local, unique-local, IPv4-mapped) e `localhost.` con il punto finale vengono bloccati, sia per i link esterni sia per il feed Outlook, con un controllo unico in `core/url-safety.js` (5097971)
+- Un'istanza Jira che risponde 429 a ogni tentativo non blocca più la sincronizzazione delle altre istanze (3c58185)
+- I post-it dell'overlay mostrano la stessa etichetta dello sfondo invece dell'id grezzo (5097971)
+
+### Manutenzione
+
+- Validazione dei payload IPC di attività locali e calendario spostata in moduli puri, con gli stessi codici di errore (5097971)
+- Logica pura di quattro script del renderer esportata per i test; copertura portata al 95% e test deboli o tautologici riscritti (529494c)
+
 ## Versione 1.7.0
 
 > La release v1.7.0 sostituisce l'etichetta del carico mentale sullo sfondo con una fascia che mostra i limiti di utilizzo di Claude e Codex, alimentata da una cattura della statusline di Claude Code installabile dalle impostazioni.
