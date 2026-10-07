@@ -1,3 +1,45 @@
+## What's Changed in v1.7.0
+
+> This release replaces the mental load label on the wallpaper with a band showing Claude and Codex usage limits, fed by a Claude Code statusline capture you can install from the settings window.
+
+### New features
+
+- Draw an AI usage band on the wallpaper in place of the mental load label, spanning the full width and redrawn when the values change (ae47f2a, 83a66a5, 30e467b, 7476af2)
+- Read Codex rate limits from local session logs (f760c6e)
+- Read Claude limits from capture snapshots, discovering the configured accounts (8906a6c, 8196d4a, 1f8a932)
+- Add a Claude Code statusline capture script with idempotent install and uninstall, run from a stable copy without a shell (18313b4, be58548, 457ef8a)
+- Install and remove the capture from the settings window (88d47e8)
+- Add the `wallpaper.show_ai_usage` toggle (3e97cb7)
+
+### Bug fixes
+
+- Never lose the original statusLine on an interrupted capture install (0873505)
+- Keep the settings.json layout across install and uninstall (3803fbe)
+- Log unsafe chain configs and keep settings backups apart (73d2f02)
+- Round fallback percentages half up, like the band (aad464c)
+- Pick the newest Codex rollouts by mtime, not readdir order (08d418c)
+- Warn when a Claude snapshot exists but cannot be read (6a37b52)
+- Show an unknown capture status instead of "not active" when it cannot be determined (1b4faad)
+- Raise the capture control text to WCAG AA contrast (f1b2c59)
+
+### Build
+
+- Ship the capture scripts outside asar and require python3 in the .deb package (b88aca4)
+
+### Maintenance
+
+- Split band drawing and the daily agenda into their own modules, under the size limits (38b2837, 69e21c6, c658640, ee914e7)
+- Compare band pixel buffers natively in tests (8a24805)
+- Pin the clock in the Outlook fetchEvents tests and stub spawnSync in the notifier cooldown test (f0e47b3, 770997e)
+- Apply prettier to drifted files, ignore Python caches and local specs (9f9da86, dd16335, de04b20)
+
+### Documentation
+
+- Add a step-by-step user guide in English and Italian (fee14d1)
+- Document the Claude and Codex limit band and the statusline capture (7d8760b, 37be303)
+- Record the plan, tasks and decisions for the AI usage band (2cffb1f, 90ac359, 5979727, 5f2378c)
+- Drop decorative emoji and duplicated blocks from the changelog (40a7d20)
+
 ## What's Changed in v1.6.0
 
 > This release adds Outlook as a second calendar source, read from the published ICS feed and configured from the settings window.

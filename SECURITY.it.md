@@ -4,7 +4,7 @@
 
 ## Versioni supportate
 
-La release corrente è `1.6.0`. Le correzioni di sicurezza vengono applicate all'ultima release e al branch `main`. Le release precedenti non ricevono patch: la strada per aggiornarsi è installare il `.deb` più recente, che conserva i dati esistenti.
+La release corrente è `1.7.0`. Le correzioni di sicurezza vengono applicate all'ultima release e al branch `main`. Le release precedenti non ricevono patch: la strada per aggiornarsi è installare il `.deb` più recente, che conserva i dati esistenti.
 
 | Versione | Supportata                      |
 | -------- | ------------------------------- |

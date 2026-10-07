@@ -1,3 +1,45 @@
+## Versione 1.7.0
+
+> La release v1.7.0 sostituisce l'etichetta del carico mentale sullo sfondo con una fascia che mostra i limiti di utilizzo di Claude e Codex, alimentata da una cattura della statusline di Claude Code installabile dalle impostazioni.
+
+### Nuove funzionalità
+
+- Fascia dei limiti AI sullo sfondo, al posto dell'etichetta del carico mentale, estesa su tutta la larghezza e ridisegnata quando cambiano i valori (ae47f2a, 83a66a5, 30e467b, 7476af2)
+- Lettura dei limiti Codex dai log di sessione locali (f760c6e)
+- Lettura dei limiti Claude dagli snapshot della cattura, con rilevamento degli account (8906a6c, 8196d4a, 1f8a932)
+- Script di cattura della statusline di Claude Code, con installazione e rimozione idempotenti e una copia stabile degli script eseguita senza shell (18313b4, be58548, 457ef8a)
+- Installazione e rimozione della cattura dalla finestra delle impostazioni (88d47e8)
+- Opzione `wallpaper.show_ai_usage` per mostrare o nascondere la fascia (3e97cb7)
+
+### Correzioni
+
+- La statusLine originale non si perde più se l'installazione della cattura si interrompe (0873505)
+- Il layout di settings.json resta intatto fra installazione e rimozione (3803fbe)
+- Log delle catene di comandi non sicure e backup delle impostazioni tenuti separati (73d2f02)
+- Percentuali di fallback arrotondate per eccesso a metà, come nella fascia (aad464c)
+- Scelta dei rollout Codex più recenti per data di modifica, non per ordine di lettura della directory (08d418c)
+- Avviso quando uno snapshot Claude esiste ma non è leggibile (6a37b52)
+- Stato della cattura mostrato come sconosciuto invece che "non attiva" quando non è determinabile (1b4faad)
+- Contrasto del testo dei controlli della cattura portato a WCAG AA (f1b2c59)
+
+### Build
+
+- Script di cattura distribuiti fuori dall'asar e dipendenza da python3 nel pacchetto .deb (b88aca4)
+
+### Manutenzione
+
+- Disegno della fascia e dell'agenda giornaliera separati in moduli propri, sotto i limiti dimensionali (38b2837, 69e21c6, c658640, ee914e7)
+- Confronto nativo dei buffer di pixel nei test della fascia (8a24805)
+- Orologio fissato nei test di fetchEvents di Outlook e spawnSync simulato nel test di cooldown del notifier (f0e47b3, 770997e)
+- Prettier applicato ai file disallineati, cache Python e spec locali ignorate da git (9f9da86, dd16335, de04b20)
+
+### Documentazione
+
+- Guida utente passo passo in inglese e italiano (fee14d1)
+- Documentazione della fascia dei limiti Claude e Codex e della cattura della statusline (7d8760b, 37be303)
+- Piano, task e decisioni della fascia dei limiti AI (2cffb1f, 90ac359, 5979727, 5f2378c)
+- Rimozione delle emoji decorative e dei blocchi duplicati dal changelog (40a7d20)
+
 ## Versione 1.6.0
 
 > La release v1.6.0 aggiunge Outlook come seconda sorgente di calendario, letta dal feed ICS pubblicato e configurabile dalle impostazioni.
