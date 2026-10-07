@@ -214,6 +214,56 @@ describe('claude-capture.py capture mode', () => {
     expect(result.stdout.toString()).toBe('5h 3%');
   });
 
+  it('logs chain_config_unsafe (never the file content) for a world-writable capture.json', () => {
+    const home = makeHome();
+    const configDir = path.join(home, 'chain-unsafe-logged');
+    installChainCommand(home, configDir, 'cat');
+    fs.chmodSync(path.join(usageDir(home), 'capture.json'), 0o666);
+
+    const payload = JSON.stringify({
+      rate_limits: { five_hour: { used_percentage: 3, resets_at: 1 } },
+    });
+    const result = runCapture({ home, configDir, input: payload });
+    expect(result.status).toBe(0);
+    expect(result.stdout.toString()).toBe('5h 3%');
+
+    const logPath = path.join(home, '.local', 'state', 'deadlineaura', 'ai-usage-capture.log');
+    const logText = fs.readFileSync(logPath, 'utf8');
+    expect(logText).toContain('ERROR chain_config_unsafe');
+    expect(logText).not.toContain('cat');
+  });
+
+  it('logs chain_config_corrupted for an existing-but-invalid capture.json, and logs nothing when it is simply absent', () => {
+    const home = makeHome();
+    const configDir = path.join(home, 'chain-corrupted');
+    const logPath = path.join(home, '.local', 'state', 'deadlineaura', 'ai-usage-capture.log');
+    const payload = JSON.stringify({
+      rate_limits: { five_hour: { used_percentage: 3, resets_at: 1 } },
+    });
+
+    // No capture.json at all: a missing chain config is the common case,
+    // not an error, so nothing should be logged about it.
+    const withoutConfig = runCapture({ home, configDir, input: payload });
+    expect(withoutConfig.status).toBe(0);
+    if (fs.existsSync(logPath)) {
+      expect(fs.readFileSync(logPath, 'utf8')).not.toContain('chain_config');
+    }
+
+    // Now a capture.json exists, with safe permissions, but is not JSON.
+    fs.mkdirSync(usageDir(home), { recursive: true, mode: 0o700 });
+    const captureJsonPath = path.join(usageDir(home), 'capture.json');
+    fs.writeFileSync(captureJsonPath, 'not valid json {{{');
+    fs.chmodSync(captureJsonPath, 0o600);
+
+    const withCorruptConfig = runCapture({ home, configDir, input: payload });
+    expect(withCorruptConfig.status).toBe(0);
+    expect(withCorruptConfig.stdout.toString()).toBe('5h 3%');
+
+    const logText = fs.readFileSync(logPath, 'utf8');
+    expect(logText).toContain('ERROR chain_config_corrupted');
+    expect(logText).not.toContain('not valid json');
+  });
+
   it('does not overwrite a snapshot target that is a symlink', () => {
     const home = makeHome();
     const configDir = path.join(home, 'symlink-acct');

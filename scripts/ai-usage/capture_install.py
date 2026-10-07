@@ -9,10 +9,13 @@ import json
 import os
 import sys
 import time
+from collections import namedtuple
 
 import ai_usage_common as common
 
 MAX_BACKUPS = 10
+
+TargetFile = namedtuple("TargetFile", ("path", "data", "mode"))
 
 
 def our_command():
@@ -44,7 +47,7 @@ def discover_targets(create_if_missing):
     existing = [path for path in candidates if os.path.exists(path)]
     if not existing and create_if_missing:
         claude_settings = candidates[0]
-        common.ensure_dir(os.path.dirname(claude_settings), common.DIR_MODE)
+        common.ensure_dir(os.path.dirname(claude_settings), mode=common.DIR_MODE)
         with open(claude_settings, "w", encoding="utf-8") as handle:
             handle.write("{}")
         existing = [claude_settings]
@@ -71,34 +74,34 @@ def save_capture_targets(targets):
     path = common.capture_json_path()
     if common.is_symlink(path):
         return
-    common.ensure_dir(os.path.dirname(path), common.DIR_MODE)
-    common.atomic_write_json(path, {"v": 1, "targets": targets}, common.FILE_MODE)
+    common.ensure_dir(os.path.dirname(path), mode=common.DIR_MODE)
+    common.atomic_write_json(path, {"v": 1, "targets": targets}, mode=common.FILE_MODE)
 
 
 def backup_target(path):
-    """Copy ``path``'s current bytes into the backups directory, pruned."""
-    common.ensure_dir(common.backups_dir(), common.DIR_MODE)
+    """Copy ``path``'s current bytes into this tool's own backups subdirectory, pruned."""
+    backups = common.ensure_private_subdir(common.backups_dir(), "statusline", mode=common.DIR_MODE)
     digest = hashlib.sha256(path.encode("utf-8")).hexdigest()[:16]
-    dest = os.path.join(common.backups_dir(), f"settings-{digest}-{time.time_ns()}.json")
+    dest = os.path.join(backups, f"settings-{digest}-{time.time_ns()}.json")
     with open(path, "rb") as source:
         content = source.read()
     with open(dest, "wb") as handle:
         handle.write(content)
     os.chmod(dest, common.FILE_MODE)
-    _prune_backups(digest)
+    _prune_backups(backups, digest)
 
 
-def _prune_backups(digest):
+def _prune_backups(backups, digest):
     """Keep only the most recent ``MAX_BACKUPS`` backups for one target."""
     prefix = f"settings-{digest}-"
     try:
-        names = sorted(n for n in os.listdir(common.backups_dir()) if n.startswith(prefix))
+        names = sorted(n for n in os.listdir(backups) if n.startswith(prefix))
     except OSError:
         return
     excess = names[:-MAX_BACKUPS] if len(names) > MAX_BACKUPS else []
     for name in excess:
         try:
-            os.remove(os.path.join(common.backups_dir(), name))
+            os.remove(os.path.join(backups, name))
         except OSError:
             pass
 
@@ -131,20 +134,31 @@ def _is_our_status_line(current, command):
     )
 
 
-def _install_target(path, data, mode, command, capture_targets):
+def _install_target(target, command, capture_targets):
     """Point one target at the capture, recording its previous statusLine first.
 
     ``capture.json`` is saved before ``settings.json`` is written, so an
     interruption on a later target never loses the statusLine to restore.
+
+    Parameters
+    ----------
+    target : TargetFile
+        The settings file being installed into (path, data, mode).
+    command : str
+        The capture command to install as the new ``statusLine``.
+    capture_targets : dict
+        Map of target path to its previous ``statusLine``, updated in place.
     """
-    current = data.get("statusLine")
-    backup_target(path)
-    capture_targets[path] = current
+    current = target.data.get("statusLine")
+    backup_target(target.path)
+    capture_targets[target.path] = current
     save_capture_targets(capture_targets)
     new_status = dict(current) if isinstance(current, dict) else {}
     new_status["type"] = "command"
     new_status["command"] = command
-    common.atomic_write_settings(path, {**data, "statusLine": new_status}, mode)
+    common.atomic_write_settings(
+        target.path, {**target.data, "statusLine": new_status}, target.mode
+    )
 
 
 def run_install():
@@ -159,13 +173,13 @@ def run_install():
     command = our_command()
     for path in targets:
         data, mode = parsed[path]
-        if _is_our_status_line(data.get("statusLine"), command):
+        if _is_our_status_line(current=data.get("statusLine"), command=command):
             unchanged.append(path)
             continue
-        _install_target(path, data, mode, command, capture_targets)
+        _install_target(TargetFile(path, data, mode), command, capture_targets)
         changed.append(path)
 
-    _print_result(changed, unchanged, [])
+    _print_result(changed, unchanged, warnings=[])
     return 0
 
 
@@ -189,7 +203,7 @@ def _uninstall_target(path, data, mode, capture_targets):
 
 def _uninstall_warning(path, data, command, capture_targets):
     """Explain why a target is left untouched, or return None when it is not ours."""
-    if not _is_our_status_line(data.get("statusLine"), command):
+    if not _is_our_status_line(current=data.get("statusLine"), command=command):
         if path in capture_targets:
             return f"{path}: statusLine was changed by the user, left untouched"
         return None
@@ -210,7 +224,10 @@ def run_uninstall():
     command = our_command()
     for path in targets:
         data, mode = parsed[path]
-        restorable = _is_our_status_line(data.get("statusLine"), command) and path in capture_targets
+        restorable = (
+            _is_our_status_line(current=data.get("statusLine"), command=command)
+            and path in capture_targets
+        )
         if not restorable:
             unchanged.append(path)
             warning = _uninstall_warning(path, data, command, capture_targets)
@@ -236,7 +253,7 @@ def run_status():
         except (OSError, ValueError):
             result[path] = {"installed": False, "error": "invalid_json"}
             continue
-        is_ours = _is_our_status_line(data.get("statusLine"), command)
+        is_ours = _is_our_status_line(current=data.get("statusLine"), command=command)
         result[path] = {"installed": is_ours}
         installed_any = installed_any or is_ours
     print(json.dumps({"installed": installed_any, "targets": result}))

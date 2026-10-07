@@ -47,8 +47,41 @@ def capture_json_path():
 
 
 def backups_dir():
-    """Return ``~/.local/share/deadlineaura/backups``."""
+    """Return ``~/.local/share/deadlineaura/backups``.
+
+    Shared with the app's own DB backups: do not force a mode on this
+    directory itself, only on subdirectories created inside it (see
+    ``ensure_private_subdir``).
+    """
     return os.path.join(home_dir(), ".local", "share", "deadlineaura", "backups")
+
+
+def ensure_private_subdir(parent, name, mode):
+    """Create ``parent/name`` with ``mode`` enforced, without rechmod'ing ``parent``.
+
+    ``parent`` is created too when missing (with ``mode``), but if it
+    already exists its permissions are left untouched: a shared parent
+    directory may intentionally use a different mode than the private
+    subdirectory being created inside it.
+
+    Parameters
+    ----------
+    parent : str
+        Directory that should contain the new subdirectory.
+    name : str
+        Name of the subdirectory to create inside ``parent``.
+    mode : int
+        Octal permission bits to enforce on the subdirectory.
+    """
+    if not os.path.isdir(parent):
+        os.makedirs(parent, mode=mode, exist_ok=True)
+    path = os.path.join(parent, name)
+    os.makedirs(path, mode=mode, exist_ok=True)
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        pass
+    return path
 
 
 def state_dir():
@@ -89,7 +122,7 @@ def log_error(kind, length):
         Byte length of the input that triggered the error, for context.
     """
     try:
-        ensure_dir(state_dir(), DIR_MODE)
+        ensure_dir(state_dir(), mode=DIR_MODE)
         line = f"{int(time.time())} ERROR {kind} len={length}\n"
         with open(log_path(), "a", encoding="utf-8") as handle:
             handle.write(line)
@@ -155,6 +188,23 @@ def atomic_write_json(path, payload, mode):
 def atomic_write_settings(path, payload, mode):
     """Write a Claude Code settings file in its own layout: 2-space indent, final newline."""
     atomic_write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n", mode)
+
+
+def load_targets_map(path):
+    """Load a capture.json-shaped file's ``targets`` dict, or ``None``.
+
+    Returns ``None`` when the file is unreadable, not valid JSON, not a
+    JSON object, or its ``targets`` key is missing or not an object.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(config, dict):
+        return None
+    targets = config.get("targets")
+    return targets if isinstance(targets, dict) else None
 
 
 def load_json_file(path):

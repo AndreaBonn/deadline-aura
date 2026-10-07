@@ -99,7 +99,7 @@ def extract_windows(payload):
         if not (common.is_finite_number(pct) and common.is_finite_number(resets_at)):
             continue
         windows[name] = {
-            "pct": common.clamp(pct, 0, 100),
+            "pct": common.clamp(pct, low=0, high=100),
             "resets_at": normalize_resets_at(resets_at),
         }
     return windows
@@ -143,9 +143,9 @@ def load_previous_snapshot(path):
 def write_snapshot(path, account, merged):
     """Write the merged snapshot atomically, refusing a symlinked target."""
     if common.is_symlink(path):
-        common.log_error("snapshot_target_symlink", 0)
+        common.log_error("snapshot_target_symlink", length=0)
         return
-    common.ensure_dir(os.path.dirname(path), common.DIR_MODE)
+    common.ensure_dir(os.path.dirname(path), mode=common.DIR_MODE)
     payload = {
         "v": common.SNAPSHOT_SCHEMA_VERSION,
         "account": account,
@@ -153,9 +153,9 @@ def write_snapshot(path, account, merged):
     }
     payload.update(merged)
     try:
-        common.atomic_write_json(path, payload, common.FILE_MODE)
+        common.atomic_write_json(path, payload, mode=common.FILE_MODE)
     except OSError:
-        common.log_error("snapshot_write_error", 0)
+        common.log_error("snapshot_write_error", length=0)
 
 
 def format_pct(value):
@@ -199,7 +199,9 @@ def load_chain_command():
     Only trusts ``capture.json`` if it is not a symlink, is owned by
     the current user, and has no group/other write bits -- otherwise a
     co-located process with a different UID could plant a command for
-    us to execute.
+    us to execute. Logs ``chain_config_unsafe``/``chain_config_corrupted``
+    (never the file's content) on those failure paths; a missing file is
+    not logged, since most calls have no chain configured at all.
     """
     path = common.capture_json_path()
     try:
@@ -207,16 +209,11 @@ def load_chain_command():
     except OSError:
         return None
     if _stat_is_unsafe(st):
+        common.log_error("chain_config_unsafe", length=0)
         return None
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            config = json.load(handle)
-    except (OSError, ValueError):
-        return None
-    if not isinstance(config, dict):
-        return None
-    targets = config.get("targets")
-    if not isinstance(targets, dict):
+    targets = common.load_targets_map(path)
+    if targets is None:
+        common.log_error("chain_config_corrupted", length=0)
         return None
     entry = targets.get(resolve_settings_path())
     if not isinstance(entry, dict):
@@ -228,9 +225,11 @@ def load_chain_command():
 def run_chain(command, raw_bytes):
     """Run the configured chain command, forwarding the original stdin."""
     try:
-        # Deroga ADR-1/A4 a "no shell=True": stessa semantica con cui
-        # Claude Code esegue la statusline; la stringa è dell'utente e
-        # il file che la contiene è 0600 e di sua proprietà.
+        # Exception to security.md's "subprocess.run: never shell=True" rule:
+        # the command string comes from capture.json, a 0600, non-symlink,
+        # user-owned file (checked in load_chain_command/_stat_is_unsafe); a
+        # fixed timeout bounds execution; and this runs with the same stdin
+        # bytes Claude Code itself would pass to the statusline chain.
         result = subprocess.run(
             ["/bin/sh", "-c", command],
             input=raw_bytes,
@@ -251,7 +250,7 @@ def run_capture():
     try:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError):
-        common.log_error("invalid_payload", len(raw))
+        common.log_error("invalid_payload", length=len(raw))
         payload = None
 
     account = determine_account()
@@ -262,12 +261,12 @@ def run_capture():
         path = common.snapshot_path(account)
         previous = load_previous_snapshot(path)
         if windows:
-            write_snapshot(path, account, merge_windows(previous, windows))
+            write_snapshot(path, account, merged=merge_windows(previous, current=windows))
 
-    merged_for_display = merge_windows(previous, windows)
+    merged_for_display = merge_windows(previous, current=windows)
 
     command = load_chain_command()
-    chain_output = run_chain(command, raw) if command else None
+    chain_output = run_chain(command, raw_bytes=raw) if command else None
     if chain_output is not None:
         sys.stdout.buffer.write(chain_output)
     else:
@@ -285,7 +284,7 @@ def main(argv):
         return run_capture()
     except Exception:  # capture must never fail the statusline
         try:
-            common.log_error("unhandled_exception", 0)
+            common.log_error("unhandled_exception", length=0)
         except Exception:
             pass
         try:

@@ -51,8 +51,12 @@ function setupRealSettingsWithCloakProfiles(home) {
   return realPath;
 }
 
+function statuslineBackupsDir(home) {
+  return path.join(home, '.local', 'share', 'deadlineaura', 'backups', 'statusline');
+}
+
 function backupFiles(home) {
-  const backupsDir = path.join(home, '.local', 'share', 'deadlineaura', 'backups');
+  const backupsDir = statuslineBackupsDir(home);
   if (!fs.existsSync(backupsDir)) {
     return [];
   }
@@ -164,6 +168,41 @@ describe('claude-capture.py install/uninstall/status', () => {
     }
 
     expect(backupFiles(home).length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('claude-capture.py statusline backups subdirectory', () => {
+  it('keeps backups in their own 0700 statusline/ subdir, without rechmod-ing a preexisting shared backups/ dir', () => {
+    const home = makeHome();
+    setupRealSettingsWithCloakProfiles(home);
+
+    const sharedBackupsDir = path.join(home, '.local', 'share', 'deadlineaura', 'backups');
+    fs.mkdirSync(sharedBackupsDir, { recursive: true });
+    fs.chmodSync(sharedBackupsDir, 0o775);
+    const dbBackupPath = path.join(sharedBackupsDir, 'db-backup.sqlite');
+    fs.writeFileSync(dbBackupPath, 'db-backup-placeholder');
+
+    const result = run(home, ['install']);
+    expect(result.status).toBe(0);
+
+    expect(fs.statSync(sharedBackupsDir).mode & 0o777).toBe(0o775);
+    expect(fs.readFileSync(dbBackupPath, 'utf8')).toBe('db-backup-placeholder');
+
+    const statuslineDir = statuslineBackupsDir(home);
+    expect(fs.statSync(statuslineDir).mode & 0o777).toBe(0o700);
+    expect(backupFiles(home).length).toBe(1);
+  });
+
+  it('creates the shared backups/ parent with 0700 when nothing else created it first', () => {
+    const home = makeHome();
+    setupRealSettingsWithCloakProfiles(home);
+
+    const result = run(home, ['install']);
+    expect(result.status).toBe(0);
+
+    const sharedBackupsDir = path.join(home, '.local', 'share', 'deadlineaura', 'backups');
+    expect(fs.statSync(sharedBackupsDir).mode & 0o777).toBe(0o700);
+    expect(fs.statSync(statuslineBackupsDir(home)).mode & 0o777).toBe(0o700);
   });
 });
 
