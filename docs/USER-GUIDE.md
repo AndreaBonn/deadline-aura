@@ -14,6 +14,7 @@ Everything you need to install Deadline Aura and use it day to day. No programmi
 - [Connect Jira](#connect-jira)
 - [Turn on AI scoring](#turn-on-ai-scoring)
 - [Reading the colors](#reading-the-colors)
+- [Seeing your Claude and Codex limits](#seeing-your-claude-and-codex-limits)
 - [Working with tasks](#working-with-tasks)
 - [Tracking your time](#tracking-your-time)
 - [Meeting reminders](#meeting-reminders)
@@ -126,6 +127,29 @@ The colour comes from a blend: the AI assessment weighs 70 percent, the mechanic
 
 The display refreshes every 60 seconds. The underlying data is fetched every 10 minutes, and the AI recalculates when your events change or every 6 hours, whichever comes first. All three intervals are configurable.
 
+## Seeing your Claude and Codex limits
+
+At the bottom of the wallpaper a band runs across the whole screen, with one card for every Claude account on the computer and one for Codex. If you use several Claude accounts through Cloak, you get one card per profile; without Cloak, a single card for your regular account.
+
+Each card has two lines:
+
+- **5h**: how much of the 5-hour limit you have used and when it resets, for example `14:30 (~2h 15m)`.
+- **7d**: how much of the weekly limit you have used and when it resets, for example `Fri 09:00 (3d 4h)`.
+
+The bar is white below 70 percent, amber up to 89 and red from 90 up. A few markers to know:
+
+| What you see | What it means                                                                     |
+| ------------ | --------------------------------------------------------------------------------- |
+| `~0%` free   | The window has already reset: the value is an estimate until fresh data arrives   |
+| `n/a`        | There is no data yet                                                              |
+| `upd. 01:06` | The last reading is more than 30 minutes old: the account has not been used since |
+
+Codex data arrives on its own, from the logs Codex writes on your computer. Claude needs a one-time step: in **Settings → Wallpaper** press **Install capture**. The app places a small script in front of the Claude Code statusline, which keeps working as before. The script stores only percentages and reset times, never reads your credentials, and needs `python3`. The change goes into `~/.claude/settings.json`, so it applies to every Cloak profile sharing that file; before writing it the app saves a copy in `~/.local/share/deadlineaura/backups/statusline`.
+
+An account updates only while a Claude Code session on that account is open. The wallpaper is redrawn when something visible changes and at least every 15 minutes, so a percentage can lag a few points behind for up to a quarter of an hour.
+
+If you do not need the band, turn it off in **Settings → Wallpaper → Show Claude/Codex limit usage**.
+
 ## Working with tasks
 
 Open the sidebar by clicking the strip. Tasks are grouped into sections, and any section with nothing in it is simply not drawn:
@@ -186,17 +210,17 @@ Clicking the coloured urgency bar opens a different panel: a written assessment 
 
 Click the gear at the bottom of the sidebar. Each tab has its own **Reset section** button, so you can undo your changes in one area without touching the rest.
 
-| Tab           | What lives here                                                                                          |
-| ------------- | -------------------------------------------------------------------------------------------------------- |
-| General       | How often the display refreshes, how often data is fetched, how far ahead to look                        |
-| Sources       | Google credentials and calendars, the Outlook feed, Jira instances and filter                            |
-| AI            | Provider keys, the order they are tried in, refresh interval, timeout, temperature                       |
-| Wallpaper     | Whether to tint the wallpaper, which background images to use, post-it options                           |
-| Sidebar       | Which edge it opens on, how wide, how transparent                                                        |
-| Notifications | Desktop notifications, the score that triggers them, the quiet period between them, and the meeting dock |
-| Interface     | Language, how many tasks to show, countdown format                                                       |
-| Shift         | Your working days and hours, and your holidays                                                           |
-| Advanced      | The constants behind the urgency calculation                                                             |
+| Tab           | What lives here                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| General       | How often the display refreshes, how often data is fetched, how far ahead to look                           |
+| Sources       | Google credentials and calendars, the Outlook feed, Jira instances and filter                               |
+| AI            | Provider keys, the order they are tried in, refresh interval, timeout, temperature                          |
+| Wallpaper     | Whether to tint the wallpaper, which background images to use, post-it options, Claude and Codex limit band |
+| Sidebar       | Which edge it opens on, how wide, how transparent                                                           |
+| Notifications | Desktop notifications, the score that triggers them, the quiet period between them, and the meeting dock    |
+| Interface     | Language, how many tasks to show, countdown format                                                          |
+| Shift         | Your working days and hours, and your holidays                                                              |
+| Advanced      | The constants behind the urgency calculation                                                                |
 
 The **Shift** tab drives the countdown shown under the clock: how long until your shift ends, or when the next one starts. It does not change the urgency score.
 
@@ -206,12 +230,14 @@ Secrets you have already saved are shown as dots rather than their real value. L
 
 Everything stays on your machine.
 
-| Path                                        | What it holds                                |
-| ------------------------------------------- | -------------------------------------------- |
-| `~/.config/deadlineaura/config.json`        | Your settings, including the tokens and keys |
-| `~/.config/deadlineaura/google-token.json`  | The Google authorization                     |
-| `~/.local/share/deadlineaura/db.sqlite`     | Tasks and score history                      |
-| `~/.local/share/deadlineaura/wallpaper.png` | The generated wallpaper                      |
+| Path                                        | What it holds                                         |
+| ------------------------------------------- | ----------------------------------------------------- |
+| `~/.config/deadlineaura/config.json`        | Your settings, including the tokens and keys          |
+| `~/.config/deadlineaura/google-token.json`  | The Google authorization                              |
+| `~/.local/share/deadlineaura/db.sqlite`     | Tasks and score history                               |
+| `~/.local/share/deadlineaura/wallpaper.png` | The generated wallpaper                               |
+| `~/.local/share/deadlineaura/ai-usage/`     | Percentages and reset times of your Claude accounts   |
+| `~/.local/share/deadlineaura/bin/`          | The capture script used by the Claude Code statusline |
 
 Both files under `.config` are written readable by your account only. They are not encrypted, so anything running as you can read them. For the full picture, see the [security policy](../SECURITY.md).
 
@@ -242,6 +268,8 @@ To remove it:
 ```bash
 sudo apt remove deadlineaura
 ```
+
+If you installed the Claude limit capture, press **Remove capture** in **Settings → Wallpaper** first: it puts your statusline back as it was. If you forget, nothing breaks, because the script stays in `~/.local/share/deadlineaura/bin` and keeps passing the data to your statusline; to remove it afterwards, run `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
 
 Your settings and database are left in place, so reinstalling later picks up where you left off. To erase those too, delete `~/.config/deadlineaura` and `~/.local/share/deadlineaura`.
 

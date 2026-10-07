@@ -96,6 +96,7 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - Outlook sync from a published ICS feed: recurring series are expanded occurrence by occurrence, moved and cancelled instances are applied, and the events count as calendar commitments in the urgency engine and the AI prompt rather than as backlog
 - Jira sync via API token with configurable JQL
 - Multi-monitor support: one strip per display, single spanned wallpaper PNG
+- Claude and Codex limit band at the bottom of the wallpaper, replacing the mental load label (the score still drives background and tint): one card per Claude account on the machine (Cloak profiles under `~/.cloak/profiles/<name>`, otherwise `~/.claude`) and one for Codex, with the used share of the 5-hour and weekly limits and the reset time with the time left (`14:30 (~2h 15m)`, `Fri 09:00 (3d 4h)`). Codex is read from its local session logs; for Claude, Settings → Wallpaper installs a capture that sits in front of the Claude Code statusline and stores only percentages and reset times. Requires `python3`
 - Config validated with Zod on startup and on every settings save
 - X11 strut reservation so the strip does not overlap the GNOME work area
 - Local tasks: create, edit, complete, and delete personal tasks directly from the sidebar, with no external sync needed
@@ -433,12 +434,15 @@ npm run sync
 
 ### File locations
 
-| Path                                        | Content                   |
-| ------------------------------------------- | ------------------------- |
-| `~/.config/deadlineaura/config.json`        | User configuration        |
-| `~/.config/deadlineaura/google-token.json`  | Google OAuth token (0600) |
-| `~/.local/share/deadlineaura/db.sqlite`     | SQLite database           |
-| `~/.local/share/deadlineaura/wallpaper.png` | Generated wallpaper       |
+| Path                                              | Content                                           |
+| ------------------------------------------------- | ------------------------------------------------- |
+| `~/.config/deadlineaura/config.json`              | User configuration                                |
+| `~/.config/deadlineaura/google-token.json`        | Google OAuth token (0600)                         |
+| `~/.local/share/deadlineaura/db.sqlite`           | SQLite database                                   |
+| `~/.local/share/deadlineaura/wallpaper.png`       | Generated wallpaper                               |
+| `~/.local/share/deadlineaura/ai-usage/latest/`    | Latest Claude limits per account                  |
+| `~/.local/share/deadlineaura/bin/`                | Copy of the capture script used by the statusline |
+| `~/.local/share/deadlineaura/backups/statusline/` | Backups of `~/.claude/settings.json` (0600)       |
 
 The full configuration schema with defaults is in `config/defaults.js`.
 
