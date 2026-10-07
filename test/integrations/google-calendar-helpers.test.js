@@ -13,10 +13,12 @@ describe('google-calendar — assignPriority', () => {
 
   it('returns 2 when title contains priority keyword', () => {
     expect(assignPriority({ summary: 'Release v2.0' })).toBe(2);
+    expect(assignPriority({ summary: 'Deploy to staging' })).toBe(2);
   });
 
   it('returns 2 when description contains priority keyword', () => {
     expect(assignPriority({ summary: 'Meeting', description: 'urgent review needed' })).toBe(2);
+    expect(assignPriority({ summary: 'Meeting', description: 'Discuss deadline for Q3' })).toBe(2);
   });
 
   it('returns 3 for normal events', () => {
@@ -29,10 +31,11 @@ describe('google-calendar — assignPriority', () => {
 
   it('uses custom keyword list when provided', () => {
     expect(assignPriority({ summary: 'custom-flag meeting' }, ['custom-flag'])).toBe(2);
+    expect(assignPriority({ summary: 'Team standup' }, ['custom-flag'])).toBe(3);
   });
 
   it('is case-insensitive', () => {
-    expect(assignPriority({ summary: 'URGENT deployment' })).toBe(2);
+    expect(assignPriority({ summary: 'URGENT: fix prod' })).toBe(2);
   });
 });
 
@@ -127,20 +130,31 @@ describe('google-calendar — extractMeetUrl', () => {
 });
 
 describe('google-calendar — normalizeEvent', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-05-08T12:00:00+02:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns normalized event for timed event', () => {
     const event = {
       id: 'ev1',
       summary: 'Sprint Review',
       start: { dateTime: '2030-05-08T10:00:00+02:00' },
-      end: { dateTime: '2030-05-08T11:00:00+02:00' },
+      end: { dateTime: '2030-05-08T13:00:00+02:00' },
       htmlLink: 'https://calendar.google.com/event/ev1',
     };
     const result = normalizeEvent(event);
     expect(result.id).toBe('gcal_ev1');
     expect(result.source).toBe('gcal');
     expect(result.title).toBe('Sprint Review');
-    expect(result.start_at).toBeGreaterThan(0);
-    expect(result.due_at).toBeGreaterThan(0);
+    expect(result.start_at).toBe(new Date(event.start.dateTime).getTime());
+    expect(result.due_at).toBe(new Date(event.end.dateTime).getTime());
+    expect(result.priority).toBe(3);
+    expect(result.is_done).toBe(0);
     expect(result.all_day).toBe(false);
     expect(result.web_url).toBe('https://calendar.google.com/event/ev1');
   });
@@ -154,6 +168,8 @@ describe('google-calendar — normalizeEvent', () => {
     };
     const result = normalizeEvent(event);
     expect(result.all_day).toBe(true);
+    expect(result.start_at).toBe(new Date('2030-05-10T00:00:00').getTime());
+    expect(result.due_at).toBe(new Date('2030-05-11T00:00:00').getTime());
     expect(result.web_url).toBeNull();
   });
 
@@ -165,6 +181,9 @@ describe('google-calendar — normalizeEvent', () => {
       end: { dateTime: '2020-01-01T11:00:00Z' },
     };
     expect(normalizeEvent(event)).toBeNull();
+    expect(normalizeEvent({ ...event, end: { dateTime: '2030-05-08T13:00:00Z' } })).toEqual(
+      expect.objectContaining({ id: 'gcal_past' }),
+    );
   });
 
   it('handles event without summary', () => {
@@ -184,9 +203,9 @@ describe('google-calendar — normalizeEvent', () => {
       start: { dateTime: '2030-05-08T10:00:00Z' },
     };
     const result = normalizeEvent(event);
-    // end is undefined → endTime is null → does not filter as past
-    expect(result).not.toBeNull();
-    expect(result.due_at).toBeNull();
+    expect(result).toEqual(
+      expect.objectContaining({ id: 'gcal_no-end', due_at: null, all_day: false }),
+    );
   });
 
   it('extracts meet_url from hangoutLink', () => {
@@ -216,11 +235,38 @@ describe('google-calendar — normalizeEvent', () => {
     const event = {
       id: 'raw',
       summary: 'Test',
+      description: 'Some details',
       start: { dateTime: '2030-05-08T10:00:00Z' },
       end: { dateTime: '2030-05-08T11:00:00Z' },
     };
     const result = normalizeEvent(event);
     const parsed = JSON.parse(result.raw_json);
-    expect(parsed.id).toBe('raw');
+    expect(parsed).toEqual(event);
+  });
+
+  it('normalizeEvent_missing_start_returns_null_start_at', () => {
+    const event = { id: 'no-start', end: { dateTime: '2030-05-08T13:00:00Z' } };
+
+    const result = normalizeEvent(event);
+
+    expect(result).toEqual(expect.objectContaining({ id: 'gcal_no-start', start_at: null }));
+  });
+
+  it('normalizeEvent_all_day_ended_yesterday_filters_event', () => {
+    const event = { id: 'past-all-day', end: { date: '2030-05-07' } };
+
+    const result = normalizeEvent(event);
+    const upcoming = normalizeEvent({ ...event, end: { date: '2030-05-09' } });
+
+    expect(result).toBeNull();
+    expect(upcoming).toEqual(expect.objectContaining({ id: 'gcal_past-all-day', all_day: true }));
+  });
+
+  it('normalizeEvent_red_event_returns_highest_priority', () => {
+    const event = { id: 'red', colorId: '11', end: { dateTime: '2030-05-08T13:00:00Z' } };
+
+    const result = normalizeEvent(event);
+
+    expect(result).toEqual(expect.objectContaining({ id: 'gcal_red', priority: 1 }));
   });
 });

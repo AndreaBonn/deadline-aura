@@ -1,8 +1,30 @@
 'use strict';
 
 const fs = require('fs');
+const { google } = require('googleapis');
 
-const { isInvalidGrant, deleteToken, TOKEN_PATH } = require('../../integrations/google-calendar');
+const {
+  isInvalidGrant,
+  deleteToken,
+  fetchEvents,
+  fetchCalendarEvents,
+  TOKEN_PATH,
+} = require('../../integrations/google-calendar');
+
+const CONFIG = {
+  sources: {
+    google_calendar: {
+      enabled: true,
+      calendars: ['primary', 'work'],
+      oauth: { client_id: 'fake-client-id', client_secret: 'fake-client-secret' },
+    },
+  },
+};
+const UPCOMING_EVENT = {
+  id: 'work-event',
+  summary: 'Work meeting',
+  end: { dateTime: '2030-05-08T13:00:00Z' },
+};
 
 describe('isInvalidGrant', () => {
   it('returns true for invalid_grant message', () => {
@@ -50,40 +72,89 @@ describe('deleteToken', () => {
   });
 });
 
-describe('fetchEvents — invalid_grant retry logic', () => {
-  it('detects when all calendar errors are invalid_grant', () => {
-    const errors = [
-      { calendarId: 'primary', message: 'invalid_grant' },
-      { calendarId: 'work', message: 'invalid_grant' },
-    ];
-    const calendars = ['primary', 'work'];
+describe('fetchEvents invalid_grant recovery', () => {
+  let client;
+  let list;
+  const authRequired = new Error('Fake OAuth flow requested');
 
-    const allInvalidGrant =
-      errors.length === calendars.length && errors.every((e) => isInvalidGrant(e.message));
-
-    expect(allInvalidGrant).toBe(true);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-05-08T12:00:00Z'));
+    client = new google.auth.OAuth2();
+    vi.spyOn(google.auth, 'OAuth2').mockImplementation(() => client);
+    vi.spyOn(client, 'generateAuthUrl').mockImplementation(() => {
+      throw authRequired;
+    });
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ access_token: 'fake-access-token', refresh_token: 'fake-refresh-token' }),
+    );
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {});
+    list = vi.fn();
+    vi.spyOn(google, 'calendar').mockReturnValue({ events: { list } });
   });
 
-  it('does not trigger retry when errors are mixed', () => {
-    const errors = [
-      { calendarId: 'primary', message: 'invalid_grant' },
-      { calendarId: 'work', message: 'Network timeout' },
-    ];
-    const calendars = ['primary', 'work'];
-
-    const allInvalidGrant =
-      errors.length === calendars.length && errors.every((e) => isInvalidGrant(e.message));
-
-    expect(allInvalidGrant).toBe(false);
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it('does not trigger retry when not all calendars failed', () => {
-    const errors = [{ calendarId: 'primary', message: 'invalid_grant' }];
-    const calendars = ['primary', 'work'];
+  it('fetchCalendarEvents_partial_failure_returns_events_and_calendar_errors', async () => {
+    list.mockImplementation(({ calendarId }) =>
+      calendarId === 'primary'
+        ? Promise.reject(new Error('Network timeout'))
+        : Promise.resolve({ data: { items: [UPCOMING_EVENT] } }),
+    );
 
-    const allInvalidGrant =
-      errors.length === calendars.length && errors.every((e) => isInvalidGrant(e.message));
+    const result = await fetchCalendarEvents(client, CONFIG.sources.google_calendar);
 
-    expect(allInvalidGrant).toBe(false);
+    expect(result).toEqual({
+      allEvents: [expect.objectContaining({ id: 'gcal_work-event', title: 'Work meeting' })],
+      calendarErrors: [{ calendarId: 'primary', message: 'Network timeout' }],
+    });
+  });
+
+  it('fetchEvents_all_invalid_grant_deletes_token_and_requests_oauth', async () => {
+    list.mockRejectedValue(new Error('Token revoked: invalid_grant'));
+    fs.existsSync.mockReturnValueOnce(true).mockReturnValue(false);
+
+    const result = fetchEvents(CONFIG);
+
+    await expect(result).rejects.toBe(authRequired);
+    expect(fs.unlinkSync).toHaveBeenCalledWith(TOKEN_PATH);
+    expect(fs.unlinkSync).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledTimes(CONFIG.sources.google_calendar.calendars.length);
+    expect(client.generateAuthUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ access_type: 'offline', prompt: 'consent' }),
+    );
+    expect(fs.unlinkSync.mock.invocationCallOrder[0]).toBeLessThan(
+      client.generateAuthUrl.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('fetchEvents_mixed_errors_reports_failures_without_reauthentication', async () => {
+    list.mockRejectedValueOnce(new Error('invalid_grant'));
+    list.mockRejectedValueOnce(new Error('Network timeout'));
+
+    const result = fetchEvents(CONFIG);
+
+    await expect(result).rejects.toThrow(
+      'All calendars failed: primary: invalid_grant; work: Network timeout',
+    );
+    expect(list).toHaveBeenCalledTimes(CONFIG.sources.google_calendar.calendars.length);
+    expect(fs.unlinkSync).not.toHaveBeenCalled();
+    expect(client.generateAuthUrl).not.toHaveBeenCalled();
+  });
+
+  it('fetchEvents_partial_invalid_grant_returns_events_without_reauthentication', async () => {
+    list.mockRejectedValueOnce(new Error('invalid_grant'));
+    list.mockResolvedValueOnce({ data: { items: [UPCOMING_EVENT] } });
+
+    const result = await fetchEvents(CONFIG);
+
+    expect(result).toEqual([expect.objectContaining({ id: 'gcal_work-event' })]);
+    expect(list).toHaveBeenCalledTimes(CONFIG.sources.google_calendar.calendars.length);
+    expect(fs.unlinkSync).not.toHaveBeenCalled();
+    expect(client.generateAuthUrl).not.toHaveBeenCalled();
   });
 });

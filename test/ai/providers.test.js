@@ -32,6 +32,29 @@ describe('BaseProvider', () => {
 });
 
 describe('GroqProvider', () => {
+  it('aborts the request when the timeout elapses', async () => {
+    vi.useFakeTimers();
+    const abortError = Object.assign(new Error('The operation was aborted'), {
+      name: 'AbortError',
+    });
+    const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation((_url, { signal }) => {
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(abortError));
+      });
+    });
+    const p = new GroqProvider(['test-key']);
+
+    try {
+      const assertion = expect(p.score('prompt', { timeout: 100 })).rejects.toBe(abortError);
+      await vi.advanceTimersByTimeAsync(100);
+
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
+  });
+
   it('has correct name', () => {
     const p = new GroqProvider(['k1']);
     expect(p.name).toBe('groq');

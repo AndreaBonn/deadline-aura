@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const childProcess = require('child_process');
+const { Canvas } = require('canvas');
 
 vi.spyOn(os, 'homedir').mockReturnValue(
   path.join(os.tmpdir(), 'deadlineaura-wc-test-' + process.pid),
@@ -20,6 +21,7 @@ vi.mock('../../core/display-manager', () => ({
 }));
 
 const wallpaperRenderer = require('../../core/wallpaper-renderer');
+const pinnedQueries = require('../../store/pinned-queries');
 const {
   setOverlayOpen,
   isOverlayOpen,
@@ -28,6 +30,7 @@ const {
   buildPinnedByDisplay,
   shouldRerender,
   resetState,
+  WALLPAPER_PATH,
 } = require('../../core/wallpaper-changer');
 
 // vi.mock() does not intercept this module: wallpaper-changer.js requires it
@@ -165,6 +168,64 @@ describe('wallpaper-changer — update()', () => {
     const result = await update(fakePalette, { force: true });
     expect(result).toHaveProperty('method');
     expect(result).toHaveProperty('path');
+  });
+});
+
+describe('wallpaper-changer - update error handling', () => {
+  const palette = { hsl: { h: 20, s: 50, l: 8 } };
+  const nowMs = new Date('2026-05-11T12:00:00Z').getTime();
+  const electronScreen = {
+    getAllDisplays: () => [
+      {
+        id: 1,
+        size: { width: 64, height: 64 },
+        bounds: { x: 0, y: 0 },
+        scaleFactor: 1,
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    renderSpy.mockRestore();
+    resetState();
+    setOverlayOpen(false);
+    vi.useFakeTimers();
+    vi.setSystemTime(nowMs);
+    vi.spyOn(pinnedQueries, 'getAllPinned').mockReturnValue([]);
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
+  });
+
+  afterEach(() => {
+    resetState();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('rejects with the encoding error when canvas.toBuffer reports failure', async () => {
+    const error = new Error('PNG encoding failed');
+    vi.spyOn(Canvas.prototype, 'toBuffer').mockImplementation((callback) => callback(error));
+
+    const result = update(palette, { force: true, electronScreen, nowMs });
+
+    await expect(result).rejects.toBe(error);
+  });
+
+  it('keeps the new wallpaper applied when stale wallpaper cleanup cannot read the directory', async () => {
+    const readDirectory = vi.spyOn(fs, 'readdirSync').mockImplementation(() => {
+      throw new Error('directory unreadable');
+    });
+    const writeFile = vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
+
+    const result = await update(palette, { force: true, electronScreen, nowMs });
+
+    expect(result).toEqual({
+      changed: true,
+      method: 'gsettings',
+      path: path.join(path.dirname(WALLPAPER_PATH), `wallpaper-${nowMs}.png`),
+    });
+    expect(readDirectory).toHaveBeenCalledWith(path.dirname(result.path));
+    expect(writeFile).toHaveBeenCalledWith(result.path, expect.any(Buffer));
   });
 });
 

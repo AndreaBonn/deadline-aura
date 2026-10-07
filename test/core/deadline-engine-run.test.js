@@ -5,9 +5,16 @@ const { run } = require('../../core/deadline-engine');
 
 const MS_PER_HOUR = 3600000;
 
-describe('deadline-engine — run()', () => {
+describe('deadline-engine run()', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-07T10:00:00Z'));
+    // Mechanical scoring must not read the developer's persisted AI score.
+    vi.spyOn(db, 'getLatestAiScore').mockReturnValue(null);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('returns global_score 0 when no active tasks exist', () => {
@@ -36,9 +43,11 @@ describe('deadline-engine — run()', () => {
 
     const result = run({ lookaheadHours: 72 });
 
-    expect(result.global_score).toBeGreaterThan(0);
-    expect(result.tasks).toHaveLength(1);
-    expect(result.tasks[0].id).toBe('t1');
+    // Single priority-1 task at 2h: 1-exp(-0.05*2/2), rounded to 3 decimals.
+    expect(result.global_score).toBe(0.049);
+    expect(result.tasks.map(({ id, urgency_score }) => ({ id, urgency_score }))).toEqual([
+      { id: 't1', urgency_score: 0.049 },
+    ]);
   });
 
   it('uses end-of-week as minimum lookahead regardless of config', () => {
@@ -68,7 +77,8 @@ describe('deadline-engine — run()', () => {
 
     const result = run({ lookaheadHours: 72, k: 0.2 });
 
-    expect(result.global_score).toBeGreaterThan(0);
+    // Custom k=0.2, priority weight=1.5 and 24h: 1-exp(-0.2*1.5/24).
+    expect(result.global_score).toBe(0.012);
   });
 
   it('uses config lookaheadHours when larger than end-of-week', () => {

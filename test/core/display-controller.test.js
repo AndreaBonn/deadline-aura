@@ -58,6 +58,8 @@ describe('display-controller — setX11Strut', () => {
     Object.defineProperty(process, 'platform', { value: originalPlatform });
     if (originalDisplay !== undefined) {
       process.env.DISPLAY = originalDisplay;
+    } else {
+      delete process.env.DISPLAY;
     }
   });
 
@@ -146,6 +148,25 @@ describe('display-controller — setX11Strut', () => {
     expect(spy.mock.calls[0][0]).toBe('xprop');
     expect(spy.mock.calls[0][1]).toContain('_NET_WM_STRUT_PARTIAL');
     expect(spy.mock.calls[1][1]).toContain('_NET_WM_DESKTOP');
+  });
+
+  it.each([
+    ['_NET_WM_STRUT_PARTIAL', '[strut] xprop strut error:'],
+    ['_NET_WM_DESKTOP', '[strut] xprop desktop error:'],
+  ])('logs the error when xprop fails to set %s', (property, message) => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    process.env.DISPLAY = ':0';
+    const error = new Error('X11 property rejected');
+    vi.spyOn(childProcess, 'execFile').mockImplementation((_cmd, args, callback) => {
+      callback(args.includes(property) ? error : null);
+    });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const display = makeDisplay();
+    const win = { isDestroyed: () => false, getNativeWindowHandle: () => Buffer.alloc(4) };
+
+    setX11Strut(win, display, 260, makeScreen([display]));
+
+    expect(log.mock.calls).toEqual([[message, error.message]]);
   });
 
   it('handles getNativeWindowHandle throwing gracefully', () => {

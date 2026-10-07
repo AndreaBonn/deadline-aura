@@ -1,6 +1,25 @@
 const { scoreTasks } = require('../../ai/ai-scorer');
 
 describe('ai-scorer', () => {
+  it('returns whatever providerManager.scoreEvents resolves with', async () => {
+    const providerManager = require('../../ai/provider-manager');
+    const fakeResult = { global_stress: 6.4, per_event: [] };
+    const scoreSpy = vi.spyOn(providerManager, 'scoreEvents').mockResolvedValueOnce(fakeResult);
+    const config = { ai: { enabled: true } };
+    const tasks = [{ id: 'test_1', title: 'Test', source: 'gcal' }];
+
+    try {
+      const result = await scoreTasks(tasks, config);
+
+      expect({ returnedSameResult: result === fakeResult, calls: scoreSpy.mock.calls }).toEqual({
+        returnedSameResult: true,
+        calls: [[tasks, config]],
+      });
+    } finally {
+      scoreSpy.mockRestore();
+    }
+  });
+
   it('returns null when AI is disabled', async () => {
     const config = { ai: { enabled: false } };
     const result = await scoreTasks([{ id: 'test' }], config);

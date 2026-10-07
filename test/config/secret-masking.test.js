@@ -35,7 +35,11 @@ describe('secret-masking', () => {
     });
 
     it('tolerates a config without ai or jira sections', () => {
-      expect(() => maskConfigForRenderer({})).not.toThrow();
+      const cfg = { language: 'it' };
+
+      const masked = maskConfigForRenderer(cfg);
+
+      expect(masked).toEqual({ language: 'it' });
     });
   });
 

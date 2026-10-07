@@ -1,127 +1,92 @@
 'use strict';
 
+const { CanvasRenderingContext2D } = require('canvas');
 const { render } = require('../../core/wallpaper-renderer');
+const { setLanguage } = require('../../i18n');
 
-const SINGLE_DISPLAY = [{ id: 'eDP-1', width: 800, height: 600, x: 0, y: 0 }];
-const LOW_PALETTE = { hsl: { h: 120, s: 30, l: 8 } };
+const NOW_MS = new Date('2026-10-07T10:00:00Z').getTime();
+const OPTIONS = {
+  displays: [{ id: 'eDP-1', width: 800, height: 600, x: 0, y: 0 }],
+  palette: { hsl: { h: 120, s: 30, l: 8 } },
+  score: 0.3,
+  pinnedByDisplay: {},
+};
 
-describe('wallpaper-renderer — branch coverage', () => {
-  it('renders overflow indicator when many events exceed available space', async () => {
-    const now = Date.now();
-    // Generate 25 events in the next 24h to trigger overflow
-    const manyEvents = Array.from({ length: 25 }, (_, i) => ({
-      id: `ev_${i}`,
-      title: `Meeting ${i}`,
-      start_at: now + (i + 1) * 600000,
-      due_at: now + (i + 1) * 600000 + 1800000,
-      source: i % 2 === 0 ? 'gcal' : 'jira',
-      priority: 3,
-    }));
+describe('wallpaper-renderer render agenda branches', () => {
+  let fillTextSpy;
 
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.5,
-      engineResult: { global_score: 0.5, tasks: [] },
-      pinnedByDisplay: {},
-      calendarEvents: manyEvents,
-    });
-
-    // Canvas should render without error
-    const buf = canvas.toBuffer('image/png');
-    expect(buf.length).toBeGreaterThan(0);
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW_MS);
+    setLanguage('en');
+    fillTextSpy = vi.spyOn(CanvasRenderingContext2D.prototype, 'fillText');
   });
 
-  it('renders events with due_at but no start_at (falls back to due_at for filtering)', async () => {
-    const now = Date.now();
-    const events = [
-      {
-        id: 'due_only',
-        title: 'Due-only event',
-        start_at: null,
-        due_at: now + 7200000,
-        source: 'jira',
-        priority: 2,
-      },
-    ];
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    setLanguage('it');
+  });
 
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.3,
-      engineResult: null,
-      pinnedByDisplay: {},
-      calendarEvents: events,
-    });
+  it('renders overflow indicator when many events exceed available space', async () => {
+    const events = Array.from({ length: 25 }, (_, i) => ({
+      title: `Meeting ${i}`,
+      start_at: NOW_MS + (i + 1) * 600000,
+      source: 'gcal',
+    }));
 
-    expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
+    await render({ ...OPTIONS, calendarEvents: events });
+
+    const texts = fillTextSpy.mock.calls.map(([text]) => text);
+    // The 600px region fits 17 rows after margins, header and bottom clearance.
+    expect(texts.filter((text) => text.startsWith('Meeting '))).toEqual(
+      events.slice(0, 17).map(({ title }) => title),
+    );
+    expect(texts).toContain('+ 8 more');
+  });
+
+  it('renders events with due_at but no start_at', async () => {
+    const event = { title: 'Due-only event', due_at: NOW_MS + 7200000, source: 'jira' };
+
+    await render({ ...OPTIONS, calendarEvents: [event] });
+
+    expect(fillTextSpy.mock.calls.map(([text]) => text)).toContain('Due-only event');
   });
 
   it('skips events with no start_at and no due_at', async () => {
     const events = [
-      { id: 'notime', title: 'No Time', start_at: null, due_at: null, source: 'gcal', priority: 3 },
+      { title: 'No Time', start_at: null, due_at: null, source: 'gcal' },
+      { title: 'Scheduled', start_at: NOW_MS + 3600000, source: 'gcal' },
     ];
 
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.3,
-      engineResult: null,
-      pinnedByDisplay: {},
-      calendarEvents: events,
-    });
+    await render({ ...OPTIONS, calendarEvents: events });
 
-    // Should render without error (event filtered out)
-    expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
+    const texts = fillTextSpy.mock.calls.map(([text]) => text);
+    expect(texts).toContain('Scheduled');
+    expect(texts).not.toContain('No Time');
   });
 
-  it('renders with calendarEvents=null (defaults to empty array)', async () => {
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.3,
-      engineResult: null,
-      pinnedByDisplay: {},
-      calendarEvents: null,
-    });
+  it.each([null, undefined])('renders an empty agenda for calendarEvents=%s', async (events) => {
+    const pinnedByDisplay = {
+      'eDP-1': [{ task_id: 'local_1', title: 'Pinned', x_pct: 50, y_pct: 50, priority: 3 }],
+    };
 
-    expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
-  });
+    await render({ ...OPTIONS, pinnedByDisplay, calendarEvents: events });
 
-  it('renders with undefined calendarEvents', async () => {
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.3,
-      engineResult: null,
-      pinnedByDisplay: {},
-    });
-
-    expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
+    const texts = fillTextSpy.mock.calls.map(([text]) => text);
+    expect(texts).toContain('Pinned');
+    expect(texts).not.toContain('NEXT 24H');
   });
 
   it('renders long event title with truncation', async () => {
-    const now = Date.now();
-    const events = [
-      {
-        id: 'long_title',
-        title: 'A'.repeat(200),
-        start_at: now + 3600000,
-        due_at: now + 7200000,
-        source: 'gcal',
-        priority: 3,
-      },
-    ];
+    const title = 'A'.repeat(200);
 
-    const canvas = await render({
-      displays: SINGLE_DISPLAY,
-      palette: LOW_PALETTE,
-      score: 0.3,
-      engineResult: { global_score: 0.3, tasks: [] },
-      pinnedByDisplay: {},
-      calendarEvents: events,
-    });
+    await render({ ...OPTIONS, calendarEvents: [{ title, start_at: NOW_MS + 3600000 }] });
 
-    expect(canvas.toBuffer('image/png').length).toBeGreaterThan(0);
+    const texts = fillTextSpy.mock.calls.map(([text]) => text);
+    const drawnTitle = texts.find((text) => /^A+…$/.test(text));
+    expect(drawnTitle).toBeDefined();
+    expect(drawnTitle.length).toBeLessThan(title.length);
+    expect(texts).not.toContain(title);
   });
 });

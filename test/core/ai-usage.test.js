@@ -1,6 +1,10 @@
 'use strict';
 
-const { collectUsage, usageSignature } = require('../../core/ai-usage');
+const { collectUsage, usageSignature, thresholdLevel } = require('../../core/ai-usage');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { syncCaptureBin } = require('../../core/ai-usage-capture-bin');
 
 const NOW_MS = new Date('2026-10-06T12:00:00.000Z').getTime();
 
@@ -20,6 +24,79 @@ function claudeRow(account, overrides = {}) {
 function fakeReaders({ claude = () => [], codex = () => null } = {}) {
   return { claude, codex };
 }
+
+describe('thresholdLevel boundaries', () => {
+  it.each([
+    [69, 'OK'],
+    [70, 'WARN'],
+    [89, 'WARN'],
+    [90, 'CRITICAL'],
+    [99, 'CRITICAL'],
+    [100, 'FULL'],
+  ])('classifies %i percent as %s', (pct, expected) => {
+    expect(thresholdLevel(pct)).toBe(expected);
+  });
+});
+
+describe('syncCaptureBin I/O failures', () => {
+  let home;
+  let source;
+  let dest;
+
+  beforeEach(() => {
+    home = fs.mkdtempSync(path.join(os.tmpdir(), 'capture-bin-errors-'));
+    source = path.join(home, 'source');
+    dest = path.join(home, 'bin');
+    fs.mkdirSync(source);
+    for (const name of ['claude-capture.py', 'capture_install.py', 'ai_usage_common.py']) {
+      fs.writeFileSync(path.join(source, name), `# ${name}\n`);
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it('reports cannot read for a missing source and copies after it is restored', () => {
+    const missing = path.join(source, 'claude-capture.py');
+    fs.unlinkSync(missing);
+
+    expect(() => syncCaptureBin({ source, dest })).toThrow(
+      `ai-usage-capture-bin: cannot read ${missing}:`,
+    );
+
+    fs.writeFileSync(missing, '# restored\n');
+    expect(syncCaptureBin({ source, dest }).copied).toHaveLength(3);
+    expect(fs.readFileSync(path.join(dest, 'claude-capture.py'), 'utf8')).toBe('# restored\n');
+  });
+
+  // chmod cannot deny root access, so root would never exercise the failed rename.
+  it.skipIf(process.getuid?.() === 0)(
+    'removes the staged temp file after a permission-denied rename (requires non-root)',
+    () => {
+      const rename = fs.renameSync;
+      // ensureDir resets permissions: lock only at the rename boundary, after staging.
+      vi.spyOn(fs, 'renameSync').mockImplementationOnce((staged, target) => {
+        expect(fs.readFileSync(staged, 'utf8')).toBe('# claude-capture.py\n');
+        fs.chmodSync(dest, 0o500);
+        try {
+          return rename(staged, target);
+        } finally {
+          fs.chmodSync(dest, 0o700);
+        }
+      });
+
+      expect(() => syncCaptureBin({ source, dest })).toThrow(/EACCES/);
+
+      expect(fs.readdirSync(dest).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+      expect(syncCaptureBin({ source, dest }).copied).toHaveLength(3);
+      expect(fs.readFileSync(path.join(dest, 'claude-capture.py'), 'utf8')).toBe(
+        '# claude-capture.py\n',
+      );
+    },
+  );
+});
 
 describe('core/ai-usage — collectUsage', () => {
   it('builds Claude rows from readClaudeUsage, preserving its ordering', () => {

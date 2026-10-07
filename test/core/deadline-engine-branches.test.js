@@ -2,6 +2,8 @@ const db = require('../../store/db');
 const {
   computeTaskUrgency,
   computeGlobalScore,
+  computeMechanicalScore,
+  describeMechanicalScore,
   DEFAULT_K,
   DEFAULT_PRIORITY_WEIGHTS,
   AI_SCORE_MAX_AGE_MS,
@@ -32,6 +34,26 @@ function makeTask(overrides = {}) {
 }
 
 describe('deadline-engine branch coverage', () => {
+  describe('computeMechanicalScore', () => {
+    it.each([
+      ['empty tasks', []],
+      [
+        'mixed priorities',
+        [
+          { urgency_score: 0.8, priority: 1, source: 'gcal' },
+          { urgency_score: 0.2, priority: 2, source: 'jira' },
+        ],
+      ],
+      ['off tasks', [{ urgency_score: 1, priority: 1, source: 'gcal', ai_category: 'off' }]],
+    ])('matches the detailed score for %s', (_scenario, tasks) => {
+      const weights = [3, 1, 0.5, 0.25];
+
+      const score = computeMechanicalScore(tasks, weights);
+
+      expect(score).toBe(describeMechanicalScore(tasks, weights).score);
+    });
+  });
+
   describe('computeTaskUrgency', () => {
     it('returns score 0.1 when due_at is undefined', () => {
       const task = makeTask({ due_at: undefined });
@@ -72,6 +94,30 @@ describe('deadline-engine branch coverage', () => {
   });
 
   describe('computeGlobalScore', () => {
+    it('returns the mechanical score when the AI score database lookup throws', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-11T12:00:00Z'));
+      vi.spyOn(db, 'getLatestAiScore').mockImplementation(() => {
+        throw new Error('database unavailable');
+      });
+      const tasks = [makeTask({ due_at: null })];
+      try {
+        const result = computeGlobalScore(tasks);
+
+        expect(result).toMatchObject({
+          global_score: 0.1,
+          breakdown: {
+            ai: null,
+            mechanical: { score: 0.1 },
+            blend: { ai_weight: 0, mechanical_weight: 1 },
+          },
+        });
+      } finally {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+      }
+    });
+
     it('uses fallback weight for priority outside array', () => {
       const tasks = [makeTask({ id: 'a', priority: 10, due_at: Date.now() + 4 * MS_PER_HOUR })];
       const result = computeGlobalScore(tasks);

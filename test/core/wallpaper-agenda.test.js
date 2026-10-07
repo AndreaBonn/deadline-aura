@@ -23,6 +23,22 @@ function drawnTexts(allTasks, agendaBottom = REGION.height) {
 }
 
 describe('wallpaper-agenda — filterUpcomingEvents', () => {
+  it('sorts due-only events alongside events with start times', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-11T12:00:00Z'));
+    try {
+      const later = event('Later deadline', 3 * HOUR_MS, 'due_at');
+      const sooner = event('Earlier deadline', HOUR_MS, 'due_at');
+      const meeting = event('Meeting', 2 * HOUR_MS);
+
+      const result = filterUpcomingEvents([later, meeting, sooner]);
+
+      expect(result).toEqual([sooner, meeting, later]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps only events in the next 24 hours, sorted by time', () => {
     const later = event('later', 5 * HOUR_MS);
     const sooner = event('sooner', 1 * HOUR_MS, 'due_at');
@@ -37,6 +53,20 @@ describe('wallpaper-agenda — filterUpcomingEvents', () => {
 });
 
 describe('wallpaper-agenda — drawDailyAgenda', () => {
+  it('draws the JIRA fallback badge for an unknown event source', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-11T12:00:00Z'));
+    try {
+      const unknown = { ...event('External review', HOUR_MS), source: 'external' };
+
+      const texts = drawnTexts([unknown]);
+
+      expect(texts.slice(-2)).toEqual(['JIRA', 'External review']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('draws the header and every upcoming event title', () => {
     const texts = drawnTexts([event('Standup', HOUR_MS), event('Review', 2 * HOUR_MS)]);
 

@@ -57,20 +57,46 @@ describe('db module exported functions', () => {
   describe('upsertTask', () => {
     it('inserts a new task', () => {
       db.upsertTask(SAMPLE_TASK);
+
       const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get(SAMPLE_TASK.id);
-      expect(row.title).toBe('Functional Test Task');
-      expect(row.source).toBe('gcal');
-      expect(row.priority).toBe(3);
+
+      expect(row).toMatchObject({
+        title: 'Functional Test Task',
+        source: 'gcal',
+        priority: 3,
+        is_done: 0,
+        is_stale: 0,
+      });
     });
 
     it('updates existing task on conflict', () => {
-      db.upsertTask({ ...SAMPLE_TASK, title: 'Updated Title' });
+      db.upsertTask(SAMPLE_TASK);
+
+      db.upsertTask({ ...SAMPLE_TASK, title: 'Updated Title', priority: 2 });
+
       const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get(SAMPLE_TASK.id);
-      expect(row.title).toBe('Updated Title');
+      expect(row).toMatchObject({ title: 'Updated Title', priority: 2 });
     });
   });
 
   describe('getActiveTasks', () => {
+    it('orders by due_at ASC with NULLs last', () => {
+      vi.useFakeTimers();
+      const now = new Date('2026-06-01T12:00:00Z').getTime();
+      vi.setSystemTime(now);
+      db.upsertTask({ ...SAMPLE_TASK, id: 'later', due_at: now + 48 * 3600000 });
+      db.upsertTask({ ...SAMPLE_TASK, id: 'sooner', due_at: now + 2 * 3600000 });
+      db.upsertTask({ ...SAMPLE_TASK, id: 'no_due', due_at: null });
+
+      try {
+        const tasks = db.getActiveTasks(72 * 3600000);
+
+        expect(tasks.map((task) => task.id)).toEqual(['sooner', 'later', 'no_due']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     beforeEach(() => {
       db.getDb().prepare('DELETE FROM tasks').run();
     });
@@ -208,15 +234,31 @@ describe('db module exported functions', () => {
   });
 
   describe('saveGlobalScore / getLastGlobalScore', () => {
+    beforeEach(() => {
+      db.getDb().prepare('DELETE FROM scores').run();
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('saves and retrieves global score', () => {
+      const now = Date.now();
+
       db.saveGlobalScore(0.73);
+
       const result = db.getLastGlobalScore();
-      expect(result.global_score).toBeCloseTo(0.73, 2);
+      expect(result).toEqual({ global_score: 0.73, computed_at: now });
     });
 
     it('returns latest score when multiple exist', () => {
       db.saveGlobalScore(0.5);
+      vi.advanceTimersByTime(1000);
+
       db.saveGlobalScore(0.9);
+
       const result = db.getLastGlobalScore();
       expect(result.global_score).toBeCloseTo(0.9, 2);
     });
@@ -230,10 +272,22 @@ describe('db module exported functions', () => {
     });
 
     it('replaces on conflict (same hash)', () => {
-      db.setAiCache('same_hash', '{"old": true}');
-      db.setAiCache('same_hash', '{"new": true}');
-      const cached = db.getAiCache('same_hash');
-      expect(cached.response_json).toBe('{"new": true}');
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+      try {
+        db.setAiCache('same_hash', '{"old": true}');
+        vi.advanceTimersByTime(1000);
+        const now = Date.now();
+
+        db.setAiCache('same_hash', '{"new": true}');
+
+        expect(db.getAiCache('same_hash')).toMatchObject({
+          response_json: '{"new": true}',
+          computed_at: now,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('returns undefined for non-existent hash', () => {
@@ -247,6 +301,35 @@ describe('db module exported functions', () => {
       db.getDb().prepare('DELETE FROM tasks').run();
       db.getDb().prepare('DELETE FROM scores').run();
       db.getDb().prepare('DELETE FROM ai_cache').run();
+    });
+
+    it('keeps recent stale tasks (within 48 hours)', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+      try {
+        db.upsertTask({ ...SAMPLE_TASK, id: 'stale_recent', synced_at: Date.now() });
+        db.markStale('gcal', []);
+
+        db.cleanupOldRecords();
+
+        const row = db
+          .getDb()
+          .prepare('SELECT id, is_stale FROM tasks WHERE id = ?')
+          .get('stale_recent');
+        expect(row).toEqual({ id: 'stale_recent', is_stale: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not throw on empty tables', () => {
+      db.cleanupOldRecords();
+
+      expect({
+        tasks: db.getActiveTasks(72 * 3600000),
+        scores: db.getScoreHistory(7),
+        cache: db.getAiCacheHistory(7),
+      }).toEqual({ tasks: [], scores: [], cache: [] });
     });
 
     it('removes old scores (older than 7 days)', () => {

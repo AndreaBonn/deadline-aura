@@ -82,3 +82,7 @@ async function initI18n(api) {
   _i18nReady = true;
   translateDom();
 }
+
+if (typeof module !== 'undefined') {
+  module.exports = { _i18nResolve, t, initI18n };
+}

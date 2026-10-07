@@ -189,3 +189,30 @@ describe('syncCaptureBin + runCaptureCommand integration (real scripts)', () => 
     expect(result).toEqual({ installed: false, targets: {} });
   });
 });
+
+describe('syncCaptureBin copy failures', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('fails with a "cannot read" error naming the source file that is missing', () => {
+    const source = writeFixtureSource(makeTmpDir('cap-src-'));
+    const dest = path.join(makeTmpDir('cap-dest-'), 'bin');
+    fs.unlinkSync(path.join(source, 'claude-capture.py'));
+
+    expect(() => syncCaptureBin({ source, dest })).toThrow(
+      `ai-usage-capture-bin: cannot read ${path.join(source, 'claude-capture.py')}`,
+    );
+  });
+
+  it('leaves no temporary file behind when the final rename fails', () => {
+    const source = writeFixtureSource(makeTmpDir('cap-src-'));
+    const dest = path.join(makeTmpDir('cap-dest-'), 'bin');
+    vi.spyOn(fs, 'renameSync').mockImplementationOnce(() => {
+      throw new Error('EXDEV: cross-device link not permitted');
+    });
+
+    expect(() => syncCaptureBin({ source, dest })).toThrow('EXDEV');
+    expect(fs.readdirSync(dest).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+  });
+});

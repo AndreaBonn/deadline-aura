@@ -1,7 +1,7 @@
 'use strict';
 
 const childProcess = require('child_process');
-const { send, shouldNotify, _resetForTest } = require('../../core/notifier');
+const { send, sendBurnoutWarning, shouldNotify, _resetForTest } = require('../../core/notifier');
 
 function makeConfig(overrides = {}) {
   return {
@@ -87,5 +87,35 @@ describe('notifier — shouldNotify cooldown', () => {
 
     const result = shouldNotify(engineResult, config);
     expect(result).toBe(false);
+  });
+});
+
+describe('notifier - sendBurnoutWarning', () => {
+  const warning = { severity: 'high', triggers: ['Insufficient recovery'] };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-11T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['exits unsuccessfully', () => ({ status: 1 })],
+    ['returns a spawn error', () => ({ status: null, error: new Error('ENOENT') })],
+    [
+      'throws synchronously',
+      () => {
+        throw new Error('spawn failed');
+      },
+    ],
+  ])('returns a failure result when notify-send %s', (_scenario, spawn) => {
+    vi.spyOn(childProcess, 'spawnSync').mockImplementation(spawn);
+
+    const result = sendBurnoutWarning(warning, makeConfig());
+
+    expect(result).toEqual({ sent: false, error: 'notify-send failed' });
   });
 });

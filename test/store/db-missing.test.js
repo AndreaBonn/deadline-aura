@@ -47,6 +47,22 @@ function insertTask(overrides = {}) {
 }
 
 describe('db — getUpcomingCalendarEvents', () => {
+  it('does not return done tasks', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    try {
+      const start_at = Date.now() + 3600000;
+      insertTask({ id: 'done_gcal', start_at, is_done: 1 });
+      insertTask({ id: 'active_gcal', start_at });
+
+      const results = db.getUpcomingCalendarEvents(24 * 3600000);
+
+      expect(results.map((event) => event.id)).toEqual(['active_gcal']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns empty array when no gcal tasks exist', () => {
     const results = db.getUpcomingCalendarEvents(24 * 3600000);
     expect(results).toHaveLength(0);
@@ -79,10 +95,20 @@ describe('db — getUpcomingCalendarEvents', () => {
   });
 
   it('does not return jira tasks', () => {
-    insertTask({ id: 'jira_task', source: 'jira', start_at: null });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
+    try {
+      const start_at = Date.now() + 3600000;
+      insertTask({ id: 'jira_task', source: 'jira', start_at: null });
+      insertTask({ id: 'jira_with_start', source: 'jira', start_at });
+      insertTask({ id: 'gcal_active', start_at });
 
-    const results = db.getUpcomingCalendarEvents(24 * 3600000);
-    expect(results.every((r) => r.source === 'gcal')).toBe(true);
+      const results = db.getUpcomingCalendarEvents(24 * 3600000);
+
+      expect(results.map((event) => event.id)).toEqual(['gcal_active']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not return tasks outside horizon', () => {
@@ -113,84 +139,5 @@ describe('db — getUpcomingCalendarEvents', () => {
     const results = db.getUpcomingCalendarEvents(24 * 3600000);
     const ids = results.map((r) => r.id);
     expect(ids.indexOf('gcal_sooner')).toBeLessThan(ids.indexOf('gcal_later'));
-  });
-});
-
-describe('db — getLatestAiScore', () => {
-  it('returns null when ai_cache is empty', () => {
-    const result = db.getLatestAiScore();
-    expect(result).toBeNull();
-  });
-
-  it('returns global_stress and computed_at for valid cache entry', () => {
-    db.setAiCache('hash123', JSON.stringify({ global_stress: 7, per_event: [] }));
-    const result = db.getLatestAiScore();
-    expect(result).not.toBeNull();
-    expect(result.global_stress).toBe(7);
-    expect(typeof result.computed_at).toBe('number');
-  });
-
-  it('returns null when response_json is malformed', () => {
-    db.getDb()
-      .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?,?,?)')
-      .run('bad_hash', '{ not valid json', Date.now());
-
-    const result = db.getLatestAiScore();
-    expect(result).toBeNull();
-  });
-});
-
-describe('db — cleanupOldRecords', () => {
-  it('deletes scores older than 7 days', () => {
-    const oldTs = Date.now() - 8 * 24 * 3600000;
-    db.getDb()
-      .prepare('INSERT INTO scores (global_score, computed_at) VALUES (?,?)')
-      .run(0.5, oldTs);
-
-    db.cleanupOldRecords();
-
-    const remaining = db.getDb().prepare('SELECT * FROM scores').all();
-    expect(remaining.every((r) => r.computed_at >= Date.now() - 7 * 24 * 3600000)).toBe(true);
-  });
-
-  it('deletes stale tasks older than 48 hours', () => {
-    const oldSyncedAt = Date.now() - 3 * 24 * 3600000;
-    db.getDb()
-      .prepare(
-        `INSERT INTO tasks (id, source, title, priority, is_done, is_stale, raw_json, synced_at)
-         VALUES (?,?,?,?,?,?,?,?)`,
-      )
-      .run('stale_old', 'gcal', 'Old Stale', 3, 0, 1, '{}', oldSyncedAt);
-
-    db.cleanupOldRecords();
-
-    const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get('stale_old');
-    expect(row).toBeUndefined();
-  });
-
-  it('keeps recent stale tasks (within 48 hours)', () => {
-    insertTask({ id: 'stale_recent' });
-    db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('stale_recent');
-
-    db.cleanupOldRecords();
-
-    const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get('stale_recent');
-    expect(row).toBeDefined();
-  });
-
-  it('deletes ai_cache entries older than 7 days', () => {
-    const oldTs = Date.now() - 8 * 24 * 3600000;
-    db.getDb()
-      .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?,?,?)')
-      .run('old_hash', '{}', oldTs);
-
-    db.cleanupOldRecords();
-
-    const row = db.getDb().prepare('SELECT * FROM ai_cache WHERE events_hash = ?').get('old_hash');
-    expect(row).toBeUndefined();
-  });
-
-  it('does not throw on empty tables', () => {
-    expect(() => db.cleanupOldRecords()).not.toThrow();
   });
 });

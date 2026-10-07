@@ -1,6 +1,25 @@
 'use strict';
 
+const fs = require('fs');
+const { google } = require('googleapis');
 const { createEvent, updateEvent, listCalendars } = require('../../integrations/google-calendar');
+
+const CONFIG = {
+  sources: {
+    google_calendar: {
+      enabled: true,
+      oauth: { client_id: 'fake-client-id', client_secret: 'fake-client-secret' },
+    },
+  },
+};
+const START_TIME = '2030-05-08T10:00:00.000Z';
+const END_TIME = '2030-05-08T11:00:00.000Z';
+const DURATION_MINUTES = 60;
+const API_EVENT = {
+  id: 'saved-event',
+  htmlLink: 'https://calendar.google.com/event/saved-event',
+  summary: 'Planning',
+};
 
 describe('google-calendar — write operations', () => {
   const originalEnv = { ...process.env };
@@ -21,7 +40,7 @@ describe('google-calendar — write operations', () => {
         createEvent(config, {
           calendarId: 'primary',
           summary: '[PROJ-42] - Fix bug',
-          startTime: new Date().toISOString(),
+          startTime: START_TIME,
           durationMinutes: 60,
         }),
       ).rejects.toThrow('client_id and client_secret required (settings or env)');
@@ -37,7 +56,7 @@ describe('google-calendar — write operations', () => {
         createEvent(config, {
           calendarId: 'primary',
           summary: 'Test',
-          startTime: new Date().toISOString(),
+          startTime: START_TIME,
           durationMinutes: 30,
         }),
       ).rejects.toThrow('client_id and client_secret required (settings or env)');
@@ -55,7 +74,7 @@ describe('google-calendar — write operations', () => {
         updateEvent(config, {
           calendarId: 'primary',
           eventId: 'evt123',
-          endTime: new Date().toISOString(),
+          endTime: END_TIME,
         }),
       ).rejects.toThrow('client_id and client_secret required (settings or env)');
     });
@@ -95,5 +114,81 @@ describe('google-calendar — write operations', () => {
       const result = await listCalendars(config);
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('google-calendar successful API operations', () => {
+  let calendar;
+
+  beforeEach(() => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ access_token: 'fake-access-token', refresh_token: 'fake-refresh-token' }),
+    );
+    calendar = {
+      events: {
+        insert: vi.fn().mockResolvedValue({ data: API_EVENT }),
+        patch: vi.fn().mockResolvedValue({ data: API_EVENT }),
+      },
+      calendarList: { list: vi.fn() },
+    };
+    vi.spyOn(google, 'calendar').mockReturnValue(calendar);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('createEvent_valid_event_inserts_and_returns_id_and_link', async () => {
+    const input = {
+      calendarId: 'work',
+      summary: 'Planning',
+      startTime: START_TIME,
+      durationMinutes: DURATION_MINUTES,
+    };
+
+    const result = await createEvent(CONFIG, input);
+
+    expect(calendar.events.insert).toHaveBeenCalledWith({
+      calendarId: 'work',
+      requestBody: {
+        summary: 'Planning',
+        start: { dateTime: START_TIME },
+        end: { dateTime: END_TIME },
+      },
+    });
+    expect(result).toEqual({ id: API_EVENT.id, htmlLink: API_EVENT.htmlLink });
+  });
+
+  it('updateEvent_valid_end_patches_and_returns_id_and_link', async () => {
+    const input = { calendarId: 'work', eventId: 'saved-event', endTime: END_TIME };
+
+    const result = await updateEvent(CONFIG, input);
+
+    expect(calendar.events.patch).toHaveBeenCalledWith({
+      calendarId: 'work',
+      eventId: 'saved-event',
+      requestBody: { end: { dateTime: END_TIME } },
+    });
+    expect(result).toEqual({ id: API_EVENT.id, htmlLink: API_EVENT.htmlLink });
+  });
+
+  it('listCalendars_mixed_access_returns_only_owner_and_writer', async () => {
+    calendar.calendarList.list.mockResolvedValue({
+      data: {
+        items: [
+          { id: 'read-only', summary: 'Read only', accessRole: 'reader' },
+          { id: 'personal', summary: 'Personal', accessRole: 'owner' },
+          { id: 'work', accessRole: 'writer' },
+        ],
+      },
+    });
+
+    const result = await listCalendars(CONFIG);
+
+    expect(result).toEqual([
+      { id: 'personal', summary: 'Personal', accessRole: 'owner' },
+      { id: 'work', summary: 'work', accessRole: 'writer' },
+    ]);
   });
 });

@@ -85,6 +85,38 @@ describe('sync-daemon — sync()', () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it('upserts jira issues and returns correct count', async () => {
+    const issues = [
+      {
+        id: 'jira_APP-42',
+        source: 'jira',
+        title: 'Ship calendar integration',
+        due_at: Date.parse('2026-10-08T09:00:00Z'),
+        start_at: null,
+        priority: 3,
+        is_done: 0,
+        web_url: 'https://example.atlassian.net/browse/APP-42',
+        raw_json: '{}',
+        synced_at: Date.parse('2026-10-07T09:00:00Z'),
+      },
+    ];
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue(issues);
+    vi.spyOn(outlook, 'fetchEvents').mockResolvedValue([]);
+
+    const result = await sync({
+      ...BASE_CONFIG,
+      sources: { ...BASE_CONFIG.sources, jira: { enabled: true } },
+    });
+
+    const stored = db.getDb().prepare('SELECT * FROM tasks WHERE source = ?').all('jira');
+    expect({ count: result.jira, errors: result.errors, stored }).toEqual({
+      count: 1,
+      errors: [],
+      stored: [expect.objectContaining(issues[0])],
+    });
+  });
+
   it('upserts outlook events and counts them separately', async () => {
     const start = Date.now() + 3600000;
     vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);

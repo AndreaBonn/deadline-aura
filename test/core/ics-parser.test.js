@@ -22,6 +22,40 @@ function findByTitle(events, title) {
 
 describe('parseIcs', () => {
   describe('single events', () => {
+    it('prefers the native Teams URL and falls back to the description when it is absent', () => {
+      const calendar = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:native@example.com',
+        'SUMMARY:Native Teams link',
+        'DTSTART:20260810T080000Z',
+        'DTEND:20260810T090000Z',
+        'X-MICROSOFT-SKYPETEAMSMEETINGURL:https://teams.microsoft.com/l/meetup-join/native',
+        'DESCRIPTION:Join https://teams.microsoft.com/l/meetup-join/description',
+        'LOCATION:https://teams.microsoft.com/l/meetup-join/location',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:fallback@example.com',
+        'SUMMARY:Description Teams link',
+        'DTSTART:20260811T080000Z',
+        'DTEND:20260811T090000Z',
+        'DESCRIPTION:Join https://teams.microsoft.com/l/meetup-join/description',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+
+      const { events } = parseIcs(calendar, WINDOW);
+
+      expect(events.map(({ uid, joinUrl }) => ({ uid, joinUrl }))).toEqual([
+        { uid: 'native@example.com', joinUrl: 'https://teams.microsoft.com/l/meetup-join/native' },
+        {
+          uid: 'fallback@example.com',
+          joinUrl: 'https://teams.microsoft.com/l/meetup-join/description',
+        },
+      ]);
+    });
+
     it('extracts title, times and location of a plain event', () => {
       const { events } = parseSample();
 
@@ -69,6 +103,36 @@ describe('parseIcs', () => {
   });
 
   describe('recurring events', () => {
+    it('omits a cancelled recurrence exception while retaining the other slots in its series', () => {
+      const calendar = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:weekly-cancel@example.com',
+        'SUMMARY:Weekly review',
+        'DTSTART:20260805T080000Z',
+        'DTEND:20260805T090000Z',
+        'RRULE:FREQ=WEEKLY;COUNT=3',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:weekly-cancel@example.com',
+        'RECURRENCE-ID:20260812T080000Z',
+        'DTSTART:20260812T080000Z',
+        'DTEND:20260812T090000Z',
+        'SUMMARY:Cancelled review',
+        'STATUS:CANCELLED',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+
+      const { events } = parseIcs(calendar, WINDOW);
+
+      expect(events.map(({ uid, start }) => ({ uid, start }))).toEqual([
+        { uid: 'weekly-cancel@example.com', start: Date.parse('2026-08-05T08:00:00Z') },
+        { uid: 'weekly-cancel@example.com', start: Date.parse('2026-08-19T08:00:00Z') },
+      ]);
+    });
+
     it('expands one occurrence per week inside the window', () => {
       const { events } = parseSample();
 
@@ -200,6 +264,34 @@ describe('parseIcs', () => {
   });
 
   describe('degraded and hostile input', () => {
+    it('warns about an orphan exception and preserves unrelated valid events', () => {
+      const calendar = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:orphan@example.com',
+        'RECURRENCE-ID:20260812T080000Z',
+        'DTSTART:20260812T100000Z',
+        'DTEND:20260812T110000Z',
+        'SUMMARY:Orphan exception',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:valid@example.com',
+        'SUMMARY:Valid meeting',
+        'DTSTART:20260810T080000Z',
+        'DTEND:20260810T090000Z',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+
+      const { events, warnings } = parseIcs(calendar, WINDOW);
+
+      expect({ events: events.map(({ uid, title }) => ({ uid, title })), warnings }).toEqual({
+        events: [{ uid: 'valid@example.com', title: 'Valid meeting' }],
+        warnings: ['orphan exception for orphan@example.com: no master event in the feed'],
+      });
+    });
+
     it('warns when the feed was published without event details', () => {
       const busy = [
         'BEGIN:VCALENDAR',
@@ -222,7 +314,10 @@ describe('parseIcs', () => {
       const { events, warnings } = parseIcs(busy, WINDOW);
 
       expect(events).toHaveLength(2);
-      expect(warnings.some((w) => w.includes('free/busy'))).toBe(true);
+      expect(warnings).toContain(
+        'the feed looks published as free/busy only: event titles carry no subject, ' +
+          'so keyword priorities and AI scoring cannot work. Republish it with full details.',
+      );
     });
 
     it('recognises the placeholder titles case-insensitively', () => {

@@ -107,6 +107,20 @@ describe('cleanupExpiredMonths', () => {
 });
 
 describe('getSlotsForDate', () => {
+  it('returns empty slots when regular mode has no regular configuration', () => {
+    const monday = new Date(2026, 4, 11);
+    const config = { enabled: true, mode: 'regular' };
+
+    const slots = getSlotsForDate(monday, config);
+    const configuredSlots = getSlotsForDate(monday, {
+      ...config,
+      regular: { work_days: [1], slots: [{ start: '09:00', end: '17:00' }] },
+    });
+
+    expect(slots).toEqual([]);
+    expect(configuredSlots).toEqual([{ start: 540, end: 1020 }]);
+  });
+
   const regularConfig = {
     enabled: true,
     mode: 'regular',
@@ -177,6 +191,25 @@ describe('getSlotsForDate', () => {
 });
 
 describe('getShiftStatus', () => {
+  it('returns an off status with no countdown when work_days is empty', () => {
+    const monday = new Date(2026, 4, 11, 10);
+    const noWorkDays = {
+      enabled: true,
+      mode: 'regular',
+      regular: { work_days: [], slots: [{ start: '09:00', end: '17:00' }] },
+    };
+
+    const status = getShiftStatus(noWorkDays, monday);
+
+    expect(status).toEqual({
+      enabled: true,
+      working: false,
+      remainingMs: 0,
+      formatted: '--:--',
+      label: 'off',
+    });
+  });
+
   const config = {
     enabled: true,
     mode: 'regular',

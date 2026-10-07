@@ -64,6 +64,28 @@ describe('deepMerge', () => {
 });
 
 describe('loadConfig', () => {
+  it('falls back to DEFAULTS when merged config fails schema validation', () => {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ sync: { interval_minutes: 61 } }), 'utf-8');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const config = loadConfig();
+
+      expect({ config, errors: errorSpy.mock.calls }).toEqual({
+        config: DEFAULTS,
+        errors: [
+          [
+            'Config: invalid fields after merge, falling back to defaults:',
+            { sync: [expect.any(String)] },
+          ],
+        ],
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('returns DEFAULTS when config file does not exist', () => {
     const config = loadConfig();
     expect(config.sync.interval_minutes).toBe(DEFAULTS.sync.interval_minutes);

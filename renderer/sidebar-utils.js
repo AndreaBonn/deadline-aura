@@ -101,8 +101,34 @@ function getEventStatus(task, now) {
   return { status: 'default', label: formatCountdown(task.hours_remaining) };
 }
 
+const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
+
+function extractJiraKey(title) {
+  const match = title.match(JIRA_KEY_PATTERN);
+  return match ? match[1] : null;
+}
+
+function buildEventSummary(jiraKey, title) {
+  if (!jiraKey) {
+    return title;
+  }
+  const cleanTitle = title
+    .replace(jiraKey, '')
+    .replace(/^[\s·-]+/, '')
+    .trim();
+  return '[' + jiraKey + '] - ' + cleanTitle;
+}
+
 // CommonJS export for Node.js / test environment.
 // In the browser the functions are available as globals via <script src>.
 if (typeof module !== 'undefined') {
-  module.exports = { formatCountdown, urgencyToColor, formatElapsed, getEventStatus };
+  module.exports = {
+    formatCountdown,
+    urgencyToColor,
+    formatElapsed,
+    getEventStatus,
+    JIRA_KEY_PATTERN,
+    extractJiraKey,
+    buildEventSummary,
+  };
 }

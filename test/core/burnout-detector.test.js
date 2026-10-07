@@ -49,6 +49,37 @@ describe('burnout-detector', () => {
   });
 
   describe('extractDailyFactors', () => {
+    it('skips rows without cognitive factors while retaining valid daily factors', () => {
+      const rows = [
+        {
+          response_json: JSON.stringify({
+            global_stress: 9,
+            daily_breakdown: [{ date: '2026-05-01', stress: 9 }],
+          }),
+          computed_at: new Date('2026-05-01T12:00:00Z').getTime(),
+        },
+        {
+          response_json: JSON.stringify({
+            global_stress: 5,
+            daily_breakdown: [{ date: '2026-05-02', stress: 4 }],
+            cognitive_factors: { recovery_adequacy: 'sufficient' },
+          }),
+          computed_at: new Date('2026-05-02T12:00:00Z').getTime(),
+        },
+      ];
+
+      const result = extractDailyFactors(rows);
+
+      expect(result).toEqual([
+        {
+          date: '2026-05-02',
+          stress: 4,
+          global_stress: 5,
+          cognitive_factors: { recovery_adequacy: 'sufficient' },
+        },
+      ]);
+    });
+
     it('returns empty array for empty input', () => {
       expect(extractDailyFactors([])).toEqual([]);
     });

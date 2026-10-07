@@ -1,25 +1,6 @@
 'use strict';
 
-// Test the pure helper logic used by sidebar time-log feature.
-// These functions are inline in sidebar.js; we replicate them here to test the logic.
-
-const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
-
-function extractJiraKey(title) {
-  const match = title.match(JIRA_KEY_PATTERN);
-  return match ? match[1] : null;
-}
-
-function buildEventSummary(jiraKey, title) {
-  if (!jiraKey) {
-    return title;
-  }
-  const cleanTitle = title
-    .replace(jiraKey, '')
-    .replace(/^[\s·-]+/, '')
-    .trim();
-  return '[' + jiraKey + '] - ' + cleanTitle;
-}
+const { extractJiraKey, buildEventSummary } = require('../../renderer/sidebar-utils');
 
 describe('time-log helpers', () => {
   describe('extractJiraKey', () => {

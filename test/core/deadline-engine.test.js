@@ -1,6 +1,19 @@
+const db = require('../../store/db');
 const { computeTaskUrgency, computeGlobalScore } = require('../../core/deadline-engine');
 
 const MS_PER_HOUR = 3600000;
+const NOW_MS = new Date('2026-10-07T10:00:00Z').getTime();
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW_MS);
+  // Mechanical scoring must not depend on the developer's persisted AI score.
+  vi.spyOn(db, 'getLatestAiScore').mockReturnValue(null);
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 function makeTask(overrides = {}) {
   return {
@@ -100,9 +113,9 @@ describe('deadline-engine', () => {
 
       const result = computeGlobalScore(tasks);
 
-      expect(result.global_score).toBeGreaterThan(0);
-      expect(result.global_score).toBeLessThanOrEqual(1);
-      expect(result.tasks).toHaveLength(2);
+      // Rounded urgencies: 1-exp(-0.05*2/2)=0.049 and
+      // 1-exp(-0.05*0.5/48)=0.001; weighted mean (2:0.5) rounds to 0.039.
+      expect(result.global_score).toBe(0.039);
     });
 
     it('excludes done tasks from calculation', () => {
@@ -112,7 +125,8 @@ describe('deadline-engine', () => {
       ];
 
       const result = computeGlobalScore(tasks);
-      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks.map(({ id }) => id)).toEqual(['b']);
+      expect(result.global_score).toBe(0.002);
     });
 
     it('sorts tasks by urgency_score descending', () => {
@@ -122,13 +136,15 @@ describe('deadline-engine', () => {
       ];
 
       const result = computeGlobalScore(tasks);
-      expect(result.tasks[0].id).toBe('high');
+      expect(result.tasks.map(({ id, urgency_score }) => ({ id, urgency_score }))).toEqual([
+        { id: 'high', urgency_score: 0.095 },
+        { id: 'low', urgency_score: 0 },
+      ]);
     });
 
     it('includes computed_at timestamp', () => {
-      const before = Date.now();
       const result = computeGlobalScore([makeTask()]);
-      expect(result.computed_at).toBeGreaterThanOrEqual(before);
+      expect(result.computed_at).toBe(NOW_MS);
     });
   });
 });

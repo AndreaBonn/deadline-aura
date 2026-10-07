@@ -207,31 +207,35 @@ describe('claude-capture.py statusline backups subdirectory', () => {
 });
 
 describe('claude-capture.py install interrupted between targets', () => {
-  it('can still restore the first target after the second target failed to write', () => {
-    const home = makeHome();
-    const realPath = claudeSettingsPath(home);
-    fs.mkdirSync(path.dirname(realPath), { recursive: true });
-    fs.writeFileSync(realPath, JSON.stringify(ORIGINAL_SETTINGS, null, 2));
-    // A standalone (non-symlinked) profile whose directory refuses the atomic temp file.
-    const lockedDir = path.join(home, '.cloak', 'profiles', 'locked');
-    fs.mkdirSync(lockedDir, { recursive: true });
-    fs.writeFileSync(path.join(lockedDir, 'settings.json'), JSON.stringify({}));
-    fs.chmodSync(lockedDir, 0o500);
+  // chmod 0o500 does not block root; running this as root cannot exercise the write failure.
+  it.skipIf(process.getuid?.() === 0)(
+    'can still restore the first target after the second target failed to write (requires non-root)',
+    () => {
+      const home = makeHome();
+      const realPath = claudeSettingsPath(home);
+      fs.mkdirSync(path.dirname(realPath), { recursive: true });
+      fs.writeFileSync(realPath, JSON.stringify(ORIGINAL_SETTINGS, null, 2));
+      // A standalone (non-symlinked) profile whose directory refuses the atomic temp file.
+      const lockedDir = path.join(home, '.cloak', 'profiles', 'locked');
+      fs.mkdirSync(lockedDir, { recursive: true });
+      fs.writeFileSync(path.join(lockedDir, 'settings.json'), JSON.stringify({}));
+      fs.chmodSync(lockedDir, 0o500);
 
-    try {
-      const install = run(home, ['install']);
-      expect(install.status).not.toBe(0);
-      expect(JSON.parse(fs.readFileSync(realPath, 'utf8')).statusLine.command).toMatch(
-        /claude-capture\.py$/,
-      );
+      try {
+        const install = run(home, ['install']);
+        expect(install.status).not.toBe(0);
+        expect(JSON.parse(fs.readFileSync(realPath, 'utf8')).statusLine.command).toMatch(
+          /claude-capture\.py$/,
+        );
 
-      run(home, ['uninstall']);
+        run(home, ['uninstall']);
 
-      expect(JSON.parse(fs.readFileSync(realPath, 'utf8'))).toEqual(ORIGINAL_SETTINGS);
-    } finally {
-      fs.chmodSync(lockedDir, 0o700);
-    }
-  });
+        expect(JSON.parse(fs.readFileSync(realPath, 'utf8'))).toEqual(ORIGINAL_SETTINGS);
+      } finally {
+        fs.chmodSync(lockedDir, 0o700);
+      }
+    },
+  );
 });
 
 describe('claude-capture.py preserves the settings file layout', () => {

@@ -1,10 +1,9 @@
 'use strict';
 
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
-   updateShiftCountdown, setShiftConfig */
+   updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary */
 
 const COLLAPSED_LIMIT = 5;
-const JIRA_KEY_PATTERN = /\b([A-Z][A-Z0-9]+-\d+)\b/;
 const COLOR_ONGOING = '#4fc3f7';
 const COLOR_ENDED = '#888';
 
@@ -428,22 +427,6 @@ function createEditForm(task) {
   form.appendChild(row);
 
   return form;
-}
-
-function extractJiraKey(title) {
-  const match = title.match(JIRA_KEY_PATTERN);
-  return match ? match[1] : null;
-}
-
-function buildEventSummary(jiraKey, title) {
-  if (!jiraKey) {
-    return title;
-  }
-  const cleanTitle = title
-    .replace(jiraKey, '')
-    .replace(/^[\s·-]+/, '')
-    .trim();
-  return '[' + jiraKey + '] - ' + cleanTitle;
 }
 
 function padTwo(n) {

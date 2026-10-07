@@ -174,3 +174,14 @@ function updateShiftCountdown() {
     timeEl.textContent = shiftFormatRemainingMs(remainingMs);
   }
 }
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    shiftParseTime,
+    shiftFormatDateKey,
+    shiftFormatMonthKey,
+    shiftGetSlotsForDate,
+    shiftFindNextWorkDay,
+    shiftFormatRemainingMs,
+  };
+}

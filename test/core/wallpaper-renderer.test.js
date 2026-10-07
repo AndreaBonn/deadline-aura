@@ -1,7 +1,6 @@
 'use strict';
 
-// Test pure/logic functions exported from wallpaper-renderer.
-// render() itself requires canvas and fs — not tested here (integration concern).
+const fs = require('fs');
 
 const path = require('path');
 const {
@@ -10,48 +9,37 @@ const {
   resolveUnpackedDir,
 } = require('../../core/wallpaper-renderer');
 
-describe('wallpaper-renderer — getBackgroundFile', () => {
-  it('returns null when no background file exists for band', () => {
-    // BACKGROUNDS_DIR likely does not have files in the test environment
-    // getBackgroundFile returns null when findBackgroundFile finds nothing
-    const result = getBackgroundFile(0.1);
-    // Either null (no file) or a string path — both are valid
-    if (result !== null) {
-      expect(typeof result).toBe('string');
-      expect(result).toMatch(/\.(png|jpg|jpeg|webp)$/);
-    } else {
-      expect(result).toBeNull();
-    }
+describe('wallpaper-renderer getBackgroundFile', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('selects "calmo" band for score 0.1', () => {
-    // We can verify band selection by checking the path name when file exists
-    // Without actual files, we verify the function does not throw
-    expect(() => getBackgroundFile(0.1)).not.toThrow();
+  it('returns null when no background file exists for the selected band', () => {
+    const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+    const missing = getBackgroundFile(0.1);
+    existsSpy.mockImplementation((file) => file === path.join(BACKGROUNDS_DIR, 'calmo.png'));
+    const available = getBackgroundFile(0.1);
+
+    expect({ missing, available }).toEqual({
+      missing: null,
+      available: path.join(BACKGROUNDS_DIR, 'calmo.png'),
+    });
   });
 
-  it('selects "normale" band for score 0.3', () => {
-    expect(() => getBackgroundFile(0.3)).not.toThrow();
-  });
+  it.each([
+    [0.1, 'calmo'],
+    [0.3, 'normale'],
+    [0.5, 'attenzione'],
+    [0.7, 'urgente'],
+    [0.9, 'critico'],
+    [1, 'critico'],
+    [0, 'calmo'],
+  ])('selects %s score background named %s', (score, band) => {
+    vi.spyOn(fs, 'existsSync').mockImplementation((file) => file.endsWith('.png'));
 
-  it('selects "attenzione" band for score 0.5', () => {
-    expect(() => getBackgroundFile(0.5)).not.toThrow();
-  });
+    const result = getBackgroundFile(score);
 
-  it('selects "urgente" band for score 0.7', () => {
-    expect(() => getBackgroundFile(0.7)).not.toThrow();
-  });
-
-  it('selects "critico" band for score 0.9', () => {
-    expect(() => getBackgroundFile(0.9)).not.toThrow();
-  });
-
-  it('handles score exactly 1.0 without throwing', () => {
-    expect(() => getBackgroundFile(1.0)).not.toThrow();
-  });
-
-  it('handles score exactly 0.0 without throwing', () => {
-    expect(() => getBackgroundFile(0.0)).not.toThrow();
+    expect(result).toBe(path.join(BACKGROUNDS_DIR, band + '.png'));
   });
 
   it('exports BACKGROUNDS_DIR as an absolute path string', () => {

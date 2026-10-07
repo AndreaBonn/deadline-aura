@@ -199,6 +199,7 @@ describe('readCodexUsage', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -210,6 +211,81 @@ describe('readCodexUsage', () => {
       lines.map((l) => JSON.stringify(l)).join('\n') + '\n',
     );
   }
+
+  function writeCompleteRollout(name, mtime) {
+    writeRollout(tmpHome, ['2026', '10', '06'], name, [
+      eventLine({
+        timestamp: '2026-10-06T12:00:00.000Z',
+        rateLimits: {
+          primary: { used_percent: 23, window_minutes: 300, resets_at: 1791324600 },
+          secondary: { used_percent: 41, window_minutes: 10080, resets_at: 1791378000 },
+        },
+      }),
+    ]);
+    const file = path.join(tmpHome, '.codex', 'sessions', '2026', '10', '06', name);
+    fs.utimesSync(file, mtime, mtime);
+    return file;
+  }
+
+  function replaceRolloutOnOpen(file) {
+    const open = fs.openSync;
+    // Directories are excluded during listing; replace the file only when it is opened.
+    return vi.spyOn(fs, 'openSync').mockImplementation((target, ...args) => {
+      if (target === file && fs.statSync(file).isFile()) {
+        fs.unlinkSync(file);
+        fs.mkdirSync(file);
+      }
+      return open(target, ...args);
+    });
+  }
+
+  it('warns and returns empty windows on a real unreadable rollout, then reads a repaired file', () => {
+    const file = writeCompleteRollout('rollout-unreadable.jsonl', 1791288000);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const open = replaceRolloutOnOpen(file);
+
+    const result = readCodexUsage({ env: {}, home: tmpHome });
+
+    expect(result).toEqual({ fiveHour: null, sevenDay: null, capturedAt: null });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'ai-usage-codex: skipped an unreadable rollout file:',
+      expect.stringContaining('EISDIR'),
+    );
+    open.mockRestore();
+    fs.rmdirSync(file);
+    writeCompleteRollout('rollout-unreadable.jsonl', 1791288000);
+    expect(readCodexUsage({ env: {}, home: tmpHome }).fiveHour).toEqual({
+      pct: 23,
+      resetsAt: 1791324600,
+    });
+  });
+
+  it('stops before opening an older unreadable rollout once both windows are known', () => {
+    const older = writeCompleteRollout('rollout-z-older.jsonl', 1791288000);
+    const newer = writeCompleteRollout('rollout-a-newer.jsonl', 1791288060);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const open = replaceRolloutOnOpen(older);
+
+    const result = readCodexUsage({ env: {}, home: tmpHome });
+
+    expect(result.fiveHour).toEqual({ pct: 23, resetsAt: 1791324600 });
+    expect(result.sevenDay).toEqual({ pct: 41, resetsAt: 1791378000 });
+    expect(open).toHaveBeenCalledWith(newer, 'r');
+    expect(open.mock.calls.filter(([target]) => target === older)).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+    fs.unlinkSync(newer);
+    expect(readCodexUsage({ env: {}, home: tmpHome })).toEqual({
+      fiveHour: null,
+      sevenDay: null,
+      capturedAt: null,
+    });
+    expect(open).toHaveBeenCalledWith(older, 'r');
+    expect(warn).toHaveBeenCalledWith(
+      'ai-usage-codex: skipped an unreadable rollout file:',
+      expect.stringContaining('EISDIR'),
+    );
+  });
 
   it('returns null when the sessions directory does not exist', () => {
     const result = readCodexUsage({ env: {}, home: tmpHome });
@@ -274,6 +350,40 @@ describe('readCodexUsage', () => {
 
 describe('listRecentRolloutFiles', () => {
   const { listRecentRolloutFiles, MAX_FILES } = require('../../core/ai-usage-codex-fs');
+
+  function populateDay(dir, base) {
+    fs.mkdirSync(dir, { recursive: true });
+    for (let i = 0; i <= MAX_FILES; i += 1) {
+      const file = path.join(dir, `rollout-${i}.jsonl`);
+      fs.writeFileSync(file, '');
+      fs.utimesSync(file, base + i, base + i);
+    }
+  }
+
+  it('stops at MAX_FILES before collecting an older day even with newer mtimes', () => {
+    const sessions = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-days-'));
+    const recentDay = path.join(sessions, '2026', '10', '06');
+    const olderDay = path.join(sessions, '2026', '10', '05');
+    try {
+      populateDay(recentDay, 1791288000);
+      populateDay(olderDay, 1791388000);
+
+      const result = listRecentRolloutFiles(sessions);
+
+      expect(result).toEqual(
+        Array.from({ length: MAX_FILES }, (_, i) =>
+          path.join(recentDay, `rollout-${MAX_FILES - i}.jsonl`),
+        ),
+      );
+      expect(result.some((file) => path.dirname(file) === olderDay)).toBe(false);
+      expect(listRecentRolloutFiles(olderDay)).toHaveLength(MAX_FILES);
+      expect(listRecentRolloutFiles(olderDay)[0]).toBe(
+        path.join(olderDay, `rollout-${MAX_FILES}.jsonl`),
+      );
+    } finally {
+      fs.rmSync(sessions, { recursive: true, force: true });
+    }
+  });
 
   it('returns the newest files by mtime even when a day holds more than MAX_FILES', () => {
     const sessions = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-many-'));

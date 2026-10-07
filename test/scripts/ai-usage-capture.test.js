@@ -16,7 +16,20 @@ function runCapture({ home, configDir, input }) {
   if (configDir !== undefined) {
     env.CLAUDE_CONFIG_DIR = configDir;
   }
-  return spawnSync('python3', [SCRIPT], { input, env, timeout: 5000 });
+  // A real input file supplies EOF even when the sandbox keeps pipe stdin open.
+  const inputPath = path.join(home, 'capture-stdin');
+  fs.writeFileSync(inputPath, input);
+  const inputFd = fs.openSync(inputPath, 'r');
+  try {
+    return spawnSync('python3', [SCRIPT], {
+      env,
+      timeout: 5000,
+      stdio: [inputFd, 'pipe', 'pipe'],
+    });
+  } finally {
+    fs.closeSync(inputFd);
+    fs.unlinkSync(inputPath);
+  }
 }
 
 function usageDir(home) {
@@ -47,6 +60,92 @@ function installChainCommand(home, configDir, command) {
 }
 
 const SLOW_CHAIN_UPPER_BOUND_MS = 4000;
+
+describe('claude-capture.py validation and fallback boundaries', () => {
+  let home;
+  let configDir;
+  const validWindow = { used_percentage: 23, resets_at: 1791324600 };
+  const validPayload = JSON.stringify({ rate_limits: { five_hour: validWindow } });
+
+  beforeEach(() => {
+    home = makeHome();
+    configDir = path.join(home, 'validation');
+  });
+
+  afterEach(() => {
+    fs.rmSync(home, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['non-dict rate_limits', 'invalid'],
+    ['non-dict window', { five_hour: 'invalid' }],
+    ['boolean percentage', { five_hour: { ...validWindow, used_percentage: true } }],
+  ])('ignores %s without writing a snapshot or interrupting the chain', (_label, rateLimits) => {
+    installChainCommand(home, configDir, "printf 'chain reached'");
+
+    const invalid = runCapture({
+      home,
+      configDir,
+      input: JSON.stringify({ rate_limits: rateLimits }),
+    });
+
+    expect(invalid.status).toBe(0);
+    expect(invalid.stdout.toString()).toBe('chain reached');
+    expect(fs.existsSync(snapshotPath(home, 'validation'))).toBe(false);
+    const valid = runCapture({ home, configDir, input: validPayload });
+    expect(valid.status).toBe(0);
+    expect(readSnapshot(home, 'validation').five_hour).toEqual({ pct: 23, resets_at: 1791324600 });
+  });
+
+  it('clamps a negative percentage to zero in the saved snapshot', () => {
+    const input = JSON.stringify({
+      rate_limits: { five_hour: { ...validWindow, used_percentage: -5 } },
+    });
+
+    const result = runCapture({ home, configDir, input });
+
+    expect(result.status).toBe(0);
+    expect(readSnapshot(home, 'validation').five_hour).toEqual({ pct: 0, resets_at: 1791324600 });
+    expect(result.stdout.toString()).toBe('5h 0%');
+  });
+
+  it('uses the default account and default settings when CLAUDE_CONFIG_DIR is unset', () => {
+    installChainCommand(home, path.join(home, '.claude'), "printf 'default chain'");
+
+    const result = runCapture({ home, input: validPayload });
+
+    expect(result.status).toBe(0);
+    expect(snapshotPath(home, 'default')).toBe(
+      path.join(home, '.local', 'share', 'deadlineaura', 'ai-usage', 'latest', 'default.json'),
+    );
+    expect(readSnapshot(home, 'default')).toMatchObject({
+      account: 'default',
+      five_hour: { pct: 23, resets_at: 1791324600 },
+    });
+    expect(result.stdout.toString()).toBe('default chain');
+  });
+
+  it.each([
+    ['nonzero exit', "printf 'failed chain output'; exit 3"],
+    ['empty stdout', 'true'],
+  ])('uses the exact usage fallback for a chain with %s', (_label, command) => {
+    const input = JSON.stringify({
+      rate_limits: {
+        five_hour: validWindow,
+        seven_day: { used_percentage: 41, resets_at: 1791378000 },
+      },
+    });
+    installChainCommand(home, configDir, "printf 'working chain'");
+    expect(runCapture({ home, configDir, input }).stdout.toString()).toBe('working chain');
+    installChainCommand(home, configDir, command);
+
+    const result = runCapture({ home, configDir, input });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.toString()).toBe('5h 23% | 7d 41%');
+    expect(readSnapshot(home, 'validation').seven_day).toEqual({ pct: 41, resets_at: 1791378000 });
+  });
+});
 
 describe('claude-capture.py capture mode', () => {
   it('writes a whitelisted snapshot from a valid payload and exits 0', () => {

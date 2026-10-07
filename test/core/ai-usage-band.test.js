@@ -3,6 +3,11 @@
 const { createCanvas } = require('canvas');
 const { bandHeight, bandTop, drawUsageBand } = require('../../core/ai-usage-band');
 const { formatReset } = require('../../core/ai-usage-format');
+const {
+  computeBandLayout,
+  BAND_PADDING_Y,
+  CARD_LABEL_LINE_HEIGHT,
+} = require('../../core/ai-usage-band-layout');
 
 const NOW_MS = new Date('2026-10-06T12:00:00.000Z').getTime();
 const NOW_S = Math.floor(NOW_MS / 1000);
@@ -65,6 +70,30 @@ describe('core/ai-usage-band — bandHeight / bandTop', () => {
 });
 
 describe('core/ai-usage-band — drawUsageBand (real canvas)', () => {
+  it('paints distinct visible bar pixels for OK, WARN and CRITICAL usage', () => {
+    const colors = [23, 75, 95].map((pct) => {
+      const { ctx } = newCtx(WIDE_REGION);
+      const rows = [claudeRow('colors', { fiveHour: { pct, resetsAt: NOW_S + 7200 } })];
+      const cell = computeBandLayout(rows.length, WIDE_REGION).cells[0];
+      // ai-usage-card: padding 16, window label 24, gap 8; sample 2px inside the bar.
+      const x = cell.x + 16 + 24 + 8 + 2;
+      // drawWindowBlock places the 6px-high bar 4px below the window line.
+      const y = bandTop(rows, WIDE_REGION) + BAND_PADDING_Y + cell.y + CARD_LABEL_LINE_HEIGHT + 6;
+
+      drawUsageBand(ctx, rows, WIDE_REGION, { nowMs: NOW_MS, lang: 'it' });
+
+      const pixel = Array.from(ctx.getImageData(x, y, 1, 1).data);
+      expect(pixel[3]).toBeGreaterThan(200);
+      expect(Math.max(...pixel.slice(0, 3))).toBeGreaterThan(200);
+      expect(Array.from(ctx.getImageData(x + 1, y, 1, 1).data)).toEqual(pixel);
+      return pixel;
+    });
+
+    expect(colors[0]).not.toEqual(colors[1]);
+    expect(colors[0]).not.toEqual(colors[2]);
+    expect(colors[1]).not.toEqual(colors[2]);
+  });
+
   it('leaves the image pixels unchanged when rows is empty', () => {
     const { canvas, ctx } = newCtx(WIDE_REGION);
     ctx.fillStyle = '#123456';

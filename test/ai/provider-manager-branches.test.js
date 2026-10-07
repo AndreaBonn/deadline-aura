@@ -41,8 +41,9 @@ describe('provider-manager — branch coverage', () => {
     });
   });
 
-  describe('scoreEvents — invalid response structure branch', () => {
-    it('logs error and continues when parseAiResponse throws', async () => {
+  describe('scoreEvents - provider errors', () => {
+    // ai/provider-manager.js:120-121 is dead code: parseAiResponse guarantees numeric global_stress.
+    it('logs the parse error and returns null when provider content is not valid JSON', async () => {
       process.env.GROQ_API_KEYS = 'key1';
 
       // Return invalid JSON that will make parseAiResponse throw
@@ -67,7 +68,10 @@ describe('provider-manager — branch coverage', () => {
 
       const result = await scoreEvents([{ id: '1', title: 'Test' }], config);
 
-      expect(result).toBeNull();
+      expect({ result, errors: consoleSpy.mock.calls }).toEqual({
+        result: null,
+        errors: [[expect.stringMatching(/^groq: .*Unexpected token/)]],
+      });
       consoleSpy.mockRestore();
       consolLog.mockRestore();
     });

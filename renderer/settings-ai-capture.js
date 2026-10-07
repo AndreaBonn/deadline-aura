@@ -167,9 +167,13 @@ async function runCaptureAction({ els, api, t, state, refresh }) {
   }
 }
 
-// CommonJS export for Node.js / test environment (readCaptureInstalled has no
-// DOM dependency). In the browser this file is loaded via <script src>, where
-// module is undefined.
+// In the browser the functions are available as globals via <script src>.
 if (typeof module !== 'undefined') {
-  module.exports = { readCaptureInstalled };
+  module.exports = {
+    readCaptureInstalled,
+    describeCaptureFailure,
+    describeCaptureResult,
+    renderCaptureStatus,
+    showCaptureMessage,
+  };
 }

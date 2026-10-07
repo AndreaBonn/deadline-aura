@@ -127,6 +127,38 @@ describe('listBackups', () => {
 });
 
 describe('rotateBackups', () => {
+  it('logs a failed unlink and continues rotating the remaining stale backups', () => {
+    const retention = 2;
+    const backupDir = path.join(tmpDir, BACKUP_SUBDIR);
+    fs.mkdirSync(backupDir, { recursive: true });
+    for (let i = 0; i < retention + 2; i++) {
+      const stub = path.join(backupDir, `stub-${i}.bak`);
+      fs.writeFileSync(stub, 'x');
+      fs.utimesSync(stub, i + 1, i + 1);
+    }
+    const unlinkSpy = vi.spyOn(fs, 'unlinkSync').mockImplementationOnce(() => {
+      throw new Error('Permission denied');
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const attempted = rotateBackups(tmpDir, retention);
+
+      expect({
+        attempted,
+        remaining: listBackups(tmpDir).map((b) => b.name),
+        errors: errorSpy.mock.calls,
+      }).toEqual({
+        attempted: 2,
+        remaining: ['stub-3.bak', 'stub-2.bak', 'stub-1.bak'],
+        errors: [['[db-backup] failed to rotate stub-1.bak:', 'Permission denied']],
+      });
+    } finally {
+      unlinkSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
   it('removes entries beyond the retention limit and returns the count removed', async () => {
     const backupDir = path.join(tmpDir, BACKUP_SUBDIR);
     fs.mkdirSync(backupDir, { recursive: true });

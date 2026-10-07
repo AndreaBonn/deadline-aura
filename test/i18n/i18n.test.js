@@ -40,6 +40,23 @@ describe('i18n module', () => {
     });
   });
 
+  describe('missing or corrupt locale file', () => {
+    it('falls back to the key when both locale files cannot be read', () => {
+      const fs = require('fs');
+      const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+        throw new Error('ENOENT: no such file');
+      });
+
+      try {
+        setLanguage('en');
+
+        expect(t('common.save')).toBe('common.save');
+      } finally {
+        readSpy.mockRestore();
+      }
+    });
+  });
+
   describe('interpolation', () => {
     it('replaces single placeholder', () => {
       expect(t('countdown.in_minutes', { n: 30 })).toBe('tra 30 minuti');
