@@ -41,14 +41,9 @@ const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
 const { applyFlybyAction } = require('./core/flyby-snooze');
 const { isSafeExternalUrl } = require('./core/url-safety');
-const {
-  validateLocalTaskCreate,
-  validateLocalTaskUpdate,
-} = require('./core/local-task-validation');
-const {
-  validateCalendarLogTime,
-  validateCalendarUpdateEvent,
-} = require('./core/calendar-ipc-validation');
+const { registerIpc } = require('./core/ipc/register-ipc');
+const { createLocalTaskHandlers } = require('./core/ipc/local-task-handlers');
+const { createCalendarHandlers } = require('./core/ipc/calendar-handlers');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
@@ -972,115 +967,11 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle('local-task:create', (_event, { title, dueAt, priority }) => {
-    const error = validateLocalTaskCreate({ title, priority });
-    if (error) {
-      return { ok: false, error };
-    }
-    const p = priority !== undefined ? Number(priority) : 3;
-    const id = localQueries.createLocalTask({ title: title.trim(), dueAt, priority: p });
-    runUpdateCycle({ force: true });
-    return { ok: true, id };
-  });
-
-  ipcMain.handle('local-task:update', (_event, { id, title, dueAt, priority }) => {
-    const error = validateLocalTaskUpdate({ id, title, priority });
-    if (error) {
-      return { ok: false, error };
-    }
-    localQueries.updateLocalTask({
-      id,
-      title: title !== undefined ? title.trim() : undefined,
-      dueAt,
-      priority,
-    });
-    runUpdateCycle({ force: true });
-    return { ok: true };
-  });
-
-  ipcMain.handle('local-task:delete', (_event, taskId) => {
-    if (!taskId || typeof taskId !== 'string') {
-      return { ok: false, error: 'INVALID_ID' };
-    }
-    localQueries.deleteLocalTask(taskId);
-    runUpdateCycle({ force: true });
-    return { ok: true };
-  });
-
-  ipcMain.handle('local-task:complete', (_event, taskId) => {
-    if (!taskId || typeof taskId !== 'string') {
-      return { ok: false, error: 'INVALID_ID' };
-    }
-    localQueries.completeLocalTask(taskId);
-    runUpdateCycle({ force: true });
-    return { ok: true };
-  });
-
-  ipcMain.handle('calendar:list', async () => {
-    try {
-      const calendars = await gcal.listCalendars(config);
-      return { ok: true, calendars };
-    } catch (err) {
-      console.error('calendar:list error:', err.message);
-      return { ok: false, error: err.message };
-    }
-  });
-
-  ipcMain.handle('calendar:get-default', () => {
-    return { ok: true, calendarId: config.sources.google_calendar.default_log_calendar || '' };
-  });
-
-  ipcMain.handle('calendar:set-default', (_event, calendarId) => {
-    if (!calendarId || typeof calendarId !== 'string') {
-      return { ok: false, error: 'INVALID_CALENDAR_ID' };
-    }
-    config.sources.google_calendar.default_log_calendar = calendarId;
-    saveConfig(config);
-    return { ok: true };
-  });
-
-  ipcMain.handle(
-    'calendar:log-time',
-    async (_event, { summary, startTime, durationMinutes, calendarId }) => {
-      const error = validateCalendarLogTime({ summary, startTime, durationMinutes });
-      if (error) {
-        return { ok: false, error };
-      }
-      const targetCalendar = calendarId || config.sources.google_calendar.default_log_calendar;
-      if (!targetCalendar) {
-        return { ok: false, error: 'NO_CALENDAR_SELECTED' };
-      }
-      try {
-        const result = await gcal.createEvent(config, {
-          calendarId: targetCalendar,
-          summary,
-          startTime,
-          durationMinutes,
-        });
-        return { ok: true, eventId: result.id, htmlLink: result.htmlLink };
-      } catch (err) {
-        console.error('calendar:log-time error:', err.message);
-        return { ok: false, error: err.message };
-      }
+  registerIpc(ipcMain, {
+    handle: {
+      ...createLocalTaskHandlers({ localQueries, refresh: runUpdateCycle }),
+      ...createCalendarHandlers({ gcal, getConfig: () => config, saveConfig }),
     },
-  );
-
-  ipcMain.handle('calendar:update-event', async (_event, { calendarId, eventId, endTime }) => {
-    const error = validateCalendarUpdateEvent({ calendarId, eventId, endTime });
-    if (error) {
-      return { ok: false, error };
-    }
-    try {
-      const result = await gcal.updateEvent(config, {
-        calendarId,
-        eventId,
-        endTime,
-      });
-      return { ok: true, eventId: result.id, htmlLink: result.htmlLink };
-    } catch (err) {
-      console.error('calendar:update-event error:', err.message);
-      return { ok: false, error: err.message };
-    }
   });
 
   const syncDaemon = require('./core/sync-daemon');
