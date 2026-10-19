@@ -1,6 +1,13 @@
 'use strict';
 
-const { getStripBounds, getMeetingDockBounds, isRightmost } = require('../../core/window-geometry');
+const {
+  getStripBounds,
+  getMeetingDockBounds,
+  isRightmost,
+  getSidebarBounds,
+  getOverlayBounds,
+  findDisplayById,
+} = require('../../core/window-geometry');
 
 const displays = [
   {
@@ -61,4 +68,31 @@ it('identifies only displays reaching the virtual right edge in a multi-monitor 
 it('preserves the inclusive comparison for a display beyond the virtual edge', () => {
   expect(isRightmost(displays[0].display, 1900)).toBe(true);
   expect(isRightmost(displays[1].display, 0)).toBe(true);
+});
+
+it.each(displays)('docks the sidebar to the work area right edge: $name', ({ display }) => {
+  const original = JSON.parse(JSON.stringify(display));
+  const bounds = getSidebarBounds(display, 380);
+  expect(bounds).toEqual({
+    x: display.workArea.x + display.workAreaSize.width - 380,
+    y: display.workArea.y,
+    width: 380,
+    height: display.workAreaSize.height,
+  });
+  expect(display).toEqual(original);
+});
+
+it('covers the full display with the overlay using bounds origin and size', () => {
+  const display = {
+    bounds: { x: 1920, y: 100, width: 1280, height: 720 },
+    size: { width: 1280, height: 720 },
+  };
+  expect(getOverlayBounds(display)).toEqual({ x: 1920, y: 100, width: 1280, height: 720 });
+});
+
+it('finds a display by its string id and returns undefined when absent', () => {
+  const list = [{ id: 7 }, { id: 12 }];
+  expect(findDisplayById(list, '12')).toBe(list[1]);
+  expect(findDisplayById(list, 'default')).toBeUndefined();
+  expect(findDisplayById(list, '1')).toBeUndefined();
 });

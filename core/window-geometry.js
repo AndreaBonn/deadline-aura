@@ -22,4 +22,33 @@ function isRightmost(display, virtualWidth) {
   return display.bounds.x + display.bounds.width >= virtualWidth;
 }
 
-module.exports = { getStripBounds, getMeetingDockBounds, isRightmost };
+function getSidebarBounds(display, sidebarWidth) {
+  return {
+    x: display.workArea.x + display.workAreaSize.width - sidebarWidth,
+    y: display.workArea.y,
+    width: sidebarWidth,
+    height: display.workAreaSize.height,
+  };
+}
+
+function getOverlayBounds(display) {
+  return {
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.size.width,
+    height: display.size.height,
+  };
+}
+
+function findDisplayById(displays, displayId) {
+  return displays.find((d) => String(d.id) === displayId);
+}
+
+module.exports = {
+  getStripBounds,
+  getMeetingDockBounds,
+  isRightmost,
+  getSidebarBounds,
+  getOverlayBounds,
+  findDisplayById,
+};

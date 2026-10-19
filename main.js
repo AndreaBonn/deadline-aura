@@ -25,6 +25,9 @@ const os = require('os');
 const { getDisplaysWithWindows } = require('./core/display-controller');
 const { createStripWindows } = require('./main-process/strip-windows');
 const { createMeetingDockWindows } = require('./main-process/meeting-dock-windows');
+const { createSidebarWindow } = require('./main-process/sidebar-window');
+const { createSettingsWindow } = require('./main-process/settings-window');
+const { createOverlayWindow } = require('./main-process/overlay-window');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
@@ -76,9 +79,6 @@ if (cleanedWorkShift.changed) {
   saveConfig(config);
 }
 
-let settingsWindow = null;
-let overlayWindow = null;
-
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
 const DEFAULT_DATA_SYNC_MINUTES = 10;
@@ -87,10 +87,6 @@ const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const DESKTOP_CHECK_MS = 1000;
 const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
-let sidebarWindow = null;
-let sidebarReady = false;
-let sidebarManualOpen = false;
-let sidebarManualClose = false;
 const strips = createStripWindows({ BrowserWindow, screen });
 const meetingDocks = createMeetingDockWindows({
   BrowserWindow,
@@ -99,6 +95,25 @@ const meetingDocks = createMeetingDockWindows({
   db,
   openExternalUrl,
   externalBrowserDependencies,
+});
+const sidebar = createSidebarWindow({
+  BrowserWindow,
+  screen,
+  strips,
+  getConfig: () => config,
+  getDisplaysWithWindows,
+  refresh: (options) => runUpdateCycle(options),
+  isFirstRunHintPending: () => firstRunHintPending,
+  onFirstRunShown: markOnboardingShown,
+});
+const settings = createSettingsWindow({ BrowserWindow, iconPath: APP_ICON_PATH });
+const overlay = createOverlayWindow({
+  BrowserWindow,
+  screen,
+  wallpaperChanger,
+  pinnedQueries,
+  withPostitCodes,
+  refresh: (options) => runUpdateCycle(options),
 });
 let desktopCheckInterval = null;
 let isUpdateCycleRunning = false;
@@ -153,167 +168,14 @@ function scheduleDataSync() {
   );
 }
 
-function openSettingsWindow() {
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus();
-    return;
-  }
-  settingsWindow = new BrowserWindow({
-    width: 720,
-    height: 560,
-    frame: false,
-    resizable: false,
-    backgroundColor: '#0a0c14',
-    icon: APP_ICON_PATH,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-settings.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
-}
-
-// --- Sidebar (full panel, hidden by default) ---
-
-function createSidebar() {
-  if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-    return;
-  }
-  const primary = screen.getPrimaryDisplay();
-  const { width, height } = primary.workAreaSize;
-  const { x: wx, y: wy } = primary.workArea;
-  const sidebarWidth = config.sidebar.width;
-
-  sidebarWindow = new BrowserWindow({
-    width: sidebarWidth,
-    height: height,
-    x: wx + width - sidebarWidth,
-    y: wy,
-    show: false,
-    frame: false,
-    transparent: false,
-    backgroundColor: '#0a0c14',
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    focusable: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  sidebarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-  sidebarWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-
-  sidebarWindow.webContents.once('did-finish-load', () => {
-    sidebarReady = true;
-    runUpdateCycle({ force: true });
-    if (firstRunHintPending) {
-      // First launch only: show the sidebar once, so the user learns what the strip opens.
-      sidebarManualOpen = true;
-      sidebarManualClose = false;
-      showSidebarOnDisplay(screen.getPrimaryDisplay());
-      // Written only once the sidebar is on screen, so a crash before this point retries.
-      try {
-        markOnboardingDone(onboardingMarkerPath(os.homedir()));
-      } catch (err) {
-        console.warn('onboarding: could not write marker:', err.message);
-      }
-    }
-  });
-
-  sidebarWindow.on('closed', () => {
-    sidebarWindow = null;
-    sidebarReady = false;
-  });
-}
-
-let activeStripDisplayId = null;
-
-function showSidebarOnDisplay(display) {
-  if (!sidebarWindow || sidebarWindow.isDestroyed()) {
-    return;
-  }
-  const { width, height } = display.workAreaSize;
-  const { x: wx, y: wy } = display.workArea;
-  const sidebarWidth = config.sidebar.width;
-  sidebarWindow.setBounds({
-    x: wx + width - sidebarWidth,
-    y: wy,
-    width: sidebarWidth,
-    height: height,
-  });
-
-  const displayId = String(display.id);
-  strips.hideStrip(displayId);
-  activeStripDisplayId = displayId;
-
-  sidebarWindow.show();
-}
-
-function hideSidebar() {
-  if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-    sidebarWindow.hide();
-  }
-  if (activeStripDisplayId) {
-    strips.showStrip(activeStripDisplayId);
-    activeStripDisplayId = null;
+/** Written only once the sidebar is on screen, so a crash before this point retries. */
+function markOnboardingShown() {
+  try {
+    markOnboardingDone(onboardingMarkerPath(os.homedir()));
+  } catch (err) {
+    console.warn('onboarding: could not write marker:', err.message);
   }
 }
-
-function toggleSidebar() {
-  if (!sidebarWindow || sidebarWindow.isDestroyed()) {
-    return;
-  }
-  if (sidebarWindow.isVisible()) {
-    sidebarManualOpen = false;
-    sidebarManualClose = true;
-    hideSidebar();
-  } else {
-    sidebarManualOpen = true;
-    sidebarManualClose = false;
-    const cursor = screen.getCursorScreenPoint();
-    const display = screen.getDisplayNearestPoint(cursor);
-    showSidebarOnDisplay(display);
-  }
-}
-
-// --- Desktop state check ---
-
-function checkDesktopState() {
-  if (!sidebarWindow || sidebarWindow.isDestroyed() || !sidebarReady) {
-    return;
-  }
-
-  // Auto-show only when multiple displays are connected (one free = sidebar target)
-  const displays = screen.getAllDisplays();
-  if (displays.length < 2) {
-    return;
-  }
-
-  getDisplaysWithWindows(screen, (occupiedDisplayIds) => {
-    if (!occupiedDisplayIds) {
-      return;
-    }
-
-    const freeDisplay = displays.find((d) => !occupiedDisplayIds.has(String(d.id)));
-
-    if (freeDisplay && !sidebarWindow.isVisible() && !sidebarManualClose) {
-      showSidebarOnDisplay(freeDisplay);
-    } else if (!freeDisplay && sidebarWindow.isVisible() && !sidebarManualOpen) {
-      hideSidebar();
-    } else if (!freeDisplay) {
-      sidebarManualClose = false;
-    }
-  });
-}
-
-// --- Init ---
 
 function initSidebar() {
   // Compute initial color before creating strips so they start with the correct palette
@@ -321,12 +183,12 @@ function initSidebar() {
   const initialPalette = colorMapper.mapScoreToColor(initialResult.global_score);
   strips.updateStripColor(initialPalette.accent_hex);
 
-  createSidebar();
+  sidebar.create();
   strips.createStrips();
   meetingDocks.createMeetingDocks();
 
-  checkDesktopState();
-  desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
+  sidebar.checkDesktopState();
+  desktopCheckInterval = setInterval(() => sidebar.checkDesktopState(), DESKTOP_CHECK_MS);
 
   screen.on('display-added', () => {
     strips.createStrips();
@@ -393,19 +255,17 @@ async function runUpdateCycle({ force = false } = {}) {
     const aiResponse = db.getLatestAiCacheResponse();
     const { clinicalNote, stressForecast } = aiNotesFromCache(aiResponse);
 
-    if (sidebarWindow && !sidebarWindow.isDestroyed() && sidebarReady) {
-      sidebarWindow.webContents.send('update', {
-        engineResult,
-        palette,
-        pinnedTaskIds: Array.from(pinnedIds),
-        favoriteTaskIds: favoriteIds,
-        clinicalNote,
-        stressForecast,
-        syncStatus: lastSyncStatus,
-        googleCalendarReady: gcal.isGoogleCalendarReady(config),
-        showFirstRunHint: firstRunHintPending,
-      });
-    }
+    sidebar.sendWhenReady('update', () => ({
+      engineResult,
+      palette,
+      pinnedTaskIds: Array.from(pinnedIds),
+      favoriteTaskIds: favoriteIds,
+      clinicalNote,
+      stressForecast,
+      syncStatus: lastSyncStatus,
+      googleCalendarReady: gcal.isGoogleCalendarReady(config),
+      showFirstRunHint: firstRunHintPending,
+    }));
 
     return { engineResult, palette };
   } catch (err) {
@@ -418,54 +278,6 @@ async function runUpdateCycle({ force = false } = {}) {
   } finally {
     isUpdateCycleRunning = false;
   }
-}
-
-function openOverlay(displayId) {
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.focus();
-    return;
-  }
-
-  wallpaperChanger.setOverlayOpen(true);
-
-  const displays = screen.getAllDisplays();
-  const targetDisplay =
-    displays.find((d) => String(d.id) === displayId) || screen.getPrimaryDisplay();
-
-  overlayWindow = new BrowserWindow({
-    x: targetDisplay.bounds.x,
-    y: targetDisplay.bounds.y,
-    width: targetDisplay.size.width,
-    height: targetDisplay.size.height,
-    fullscreen: true,
-    transparent: true,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    backgroundColor: '#00000000',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-overlay.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  overlayWindow.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
-
-  overlayWindow.webContents.once('did-finish-load', () => {
-    const pinned = withPostitCodes(pinnedQueries.getByDisplay(displayId));
-    overlayWindow.webContents.send('overlay-init', {
-      pinnedTasks: pinned,
-      displayId,
-      width: targetDisplay.size.width,
-      height: targetDisplay.size.height,
-    });
-  });
-
-  overlayWindow.on('closed', () => {
-    overlayWindow = null;
-    wallpaperChanger.setOverlayOpen(false);
-  });
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -521,7 +333,7 @@ app.whenReady().then(() => {
   }, burnoutIntervalMs);
 
   ipcMain.on('sidebar:toggle', () => {
-    toggleSidebar();
+    sidebar.toggle();
   });
 
   ipcMain.on('onboarding:dismiss-hint', () => {
@@ -548,7 +360,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('settings:open', () => {
-    openSettingsWindow();
+    settings.open();
   });
 
   ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
@@ -584,9 +396,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('settings:close', () => {
-    if (settingsWindow && !settingsWindow.isDestroyed()) {
-      settingsWindow.close();
-    }
+    settings.close();
   });
 
   ipcMain.on('task:favorite', (_event, taskId) => {
@@ -599,44 +409,7 @@ app.whenReady().then(() => {
     runUpdateCycle({ force: true });
   });
 
-  ipcMain.on('pin-task', (_event, { taskId, displayId }) => {
-    pinnedQueries.pinTask({ taskId, displayId: displayId || 'default' });
-    runUpdateCycle({ force: true });
-  });
-
-  ipcMain.on('unpin-task', (_event, { taskId, displayId }) => {
-    if (displayId) {
-      pinnedQueries.unpinTask({ taskId, displayId });
-    } else {
-      pinnedQueries.unpinTaskFromAll(taskId);
-    }
-    runUpdateCycle({ force: true });
-  });
-
-  ipcMain.on('open-overlay', (_event, { displayId }) => {
-    openOverlay(displayId || 'default');
-  });
-
-  ipcMain.on('overlay-unpin-tasks', (_event, taskIds) => {
-    for (const taskId of taskIds) {
-      pinnedQueries.unpinTaskFromAll(taskId);
-    }
-  });
-
-  ipcMain.on('save-positions', (_event, positions) => {
-    pinnedQueries.updatePositions(positions);
-    wallpaperChanger.setOverlayOpen(false);
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.close();
-    }
-    runUpdateCycle({ force: true });
-  });
-
-  ipcMain.on('overlay-cancel', () => {
-    if (overlayWindow && !overlayWindow.isDestroyed()) {
-      overlayWindow.close();
-    }
-  });
+  overlay.registerIpc(ipcMain);
 
   registerIpc(ipcMain, {
     handle: {
@@ -657,9 +430,7 @@ app.whenReady().then(() => {
           saveConfig(data);
           config = loadConfig();
           scheduleDataSync();
-          if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-            sidebarWindow.webContents.send('config-changed', config);
-          }
+          sidebar.send('config-changed', config);
         },
       }),
       ...createFlybyHandlers({
@@ -667,9 +438,7 @@ app.whenReady().then(() => {
         applyConfig: (data) => {
           saveConfig(data);
           config = loadConfig();
-          if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-            sidebarWindow.webContents.send('config-changed', config);
-          }
+          sidebar.send('config-changed', config);
         },
       }),
     },

@@ -7,6 +7,31 @@ const { registerIpc } = require('../../../core/ipc/register-ipc');
 const { createSettingsHandlers } = require('../../../core/ipc/settings-handlers');
 const { createFlybyHandlers } = require('../../../core/ipc/flyby-handlers');
 const masking = require('../../../config/secret-masking');
+const { createSidebarWindow } = require('../../../main-process/sidebar-window');
+
+// Real SidebarWindow wired to a fake BrowserWindow, so the send guard under test is the shipped one.
+function createSidebar(state, calls) {
+  class FakeWindow {
+    webContents = {
+      send: (channel, config) => calls.push([channel, config.language]),
+      once: () => {},
+    };
+    isDestroyed = () => state === 'destroyed';
+    setVisibleOnAllWorkspaces = () => {};
+    loadFile = () => {};
+    on = () => {};
+  }
+  const primary = { workArea: { x: 0, y: 0 }, workAreaSize: { width: 1000, height: 800 } };
+  const sidebar = createSidebarWindow({
+    BrowserWindow: FakeWindow,
+    screen: { getPrimaryDisplay: () => primary },
+    getConfig: () => ({ sidebar: { width: 260 } }),
+  });
+  if (state !== 'absent') {
+    sidebar.create();
+  }
+  return sidebar;
+}
 
 function setup(sidebar = 'live') {
   const calls = [];
@@ -39,13 +64,7 @@ function setup(sidebar = 'live') {
       return { ...persisted, language: 'en' };
     },
     scheduleDataSync: () => calls.push(['scheduleDataSync', context.config.language]),
-    sidebarWindow:
-      sidebar === 'absent'
-        ? null
-        : {
-            isDestroyed: () => sidebar === 'destroyed',
-            webContents: { send: (channel, config) => calls.push([channel, config.language]) },
-          },
+    sidebar: createSidebar(sidebar, calls),
   };
   const source = fs.readFileSync(path.resolve(__dirname, '../../../main.js'), 'utf8');
   const start = source.indexOf('  registerIpc(ipcMain, {');
