@@ -1,8 +1,14 @@
+// @vitest-environment happy-dom
 'use strict';
+
+/* global document, window */
 
 const {
   buildScoreBreakdownHtml,
   formatHoursRemaining,
+  renderScoreBreakdown,
+  toggleScoreBreakdown,
+  initScoreBreakdown,
 } = require('../../renderer/sidebar-score-breakdown');
 const { escapeHtml } = require('../../renderer/sidebar-utils');
 const t = (key, params = {}) => key + (params.n === undefined ? '' : ` ${params.n}`);
@@ -134,5 +140,65 @@ describe('score breakdown HTML', () => {
     expect(buildScoreBreakdownHtml(data, t)).toContain(driver.title);
     driver.title = null;
     expect(buildScoreBreakdownHtml(data, t)).toContain('title=""');
+  });
+});
+
+describe('score breakdown panel DOM', () => {
+  let api;
+  beforeEach(() => {
+    api = { getScoreBreakdown: vi.fn(), openLink: vi.fn() };
+    window.deadlineAura = api;
+    vi.stubGlobal('t', t);
+    document.body.innerHTML =
+      '<button id="scoreHelpBtn"></button><div id="scoreBreakdownPanel" hidden></div>';
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete window.deadlineAura;
+  });
+  const panel = () => document.getElementById('scoreBreakdownPanel');
+
+  it('renders the unavailable message when there is no payload', () => {
+    renderScoreBreakdown(null);
+    expect(panel().textContent).toBe('score_breakdown.unavailable');
+  });
+
+  it('opens the panel and fills it from the bridge, then closes on the second toggle', async () => {
+    api.getScoreBreakdown.mockResolvedValue(null);
+    await toggleScoreBreakdown();
+    expect(panel().hasAttribute('hidden')).toBe(false);
+    expect(panel().textContent).toBe('score_breakdown.unavailable');
+    await toggleScoreBreakdown();
+    expect(panel().hasAttribute('hidden')).toBe(true);
+    expect(api.getScoreBreakdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the unavailable message and logs when the bridge rejects', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.getScoreBreakdown.mockRejectedValue(new Error('boom'));
+    await toggleScoreBreakdown();
+    expect(panel().textContent).toBe('score_breakdown.unavailable');
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it('wires the help button and routes breakdown-open clicks to openLink', async () => {
+    api.getScoreBreakdown.mockResolvedValue(null);
+    initScoreBreakdown();
+    document.getElementById('scoreHelpBtn').click();
+    await vi.waitFor(() => expect(panel().hasAttribute('hidden')).toBe(false));
+    panel().innerHTML =
+      '<button class="breakdown-open" data-url="https://example.test/a"></button><span class="x"></span>';
+    panel().querySelector('.x').click();
+    expect(api.openLink).not.toHaveBeenCalled();
+    panel().querySelector('.breakdown-open').click();
+    expect(api.openLink).toHaveBeenCalledWith('https://example.test/a');
+  });
+
+  it('does nothing when the markup is missing', async () => {
+    document.body.innerHTML = '';
+    renderScoreBreakdown(null);
+    await toggleScoreBreakdown();
+    expect(() => initScoreBreakdown()).not.toThrow();
   });
 });

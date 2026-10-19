@@ -12,6 +12,8 @@ it('loads pure sidebar scripts in page order without CommonJS and exposes workin
     'sidebar-score-breakdown.js',
     'sidebar-task-groups.js',
     'sidebar-timer.js',
+    'sidebar-timer-picker.js',
+    'sidebar-flyby.js',
     'sidebar-task-card.js',
     'sidebar-form-values.js',
     'sidebar-ai-panel.js',
@@ -65,6 +67,21 @@ it('loads pure sidebar scripts in page order without CommonJS and exposes workin
       isToday: true,
     },
   ]);
+  for (const name of [
+    'createTimerButton',
+    'createTimerCalendarPicker',
+    'applyFlybyIcon',
+    'initFlybyToggle',
+    'renderStressForecast',
+    'renderClinicalNote',
+    'updateAiNotesToggle',
+    'initAiNotesToggle',
+    'renderScoreBreakdown',
+    'toggleScoreBreakdown',
+    'initScoreBreakdown',
+  ]) {
+    expect(typeof context[name], name).toBe('function');
+  }
   const timer = context.createTimerState(
     { id: 'task' },
     {

@@ -1,6 +1,6 @@
 'use strict';
 
-/* global escapeHtml */
+/* global t, escapeHtml */
 const escapeScoreHtml =
   typeof module !== 'undefined' ? require('./sidebar-utils').escapeHtml : escapeHtml;
 
@@ -182,6 +182,52 @@ function buildScoreBreakdownHtml(payload, t) {
   ].join('');
 }
 
+function renderScoreBreakdown(payload) {
+  const panel = document.getElementById('scoreBreakdownPanel');
+  if (panel) {
+    panel.innerHTML = buildScoreBreakdownHtml(payload, t);
+  }
+}
+
+async function toggleScoreBreakdown() {
+  const panel = document.getElementById('scoreBreakdownPanel');
+  if (!panel) {
+    return;
+  }
+  const isOpen = !panel.hasAttribute('hidden');
+  if (isOpen) {
+    panel.setAttribute('hidden', '');
+    return;
+  }
+  panel.removeAttribute('hidden');
+  try {
+    const payload = await window.deadlineAura.getScoreBreakdown();
+    renderScoreBreakdown(payload);
+  } catch (err) {
+    console.error('[score-breakdown] failed to load:', err);
+    renderScoreBreakdown(null);
+  }
+}
+
+function initScoreBreakdown() {
+  const btn = document.getElementById('scoreHelpBtn');
+  if (btn) {
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleScoreBreakdown();
+    });
+  }
+  const panel = document.getElementById('scoreBreakdownPanel');
+  if (panel) {
+    panel.addEventListener('click', function (e) {
+      const openBtn = e.target.closest('.breakdown-open');
+      if (openBtn) {
+        window.deadlineAura.openLink(openBtn.dataset.url);
+      }
+    });
+  }
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     formatHoursRemaining,
@@ -192,5 +238,8 @@ if (typeof module !== 'undefined') {
     buildWhySection,
     buildBlendFooter,
     buildScoreBreakdownHtml,
+    renderScoreBreakdown,
+    toggleScoreBreakdown,
+    initScoreBreakdown,
   };
 }
