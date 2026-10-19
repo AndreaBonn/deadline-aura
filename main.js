@@ -53,6 +53,7 @@ const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
+const { runSyncCycle } = require('./core/sync-runner');
 const { engineOptionsFromConfig, aiNotesFromCache } = require('./core/update-payload');
 const { describeSourceStatus, collectSourceFacts } = require('./core/source-status');
 const {
@@ -115,18 +116,24 @@ let dataSyncIntervalMinutes = null;
  * (Re)starts the periodic data sync with the interval currently in the config.
  * Called at startup and after a settings save, so a new interval applies without a restart.
  */
-async function runManualSync() {
-  try {
-    const syncDaemon = require('./core/sync-daemon');
-    const syncResult = await syncDaemon.sync(config);
-    lastSyncStatus = summarizeSync(syncResult, Date.now());
-    if (syncResult.errors && syncResult.errors.length > 0) {
-      console.error('[sync-now] errors:', JSON.stringify(syncResult.errors));
-    }
-    runUpdateCycle();
-  } catch (err) {
-    console.error('Manual sync error:', err.message);
-  }
+function runSyncAndRefresh(options) {
+  return runSyncCycle({
+    summarize: summarizeSync,
+    onStatus: (summary) => {
+      lastSyncStatus = summary;
+    },
+    refresh: runUpdateCycle,
+    log: console,
+    ...options,
+  });
+}
+
+function runManualSync() {
+  return runSyncAndRefresh({
+    tag: 'sync-now',
+    failureLabel: 'Manual sync error:',
+    sync: () => require('./core/sync-daemon').sync(config),
+  });
 }
 
 function scheduleDataSync() {
@@ -137,15 +144,16 @@ function scheduleDataSync() {
   clearInterval(dataSyncTimer);
   dataSyncIntervalMinutes = minutes;
   const syncDaemonModule = require('./core/sync-daemon');
-  dataSyncTimer = setInterval(async () => {
-    try {
-      const syncResult = await syncDaemonModule.sync(config);
-      lastSyncStatus = summarizeSync(syncResult, Date.now());
-      runUpdateCycle({ force: true });
-    } catch (err) {
-      console.error('[data-sync] error:', err.message);
-    }
-  }, minutes * 60000);
+  dataSyncTimer = setInterval(
+    () =>
+      runSyncAndRefresh({
+        tag: 'data-sync',
+        failureLabel: '[data-sync] error:',
+        sync: () => syncDaemonModule.sync(config),
+        force: true,
+      }),
+    minutes * 60000,
+  );
 }
 
 function openSettingsWindow() {
@@ -1076,19 +1084,16 @@ app.whenReady().then(() => {
   });
 
   const syncDaemon = require('./core/sync-daemon');
-  syncDaemon
-    .sync(config)
-    .then((syncResult) => {
-      console.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
-      lastSyncStatus = summarizeSync(syncResult, Date.now());
-      if (syncResult.errors && syncResult.errors.length > 0) {
-        console.error('[startup-sync] errors:', JSON.stringify(syncResult.errors));
-      }
-      runUpdateCycle({ force: true });
-    })
-    .catch((err) => {
-      console.error('[startup-sync] failed:', err.message);
-    });
+  runSyncAndRefresh({
+    tag: 'startup-sync',
+    failureLabel: '[startup-sync] failed:',
+    sync: () =>
+      syncDaemon.sync(config).then((syncResult) => {
+        console.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
+        return syncResult;
+      }),
+    force: true,
+  });
 });
 
 app.on('window-all-closed', () => {
