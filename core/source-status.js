@@ -40,4 +40,27 @@ function describeSourceStatus({ google, outlook, jira, failedSources }) {
   ];
 }
 
-module.exports = { describeSourceStatus };
+function collectSourceFacts(config, { gcal, jira, lastSyncStatus }) {
+  const { clientId, clientSecret } = gcal.resolveGoogleOAuth(config);
+  const completeJiraInstances = jira
+    .resolveInstances(config)
+    .filter((inst) => inst.domain && inst.email && (inst.apiToken || inst.api_token));
+  return {
+    google: {
+      enabled: Boolean(config.sources.google_calendar.enabled),
+      hasCredentials: Boolean(clientId && clientSecret),
+      authorized: gcal.isGoogleCalendarReady(config),
+    },
+    outlook: {
+      enabled: Boolean(config.sources.outlook?.enabled),
+      hasUrl: Boolean(config.sources.outlook?.ics_url?.trim()),
+    },
+    jira: {
+      enabled: Boolean(config.sources.jira.enabled),
+      instanceCount: completeJiraInstances.length,
+    },
+    failedSources: lastSyncStatus ? lastSyncStatus.failedSources : [],
+  };
+}
+
+module.exports = { describeSourceStatus, collectSourceFacts };

@@ -48,7 +48,7 @@ const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
-const { describeSourceStatus } = require('./core/source-status');
+const { describeSourceStatus, collectSourceFacts } = require('./core/source-status');
 const {
   onboardingMarkerPath,
   isFirstRun,
@@ -121,30 +121,6 @@ async function runManualSync() {
   } catch (err) {
     console.error('Manual sync error:', err.message);
   }
-}
-
-// Facts about the saved config behind the connection status shown in the settings.
-function collectSourceFacts() {
-  const { clientId, clientSecret } = gcal.resolveGoogleOAuth(config);
-  const completeJiraInstances = jira
-    .resolveInstances(config)
-    .filter((inst) => inst.domain && inst.email && (inst.apiToken || inst.api_token));
-  return {
-    google: {
-      enabled: Boolean(config.sources.google_calendar.enabled),
-      hasCredentials: Boolean(clientId && clientSecret),
-      authorized: gcal.isGoogleCalendarReady(config),
-    },
-    outlook: {
-      enabled: Boolean(config.sources.outlook?.enabled),
-      hasUrl: Boolean(config.sources.outlook?.ics_url?.trim()),
-    },
-    jira: {
-      enabled: Boolean(config.sources.jira.enabled),
-      instanceCount: completeJiraInstances.length,
-    },
-    failedSources: lastSyncStatus ? lastSyncStatus.failedSources : [],
-  };
 }
 
 function scheduleDataSync() {
@@ -826,7 +802,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('settings:source-status', () => ({
     at: lastSyncStatus ? lastSyncStatus.at : null,
-    sources: describeSourceStatus(collectSourceFacts()),
+    sources: describeSourceStatus(collectSourceFacts(config, { gcal, jira, lastSyncStatus })),
   }));
 
   ipcMain.handle('google:authorize', async () => {
