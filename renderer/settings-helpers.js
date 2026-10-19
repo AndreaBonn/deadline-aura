@@ -97,6 +97,61 @@ function describeIssue(issue, translate) {
   return translate('settings.save_error_generic');
 }
 
+const GOOGLE_AUTH_KEYS = {
+  MISSING_CREDENTIALS: 'settings.google_auth_missing',
+  PORT_IN_USE: 'settings.google_auth_port',
+  AUTH_IN_PROGRESS: 'settings.google_auth_busy',
+};
+
+/**
+ * Sentence shown after the "Connect Google account" button.
+ *
+ * @param {{ok: boolean, alreadyAuthorized?: boolean, error?: string}} result - authorizeGoogle() outcome.
+ * @param {Function} translate - i18n function (key, params) => string.
+ * @returns {{text: string, ok: boolean}} Message and whether it is a success.
+ */
+function googleAuthMessage(result, translate) {
+  if (result.ok) {
+    const key = result.alreadyAuthorized
+      ? 'settings.google_auth_already'
+      : 'settings.google_auth_ok';
+    return { text: translate(key), ok: true };
+  }
+  const key = GOOGLE_AUTH_KEYS[result.error];
+  return {
+    text: key ? translate(key) : translate('settings.google_auth_failed', { error: result.error }),
+    ok: false,
+  };
+}
+
+const JIRA_VERIFY_KEYS = {
+  AUTH_FAILED: 'settings.jira_verify_auth',
+  NOT_FOUND: 'settings.jira_verify_not_found',
+  INVALID_JQL: 'settings.jira_verify_jql',
+  UNREACHABLE: 'settings.jira_verify_unreachable',
+  MISSING_FIELDS: 'settings.jira_verify_missing',
+  INVALID_DOMAIN: 'settings.jira_verify_domain',
+};
+
+/**
+ * Sentence shown after the "Test connection" button of a Jira instance.
+ *
+ * @param {{ok: boolean, count?: number, more?: boolean, error?: string}} result - verifyJiraInstance() outcome.
+ * @param {Function} translate - i18n function (key, params) => string.
+ * @returns {{text: string, ok: boolean}} Message and whether it is a success.
+ */
+function jiraVerifyMessage(result, translate) {
+  if (result.ok) {
+    const key = result.more ? 'settings.jira_verify_more' : 'settings.jira_verify_ok';
+    return { text: translate(key, { n: result.count }), ok: true };
+  }
+  const key = JIRA_VERIFY_KEYS[result.error];
+  return {
+    text: key ? translate(key) : translate('settings.jira_verify_http', { code: result.error }),
+    ok: false,
+  };
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     isConfigDirty,
@@ -105,5 +160,7 @@ if (typeof module !== 'undefined') {
     isJiraConfigured,
     hasAnyAiKey,
     describeIssue,
+    googleAuthMessage,
+    jiraVerifyMessage,
   };
 }

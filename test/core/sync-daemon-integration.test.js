@@ -371,4 +371,37 @@ describe('sync-daemon — sync()', () => {
     const task = db.getDb().prepare('SELECT is_stale FROM tasks WHERE id = ?').get('gcal_keep');
     expect(task.is_stale).toBe(0);
   });
+
+  it('keeps the tasks of a failed Jira site while updating the healthy one', async () => {
+    const jiraTask = (id, title) => ({
+      id,
+      source: 'jira',
+      title,
+      due_at: Date.now() + 3600000,
+      start_at: null,
+      priority: 3,
+      is_done: 0,
+      is_stale: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    });
+    db.upsertTask(jiraTask('jira_down_1', 'From the site that is down'));
+
+    const partial = new Error('down.atlassian.net: Jira API 503');
+    partial.partialIssues = [jiraTask('jira_up_1', 'From the healthy site')];
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([]);
+    vi.spyOn(jira, 'fetchIssues').mockRejectedValue(partial);
+
+    const result = await sync({
+      ...BASE_CONFIG,
+      sources: { ...BASE_CONFIG.sources, jira: { enabled: true } },
+    });
+
+    const row = (id) => db.getDb().prepare('SELECT is_stale FROM tasks WHERE id = ?').get(id);
+    expect(result.errors.map((e) => e.source)).toContain('jira');
+    expect(row('jira_down_1').is_stale).toBe(0);
+    expect(row('jira_up_1')).toEqual({ is_stale: 0 });
+    expect(result.jira).toBe(1);
+  });
 });

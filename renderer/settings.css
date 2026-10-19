@@ -893,3 +893,71 @@ input[type='range'] {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* --- Connection status, authorize and test buttons --- */
+
+.source-status {
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.source-status .field-group-title {
+  margin-bottom: 8px;
+}
+
+.source-status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.source-state--ok {
+  color: #6fcf97;
+}
+
+.source-state--setup,
+.source-state--authorize {
+  color: #f0c64b;
+}
+
+.source-state--error {
+  color: #ff8a80;
+}
+
+.source-state--off {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.action-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  max-width: 320px;
+}
+
+.instance-card .action-result {
+  align-items: flex-start;
+  max-width: none;
+  margin-top: 6px;
+}
+
+.action-result-text {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.action-result-text--ok {
+  color: #6fcf97;
+}
+
+.action-result-text--error {
+  color: #ff8a80;
+}

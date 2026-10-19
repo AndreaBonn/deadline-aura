@@ -56,7 +56,20 @@ async function sync(config) {
     errors,
   );
 
-  const jiraIssues = await fetchWithErrorCapture(() => jira.fetchIssues(config), 'jira', errors);
+  // Issues from the Jira sites that answered when another site did not.
+  let jiraPartialIssues = [];
+  const jiraIssues = await fetchWithErrorCapture(
+    async () => {
+      try {
+        return await jira.fetchIssues(config);
+      } catch (err) {
+        jiraPartialIssues = err.partialIssues || [];
+        throw err;
+      }
+    },
+    'jira',
+    errors,
+  );
 
   const outlookEvents = await fetchWithErrorCapture(
     () => outlook.fetchEvents(config),
@@ -91,6 +104,13 @@ async function sync(config) {
 
   if (!failedSources.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
     jiraCount = upsertMany(jiraIssues, 'jira');
+  } else if (jiraPartialIssues.length > 0) {
+    // Refresh what the healthy sites returned, but mark nothing stale: the issues of the
+    // failed site would otherwise vanish from the desktop.
+    database.transaction((tasks) => tasks.forEach((task) => db.upsertTask(task)))(
+      jiraPartialIssues,
+    );
+    jiraCount = jiraPartialIssues.length;
   }
 
   if (
@@ -100,7 +120,13 @@ async function sync(config) {
     outlookCount = upsertMany(outlookEvents, 'outlook');
   }
 
-  const allTasks = [...gcalEvents, ...googleTasks, ...jiraIssues, ...outlookEvents];
+  const allTasks = [
+    ...gcalEvents,
+    ...googleTasks,
+    ...jiraIssues,
+    ...jiraPartialIssues,
+    ...outlookEvents,
+  ];
 
   if (config.ai?.enabled && allTasks.length > 0) {
     await runAiScoring(allTasks, config, errors);

@@ -6,7 +6,8 @@
    createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t,
    renderCaptureControl, isConfigDirty, tabForIssuePath, isGoogleConfigured,
    isJiraConfigured, hasAnyAiKey, createNotice, createCollapsible, createGoogleSteps,
-   createProviderLabel, AI_PROVIDERS, describeIssue */
+   createProviderLabel, AI_PROVIDERS, describeIssue, createSourceStatusBox,
+   createActionWithResult, googleAuthMessage, jiraVerifyMessage */
 
 let config = {};
 let savedConfig = {};
@@ -108,12 +109,21 @@ function describeSaveError(result) {
   return t('settings.save_error_tab', { tab: tabLabel, detail: describeIssue(issue, t) });
 }
 
+// Rebuilds the status box in place, without re-rendering the fields being edited.
+function refreshSourceStatus() {
+  const slot = document.getElementById('sourceStatusSlot');
+  if (slot) {
+    slot.replaceChildren(createSourceStatusBox(settingsApi));
+  }
+}
+
 async function saveSettings() {
   const result = await settingsApi.saveConfig(config);
   if (result.ok) {
     savedConfig = JSON.parse(JSON.stringify(config));
     userTouched = false;
     updateDirtyState();
+    refreshSourceStatus();
     feedback.classList.remove('save-feedback--error');
     feedback.textContent = t('settings.saved');
     setTimeout(() => {
@@ -255,6 +265,23 @@ function renderSorgenti() {
         },
       ),
     ),
+    createField(
+      t('settings.google_authorize'),
+      createActionWithResult({
+        label: t('settings.google_authorize_btn'),
+        busyLabel: t('settings.google_authorize_wait'),
+        run: async () => {
+          // Authorization uses the saved credentials: save pending edits first.
+          if (updateDirtyState() && !(await saveSettings())) {
+            return null;
+          }
+          const outcome = googleAuthMessage(await settingsApi.authorizeGoogle(), t);
+          refreshSourceStatus();
+          return outcome;
+        },
+      }),
+      t('settings.google_authorize_hint'),
+    ),
     createCollapsible(t('settings.more_options'), t('settings.google_more_options'), [
       createField(
         t('settings.calendars'),
@@ -328,7 +355,10 @@ function renderSorgenti() {
     ),
   );
 
-  return [gcal, outlook, renderJiraGroup()];
+  const status = document.createElement('div');
+  status.id = 'sourceStatusSlot';
+  status.appendChild(createSourceStatusBox(settingsApi));
+  return [status, gcal, outlook, renderJiraGroup()];
 }
 
 function renderJiraGroup() {
@@ -420,6 +450,22 @@ function renderJiraGroup() {
           },
         ),
       ),
+    );
+    card.appendChild(
+      createActionWithResult({
+        label: t('settings.jira_verify_btn'),
+        busyLabel: t('settings.jira_verify_wait'),
+        run: async () => {
+          const inst = instances[i];
+          const result = await settingsApi.verifyJira(i, {
+            domain: inst.domain,
+            email: inst.email,
+            api_token: inst.api_token,
+            jql: jiraCfg.jql,
+          });
+          return jiraVerifyMessage(result, t);
+        },
+      }),
     );
     jira.appendChild(card);
   }

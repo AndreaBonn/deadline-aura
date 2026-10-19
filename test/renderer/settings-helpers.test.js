@@ -93,3 +93,64 @@ describe('describeIssue', () => {
     expect(describeIssue({ code: 'invalid_type' }, translate)).toBe('settings.save_error_generic:');
   });
 });
+
+describe('googleAuthMessage', () => {
+  const { googleAuthMessage } = require('../../renderer/settings-helpers');
+  const translate = (key, params = {}) => [key, params.error].filter(Boolean).join(':');
+
+  it.each([
+    [{ ok: true }, 'settings.google_auth_ok'],
+    [{ ok: true, alreadyAuthorized: true }, 'settings.google_auth_already'],
+    [{ ok: false, error: 'MISSING_CREDENTIALS' }, 'settings.google_auth_missing'],
+    [{ ok: false, error: 'PORT_IN_USE' }, 'settings.google_auth_port'],
+    [{ ok: false, error: 'AUTH_IN_PROGRESS' }, 'settings.google_auth_busy'],
+  ])('maps %j to %s', (result, expected) => {
+    expect(googleAuthMessage(result, translate)).toEqual({
+      text: expected,
+      ok: result.ok,
+    });
+  });
+
+  it('keeps the underlying reason for any other failure', () => {
+    expect(googleAuthMessage({ ok: false, error: 'OAuth timeout' }, translate)).toEqual({
+      text: 'settings.google_auth_failed:OAuth timeout',
+      ok: false,
+    });
+  });
+});
+
+describe('jiraVerifyMessage', () => {
+  const { jiraVerifyMessage } = require('../../renderer/settings-helpers');
+  const translate = (key, params = {}) =>
+    [key, params.n, params.code].filter((x) => x !== undefined).join(':');
+
+  it('reports the number of issues found', () => {
+    expect(jiraVerifyMessage({ ok: true, count: 6, more: false }, translate)).toEqual({
+      text: 'settings.jira_verify_ok:6',
+      ok: true,
+    });
+  });
+
+  it('says "more than" when the first page is full', () => {
+    expect(jiraVerifyMessage({ ok: true, count: 50, more: true }, translate).text).toBe(
+      'settings.jira_verify_more:50',
+    );
+  });
+
+  it.each([
+    ['AUTH_FAILED', 'settings.jira_verify_auth'],
+    ['NOT_FOUND', 'settings.jira_verify_not_found'],
+    ['INVALID_JQL', 'settings.jira_verify_jql'],
+    ['UNREACHABLE', 'settings.jira_verify_unreachable'],
+    ['MISSING_FIELDS', 'settings.jira_verify_missing'],
+    ['INVALID_DOMAIN', 'settings.jira_verify_domain'],
+  ])('maps %s to %s', (error, key) => {
+    expect(jiraVerifyMessage({ ok: false, error }, translate)).toEqual({ text: key, ok: false });
+  });
+
+  it('shows the status code for an unexpected HTTP error', () => {
+    expect(jiraVerifyMessage({ ok: false, error: 'HTTP_502' }, translate).text).toBe(
+      'settings.jira_verify_http:HTTP_502',
+    );
+  });
+});

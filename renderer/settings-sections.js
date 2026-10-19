@@ -145,6 +145,103 @@ function createProviderLabel(provider, api) {
   return wrap;
 }
 
+const SOURCE_LABELS = {
+  google_calendar: 'Google Calendar',
+  outlook: 'Outlook',
+  jira: 'Jira',
+};
+
+/**
+ * Status summary of the saved connections, filled asynchronously from the main process.
+ *
+ * @param {object} api - settingsApi (sourceStatus).
+ * @returns {HTMLDivElement} Box that renders itself once the status arrives.
+ */
+function createSourceStatusBox(api) {
+  const box = document.createElement('div');
+  box.className = 'source-status';
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-live', 'polite');
+  const title = document.createElement('div');
+  title.className = 'field-group-title';
+  title.textContent = t('settings.status_title');
+  box.appendChild(title);
+
+  api
+    .sourceStatus()
+    .then((status) => {
+      for (const source of status.sources) {
+        const row = document.createElement('div');
+        row.className = 'source-status-row';
+        const name = document.createElement('span');
+        name.textContent = SOURCE_LABELS[source.id] || source.id;
+        const state = document.createElement('span');
+        state.className = 'source-state source-state--' + source.state;
+        state.textContent = t('settings.status_' + source.state);
+        row.append(name, state);
+        box.appendChild(row);
+      }
+      const note = document.createElement('div');
+      note.className = 'field-hint';
+      note.textContent = status.at
+        ? t('settings.status_at', {
+            time: new Date(status.at).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          })
+        : t('settings.status_never');
+      box.appendChild(note);
+    })
+    .catch((err) => {
+      console.error('source status failed:', err);
+      box.hidden = true;
+    });
+  return box;
+}
+
+/**
+ * A button that runs an async check and shows its outcome next to it.
+ *
+ * @param {{label: string, busyLabel: string, run: Function}} spec - run() resolves to {text, ok}.
+ * @returns {HTMLDivElement} Button plus a live result line.
+ */
+function createActionWithResult(spec) {
+  const wrap = document.createElement('div');
+  wrap.className = 'action-result';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn--secondary btn--small';
+  btn.textContent = spec.label;
+  const result = document.createElement('div');
+  result.className = 'action-result-text';
+  result.setAttribute('role', 'status');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = spec.busyLabel;
+    result.textContent = '';
+    try {
+      const outcome = await spec.run();
+      if (outcome) {
+        result.textContent = outcome.text;
+        result.classList.toggle('action-result-text--ok', outcome.ok);
+        result.classList.toggle('action-result-text--error', !outcome.ok);
+      }
+    } catch (err) {
+      // A failed IPC call must still tell the user something happened.
+      console.error('settings action failed:', err);
+      result.textContent = t('settings.action_failed');
+      result.classList.remove('action-result-text--ok');
+      result.classList.add('action-result-text--error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = spec.label;
+    }
+  });
+  wrap.append(btn, result);
+  return wrap;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     AI_PROVIDERS,
@@ -153,5 +250,7 @@ if (typeof module !== 'undefined') {
     createCollapsible,
     createGoogleSteps,
     createProviderLabel,
+    createSourceStatusBox,
+    createActionWithResult,
   };
 }

@@ -105,7 +105,7 @@ describe('jira — fetchFromInstance error handling', () => {
     vi.restoreAllMocks();
   });
 
-  it('captures fetch error and returns empty after retries', async () => {
+  it('logs the fetch error and rejects after retries when the only instance is unreachable', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
 
@@ -120,11 +120,15 @@ describe('jira — fetchFromInstance error handling', () => {
     };
 
     const promise = fetchIssues(config);
+    const outcome = expect(promise).rejects.toThrow('bad.atlassian.net: network error');
     // Advance past all retry delays (2s + 4s + 8s)
     await vi.advanceTimersByTimeAsync(15000);
-    const result = await promise;
+    await outcome;
 
-    expect(result).toEqual([]);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Jira [bad.atlassian.net]: fetch error:',
+      'network error',
+    );
     consoleSpy.mockRestore();
   });
 });

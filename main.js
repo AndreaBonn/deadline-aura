@@ -31,6 +31,7 @@ const localQueries = require('./store/local-queries');
 const favoriteQueries = require('./store/favorite-queries');
 const burnoutDetector = require('./core/burnout-detector');
 const gcal = require('./integrations/google-calendar');
+const jira = require('./integrations/jira');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
 const { applyFlybyAction } = require('./core/flyby-snooze');
@@ -47,6 +48,7 @@ const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
+const { describeSourceStatus } = require('./core/source-status');
 const {
   onboardingMarkerPath,
   isFirstRun,
@@ -122,6 +124,44 @@ let dataSyncIntervalMinutes = null;
  * (Re)starts the periodic data sync with the interval currently in the config.
  * Called at startup and after a settings save, so a new interval applies without a restart.
  */
+async function runManualSync() {
+  try {
+    const syncDaemon = require('./core/sync-daemon');
+    const syncResult = await syncDaemon.sync(config);
+    lastSyncStatus = summarizeSync(syncResult, Date.now());
+    if (syncResult.errors && syncResult.errors.length > 0) {
+      console.error('[sync-now] errors:', JSON.stringify(syncResult.errors));
+    }
+    runUpdateCycle();
+  } catch (err) {
+    console.error('Manual sync error:', err.message);
+  }
+}
+
+// Facts about the saved config behind the connection status shown in the settings.
+function collectSourceFacts() {
+  const { clientId, clientSecret } = gcal.resolveGoogleOAuth(config);
+  const completeJiraInstances = jira
+    .resolveInstances(config)
+    .filter((inst) => inst.domain && inst.email && (inst.apiToken || inst.api_token));
+  return {
+    google: {
+      enabled: Boolean(config.sources.google_calendar.enabled),
+      hasCredentials: Boolean(clientId && clientSecret),
+      authorized: gcal.isGoogleCalendarReady(config),
+    },
+    outlook: {
+      enabled: Boolean(config.sources.outlook?.enabled),
+      hasUrl: Boolean(config.sources.outlook?.ics_url?.trim()),
+    },
+    jira: {
+      enabled: Boolean(config.sources.jira.enabled),
+      instanceCount: completeJiraInstances.length,
+    },
+    failedSources: lastSyncStatus ? lastSyncStatus.failedSources : [],
+  };
+}
+
 function scheduleDataSync() {
   const minutes = config.sync.data_interval_minutes || DEFAULT_DATA_SYNC_MINUTES;
   if (dataSyncTimer && minutes === dataSyncIntervalMinutes) {
@@ -795,18 +835,42 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.on('sync:run', async () => {
-    try {
-      const syncDaemon = require('./core/sync-daemon');
-      const syncResult = await syncDaemon.sync(config);
-      lastSyncStatus = summarizeSync(syncResult, Date.now());
-      if (syncResult.errors && syncResult.errors.length > 0) {
-        console.error('[sync-now] errors:', JSON.stringify(syncResult.errors));
-      }
-      runUpdateCycle();
-    } catch (err) {
-      console.error('Manual sync error:', err.message);
+  ipcMain.on('sync:run', () => {
+    runManualSync();
+  });
+
+  ipcMain.handle('settings:source-status', () => ({
+    at: lastSyncStatus ? lastSyncStatus.at : null,
+    sources: describeSourceStatus(collectSourceFacts()),
+  }));
+
+  ipcMain.handle('google:authorize', async () => {
+    const result = await gcal.authorizeGoogle(config);
+    if (result.ok && !result.alreadyAuthorized) {
+      // Fill the sidebar right away instead of waiting for the next scheduled sync.
+      runManualSync();
     }
+    return result;
+  });
+
+  ipcMain.handle('jira:verify', (_event, { instance }) => {
+    // Match the saved instance by site and account, not by position: unsaved removals
+    // shift positions, and a token must only go back to the site it was saved for.
+    const savedIndex = (config.sources.jira.instances || []).findIndex(
+      (inst) => inst.domain === instance.domain && inst.email === instance.email,
+    );
+    const saved = config.sources.jira.instances?.[savedIndex];
+    const maskedSaved = maskConfigForRenderer(config).sources.jira.instances?.[savedIndex];
+    const apiToken = jira.pickVerifyToken(instance, saved, maskedSaved?.api_token);
+    if (!apiToken) {
+      return { ok: false, error: 'MISSING_FIELDS' };
+    }
+    return jira.verifyJiraInstance({
+      domain: instance.domain,
+      email: instance.email,
+      apiToken,
+      jql: instance.jql || config.sources.jira.jql || DEFAULTS.sources.jira.jql,
+    });
   });
 
   ipcMain.on('shell:open-link', (_event, url) => {

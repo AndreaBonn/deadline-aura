@@ -153,32 +153,32 @@ describe('jira fetchIssues HTTP retries', () => {
     ]);
   });
 
-  it('logs the rate limit and returns no issues after three persistent 429 responses', async () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('rejects after three persistent 429 responses when the only instance is rate limited', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ status: 429, ok: false });
 
     const promise = fetchIssues(makeConfig());
+    const outcome = expect(promise).rejects.toThrow(
+      'test.atlassian.net: Jira API 429: rate limited',
+    );
     await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000);
-    const result = await promise;
 
-    expect({ result, logged: errorSpy.mock.calls[0] }).toEqual({
-      result: [],
-      logged: ['Jira [test.atlassian.net]: fetch error:', 'Jira API 429: rate limited'],
-    });
+    // A rejection lets the sync keep the existing Jira tasks instead of marking them stale.
+    await outcome;
   });
 
   it('stops after three attempts when every response is a 429', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ status: 429, ok: false });
 
-    const promise = fetchIssues(makeConfig());
+    const promise = fetchIssues(makeConfig()).catch(() => {});
     await vi.advanceTimersByTimeAsync(2000 + 4000 + 8000);
     await promise;
 
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
 
-  it('logs the domain and HTTP 500 status and returns no issues for the failed instance', async () => {
+  it('logs the domain and HTTP 500 status and rejects when the only instance fails', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
@@ -187,14 +187,43 @@ describe('jira fetchIssues HTTP retries', () => {
     });
 
     const promise = fetchIssues(makeConfig());
+    const outcome = expect(promise).rejects.toThrow('Jira API 500: Internal Server Error');
     await vi.advanceTimersByTimeAsync(2000 + 4000);
-    const result = await promise;
+    await outcome;
 
-    expect(result).toEqual([]);
     expect(fetchSpy).toHaveBeenCalledTimes(3);
     expect(errorSpy).toHaveBeenCalledWith(
       'Jira [test.atlassian.net]: fetch error:',
       'Jira API 500: Internal Server Error',
     );
+  });
+
+  it('rejects with the healthy instance issues attached when another instance fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const issue = { id: 'ok1', key: 'OK-1', fields: { summary: 'Healthy' } };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      String(url).includes('down.atlassian.net')
+        ? { ok: false, status: 503, statusText: 'Service Unavailable' }
+        : mockJiraResponse([issue]),
+    );
+    const config = makeConfig({
+      instances: [
+        { domain: 'up.atlassian.net', email: 'u@x.io', api_token: 't' },
+        { domain: 'down.atlassian.net', email: 'u@x.io', api_token: 't' },
+      ],
+    });
+
+    const promise = fetchIssues(config);
+    const settled = promise.then(
+      () => null,
+      (err) => err,
+    );
+    await vi.advanceTimersByTimeAsync(2000 + 4000);
+    const err = await settled;
+
+    // The sync must not treat a partial answer as complete: it would mark the failed
+    // site's issues as stale. The healthy issues travel with the error instead.
+    expect(err.message).toContain('down.atlassian.net');
+    expect(err.partialIssues).toEqual([expect.objectContaining({ id: 'jira_ok1' })]);
   });
 });

@@ -1,5 +1,7 @@
 'use strict';
 
+const net = require('net');
+
 const PRIORITY_MAP = {
   highest: 1,
   blocker: 1,
@@ -105,8 +107,10 @@ async function fetchFromInstance({ domain, email, apiToken, jql }) {
       issues.push(...pageIssues.map((issue) => normalizeIssue(issue, domain)));
       nextPageToken = data.isLast === false ? data.nextPageToken : null;
     } catch (err) {
+      // A half-read instance is a failed instance: returning its first pages would let the
+      // sync mark the issues of the missing pages as stale.
       console.error(`Jira [${domain}]: fetch error:`, err.message);
-      break;
+      throw new Error(`${domain}: ${err.message}`);
     }
   } while (nextPageToken);
 
@@ -153,7 +157,7 @@ async function fetchIssues(config) {
     return [];
   }
 
-  const results = await Promise.all(
+  const results = await Promise.allSettled(
     instances.map((inst) =>
       fetchFromInstance({
         domain: inst.domain,
@@ -164,10 +168,104 @@ async function fetchIssues(config) {
     ),
   );
 
-  return results.flat();
+  // Any failed site makes the source fail, so the sync does not mark that site's issues
+  // as stale. The issues of the healthy sites travel with the error: the sync stores them
+  // without touching the rest.
+  const failed = results.filter((r) => r.status === 'rejected');
+  const issues = results.filter((r) => r.status === 'fulfilled').flatMap((r) => r.value);
+  if (failed.length > 0) {
+    const error = new Error(failed.map((r) => r.reason.message).join('; '));
+    error.partialIssues = issues;
+    throw error;
+  }
+  return issues;
+}
+
+const VERIFY_TIMEOUT_MS = 10000;
+const HOSTNAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+// Names that only make sense inside a local network: a verify request there would let the
+// settings window probe internal services.
+const INTERNAL_HOST_SUFFIXES = ['.local', '.internal', '.localhost', '.lan', '.home.arpa'];
+
+function isInternalHost(host) {
+  // The URL parser expands shorthand addresses ("127.1", "0x7f.1") into real IPs:
+  // check the host the request would actually reach.
+  const lower = new URL(`https://${host}`).hostname.toLowerCase();
+  return (
+    net.isIP(lower) !== 0 ||
+    lower === 'localhost' ||
+    INTERNAL_HOST_SUFFIXES.some((suffix) => lower.endsWith(suffix))
+  );
+}
+
+const VERIFY_HTTP_ERRORS = {
+  400: 'INVALID_JQL',
+  401: 'AUTH_FAILED',
+  403: 'AUTH_FAILED',
+  404: 'NOT_FOUND',
+};
+
+/**
+ * Checks one Jira instance on request, from the settings window: a single request, no retries.
+ *
+ * @param {{domain: string, email: string, apiToken: string, jql: string}} instance - Fields to test.
+ * @returns {Promise<{ok: true, count: number, more: boolean}|{ok: false, error: string}>} Number of
+ *   issues on the first page, or an error code (MISSING_FIELDS, INVALID_DOMAIN, AUTH_FAILED,
+ *   NOT_FOUND, INVALID_JQL, UNREACHABLE, HTTP_<status>).
+ */
+async function verifyJiraInstance({ domain, email, apiToken, jql }) {
+  if (!domain || !email || !apiToken) {
+    return { ok: false, error: 'MISSING_FIELDS' };
+  }
+  const host = domain.trim();
+  if (!HOSTNAME_PATTERN.test(host) || isInternalHost(host)) {
+    return { ok: false, error: 'INVALID_DOMAIN' };
+  }
+  const params = new URLSearchParams({
+    jql,
+    fields: 'summary',
+    maxResults: String(MAX_RESULTS_PER_PAGE),
+  });
+  let response;
+  try {
+    response = await fetch(`https://${host}/rest/api/3/search/jql?${params}`, {
+      method: 'GET',
+      headers: { Authorization: buildAuthHeader(email, apiToken), Accept: 'application/json' },
+      signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.warn(`Jira [${host}]: verify failed:`, err.message);
+    return { ok: false, error: 'UNREACHABLE' };
+  }
+  if (!response.ok) {
+    return { ok: false, error: VERIFY_HTTP_ERRORS[response.status] || `HTTP_${response.status}` };
+  }
+  const data = await response.json();
+  return { ok: true, count: (data.issues || []).length, more: data.isLast === false };
+}
+
+/**
+ * Chooses which API token a connection test may send.
+ *
+ * The settings window gets saved tokens masked. When the mask comes back unchanged, the
+ * saved token is used, but only for the same site and account it was saved for.
+ *
+ * @param {{domain: string, email: string, api_token: string}} sent - Fields from the window.
+ * @param {{domain: string, email: string, api_token: string}|undefined} saved - Saved instance at that position.
+ * @param {string|undefined} maskedToken - The masked value the window received for it.
+ * @returns {string|null} Token to send, or null when the saved token must not leave.
+ */
+function pickVerifyToken(sent, saved, maskedToken) {
+  if (!saved || sent.api_token !== maskedToken) {
+    return sent.api_token;
+  }
+  return saved.domain === sent.domain && saved.email === sent.email ? saved.api_token : null;
 }
 
 module.exports = {
+  verifyJiraInstance,
+  pickVerifyToken,
+  resolveInstances,
   fetchIssues,
   normalizeIssue,
   mapJiraPriority,

@@ -150,6 +150,31 @@ function startAuthFlow(oAuth2Client) {
   });
 }
 
+// Only one consent page and one callback server at a time: the settings button and a
+// background sync can both ask for authorization, and they would fight over the port.
+// A caller with other client credentials may not join: the token it got would belong
+// to the wrong client and every later refresh would fail.
+let pendingAuthFlow = null; // { clientId, promise }
+
+function runSharedAuthFlow(oAuth2Client, clientId) {
+  if (pendingAuthFlow) {
+    if (pendingAuthFlow.clientId !== clientId) {
+      const busy = new Error('Another Google authorization is in progress');
+      busy.code = 'AUTH_IN_PROGRESS';
+      return Promise.reject(busy);
+    }
+    return pendingAuthFlow.promise.then((tokens) => {
+      oAuth2Client.setCredentials(tokens);
+      return tokens;
+    });
+  }
+  const promise = startAuthFlow(oAuth2Client).finally(() => {
+    pendingAuthFlow = null;
+  });
+  pendingAuthFlow = { clientId, promise };
+  return promise;
+}
+
 async function getAuthenticatedClient(clientId, clientSecret) {
   const oAuth2Client = createOAuthClient(clientId, clientSecret);
 
@@ -157,8 +182,46 @@ async function getAuthenticatedClient(clientId, clientSecret) {
     return oAuth2Client;
   }
 
-  await startAuthFlow(oAuth2Client);
+  await runSharedAuthFlow(oAuth2Client, clientId);
   return oAuth2Client;
+}
+
+/**
+ * Starts the Google consent flow on request, from the settings window.
+ *
+ * @param {object} config - Application config with the saved client credentials.
+ * @returns {Promise<{ok: boolean, alreadyAuthorized?: boolean, error?: string}>} Outcome;
+ *   error is MISSING_CREDENTIALS, PORT_IN_USE, AUTH_IN_PROGRESS or the underlying message.
+ */
+async function authorizeGoogle(config) {
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
+  if (!clientId || !clientSecret) {
+    return { ok: false, error: 'MISSING_CREDENTIALS' };
+  }
+  const existing = createOAuthClient(clientId, clientSecret);
+  if (loadSavedToken(existing)) {
+    try {
+      // A token file can survive a revocation: prove it still works before saying so.
+      await existing.getAccessToken();
+      return { ok: true, alreadyAuthorized: true };
+    } catch (err) {
+      // Revoked, or an old token that can no longer be refreshed: ask for consent again.
+      // Anything else (offline, Google down) is reported as is, the token may still be good.
+      if (!isInvalidGrant(err.message) && !/no refresh token/i.test(err.message)) {
+        return { ok: false, error: err.message };
+      }
+      deleteToken();
+    }
+  }
+  try {
+    await getAuthenticatedClient(clientId, clientSecret);
+    return { ok: true };
+  } catch (err) {
+    if (err.code === 'EADDRINUSE') {
+      return { ok: false, error: 'PORT_IN_USE' };
+    }
+    return { ok: false, error: err.code === 'AUTH_IN_PROGRESS' ? err.code : err.message };
+  }
 }
 
 function assignPriority(event, priorityKeywords) {
@@ -448,6 +511,7 @@ module.exports = {
   isInvalidGrant,
   deleteToken,
   isGoogleCalendarReady,
+  authorizeGoogle,
   fetchCalendarEvents,
   TOKEN_PATH,
 };
