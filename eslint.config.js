@@ -66,6 +66,16 @@ module.exports = [
     },
   },
   {
+    // Grow this explicit list as files are decomposed under specs/005-god-file-decomposition.
+    files: ['core/source-status.js', 'renderer/sidebar-utils.js', 'renderer/settings-helpers.js'],
+    rules: {
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 30, skipBlankLines: true, skipComments: true }],
+      'max-params': ['error', 4],
+      'max-depth': ['error', 3],
+    },
+  },
+  {
     ignores: ['node_modules/', 'dist/', 'coverage/'],
   },
 ];
