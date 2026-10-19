@@ -14,7 +14,7 @@
 }
 
 const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
-const { execFile, execFileSync, spawn } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 const { openExternalUrl } = require('./core/open-external');
 const externalBrowserDependencies = {
   which: (bin) => execFileSync('which', [bin], { stdio: 'ignore' }),
@@ -22,11 +22,9 @@ const externalBrowserDependencies = {
 };
 const path = require('path');
 const os = require('os');
-const {
-  setX11Strut,
-  getDisplaysWithWindows,
-  getVirtualScreenWidth,
-} = require('./core/display-controller');
+const { getDisplaysWithWindows } = require('./core/display-controller');
+const { createStripWindows } = require('./main-process/strip-windows');
+const { createMeetingDockWindows } = require('./main-process/meeting-dock-windows');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
@@ -39,14 +37,12 @@ const gcal = require('./integrations/google-calendar');
 const jira = require('./integrations/jira');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
-const { isSafeExternalUrl } = require('./core/url-safety');
 const { registerIpc } = require('./core/ipc/register-ipc');
 const { createLocalTaskHandlers } = require('./core/ipc/local-task-handlers');
 const { createCalendarHandlers } = require('./core/ipc/calendar-handlers');
 const { createSettingsHandlers } = require('./core/ipc/settings-handlers');
 const { createFlybyHandlers } = require('./core/ipc/flyby-handlers');
 const { loadConfig, saveConfig } = require('./config/loader');
-const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
 const { runSyncCycle } = require('./core/sync-runner');
@@ -88,7 +84,6 @@ const UPDATE_INTERVAL_MS = 60000;
 const DEFAULT_DATA_SYNC_MINUTES = 10;
 const MEETING_DOCK_CHECK_MS = 30000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
-const STRIP_WIDTH = 10;
 const DESKTOP_CHECK_MS = 1000;
 const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
@@ -96,10 +91,16 @@ let sidebarWindow = null;
 let sidebarReady = false;
 let sidebarManualOpen = false;
 let sidebarManualClose = false;
-let stripWindows = new Map(); // displayId → BrowserWindow
-let meetingDockWindows = new Map(); // displayId → BrowserWindow
+const strips = createStripWindows({ BrowserWindow, screen });
+const meetingDocks = createMeetingDockWindows({
+  BrowserWindow,
+  screen,
+  getConfig: () => config,
+  db,
+  openExternalUrl,
+  externalBrowserDependencies,
+});
 let desktopCheckInterval = null;
-let currentPaletteHex = '#334155';
 let isUpdateCycleRunning = false;
 // Outcome of the last data sync, shown in the sidebar footer.
 let lastSyncStatus = null;
@@ -249,10 +250,7 @@ function showSidebarOnDisplay(display) {
   });
 
   const displayId = String(display.id);
-  const strip = stripWindows.get(displayId);
-  if (strip && !strip.isDestroyed()) {
-    strip.hide();
-  }
+  strips.hideStrip(displayId);
   activeStripDisplayId = displayId;
 
   sidebarWindow.show();
@@ -263,10 +261,7 @@ function hideSidebar() {
     sidebarWindow.hide();
   }
   if (activeStripDisplayId) {
-    const strip = stripWindows.get(activeStripDisplayId);
-    if (strip && !strip.isDestroyed()) {
-      strip.show();
-    }
+    strips.showStrip(activeStripDisplayId);
     activeStripDisplayId = null;
   }
 }
@@ -285,219 +280,6 @@ function toggleSidebar() {
     const cursor = screen.getCursorScreenPoint();
     const display = screen.getDisplayNearestPoint(cursor);
     showSidebarOnDisplay(display);
-  }
-}
-
-// --- Strips (one per display, always visible, same renderer as sidebar) ---
-
-function createStrips() {
-  destroyStrips();
-  const displays = screen.getAllDisplays();
-  const virtualWidth = getVirtualScreenWidth(screen);
-
-  for (const display of displays) {
-    const { x: bx, width: bw } = display.bounds;
-    const { y: wy } = display.workArea;
-    const { height } = display.workAreaSize;
-    const displayId = String(display.id);
-    const isRightmost = bx + bw >= virtualWidth;
-
-    const stripWin = new BrowserWindow({
-      width: STRIP_WIDTH,
-      height: height,
-      x: bx + bw - STRIP_WIDTH,
-      y: wy,
-      show: false,
-      frame: false,
-      transparent: false,
-      backgroundColor: currentPaletteHex,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      focusable: true,
-      resizable: false,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-
-    // Only the rightmost-display strip needs to be sticky across workspaces
-    // (it carries the strut). On secondary displays, sticky + DOCK causes
-    // GNOME/Mutter to pin the window to the primary monitor.
-    if (isRightmost) {
-      stripWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-    }
-    stripWin.loadFile(path.join(__dirname, 'renderer', 'strip.html'));
-
-    stripWin.webContents.once('did-finish-load', () => {
-      stripWin.webContents.send('strip-color', currentPaletteHex);
-      // DOCK + sticky desktop only on the rightmost display (where the strut is applied).
-      // Applying them to secondary displays causes Mutter to relocate the window to primary.
-      if (process.platform === 'linux' && process.env.DISPLAY && isRightmost) {
-        try {
-          const xidStr = String(stripWin.getNativeWindowHandle().readUInt32LE(0));
-          execFile(
-            'xprop',
-            [
-              '-id',
-              xidStr,
-              '-f',
-              '_NET_WM_WINDOW_TYPE',
-              '32a',
-              '-set',
-              '_NET_WM_WINDOW_TYPE',
-              '_NET_WM_WINDOW_TYPE_DOCK',
-            ],
-            () => {
-              execFile(
-                'xprop',
-                [
-                  '-id',
-                  xidStr,
-                  '-f',
-                  '_NET_WM_DESKTOP',
-                  '32c',
-                  '-set',
-                  '_NET_WM_DESKTOP',
-                  '0xffffffff',
-                ],
-                () => {
-                  stripWin.show();
-                  setX11Strut(stripWin, display, STRIP_WIDTH, screen);
-                },
-              );
-            },
-          );
-        } catch {
-          stripWin.show();
-          setX11Strut(stripWin, display, STRIP_WIDTH, screen);
-        }
-      } else {
-        stripWin.show();
-      }
-    });
-
-    stripWindows.set(displayId, stripWin);
-  }
-}
-
-function destroyStrips() {
-  for (const win of stripWindows.values()) {
-    if (win && !win.isDestroyed()) {
-      win.close();
-    }
-  }
-  stripWindows = new Map();
-}
-
-function updateStripColor(hex) {
-  currentPaletteHex = hex;
-  for (const win of stripWindows.values()) {
-    if (win && !win.isDestroyed() && win.webContents) {
-      win.webContents.send('strip-color', hex);
-    }
-  }
-}
-
-// --- Meeting Dock (one per display, bottom edge) ---
-
-const MEETING_DOCK_HEIGHT = 52;
-
-function createMeetingDocks() {
-  destroyMeetingDocks();
-  if (!config.meeting_dock?.enabled) {
-    return;
-  }
-
-  const displays = screen.getAllDisplays();
-  for (const display of displays) {
-    const { x: wx, y: wy } = display.workArea;
-    const { width, height } = display.workAreaSize;
-    const displayId = String(display.id);
-
-    const dockWin = new BrowserWindow({
-      width: width,
-      height: MEETING_DOCK_HEIGHT,
-      x: wx,
-      y: wy + height - MEETING_DOCK_HEIGHT,
-      show: false,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      focusable: true,
-      resizable: false,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload-meeting-dock.js'),
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-
-    dockWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
-    dockWin.loadFile(path.join(__dirname, 'renderer', 'meeting-dock.html'));
-
-    dockWin.webContents.once('did-finish-load', () => {
-      if (process.platform === 'linux' && process.env.DISPLAY) {
-        try {
-          const xidStr = String(dockWin.getNativeWindowHandle().readUInt32LE(0));
-          // Sticky on all desktops — no DOCK type to preserve transparency
-          execFile(
-            'xprop',
-            [
-              '-id',
-              xidStr,
-              '-f',
-              '_NET_WM_DESKTOP',
-              '32c',
-              '-set',
-              '_NET_WM_DESKTOP',
-              '0xffffffff',
-            ],
-            () => {
-              // No strut reservation — dock overlaps, hidden when empty
-            },
-          );
-        } catch {
-          // xprop not available — proceed without sticky desktop
-        }
-      }
-    });
-
-    // Click-through on transparent areas, forward mouse events to renderer.
-    // On Linux (X11), forward option does not reliably deliver mouse events
-    // to the renderer, so mouseenter never fires and clicks pass through.
-    // Disable click-through on Linux to keep the dock interactive.
-    if (process.platform !== 'linux') {
-      dockWin.setIgnoreMouseEvents(true, { forward: true });
-    }
-
-    meetingDockWindows.set(displayId, dockWin);
-  }
-}
-
-function destroyMeetingDocks() {
-  for (const win of meetingDockWindows.values()) {
-    if (win && !win.isDestroyed()) {
-      win.close();
-    }
-  }
-  meetingDockWindows = new Map();
-}
-
-function updateMeetingDocks() {
-  if (!config.meeting_dock?.enabled) {
-    return;
-  }
-
-  const lookaheadMin = config.meeting_dock?.lookahead_minutes || 10;
-  const meetings = db.getUpcomingMeetings(lookaheadMin, -5);
-
-  for (const win of meetingDockWindows.values()) {
-    if (win && !win.isDestroyed() && win.webContents) {
-      win.webContents.send('meetings-update', meetings);
-    }
   }
 }
 
@@ -537,22 +319,22 @@ function initSidebar() {
   // Compute initial color before creating strips so they start with the correct palette
   const initialResult = deadlineEngine.run(engineOptionsFromConfig(config));
   const initialPalette = colorMapper.mapScoreToColor(initialResult.global_score);
-  currentPaletteHex = initialPalette.accent_hex;
+  strips.updateStripColor(initialPalette.accent_hex);
 
   createSidebar();
-  createStrips();
-  createMeetingDocks();
+  strips.createStrips();
+  meetingDocks.createMeetingDocks();
 
   checkDesktopState();
   desktopCheckInterval = setInterval(checkDesktopState, DESKTOP_CHECK_MS);
 
   screen.on('display-added', () => {
-    createStrips();
-    createMeetingDocks();
+    strips.createStrips();
+    meetingDocks.createMeetingDocks();
   });
   screen.on('display-removed', () => {
-    createStrips();
-    createMeetingDocks();
+    strips.createStrips();
+    meetingDocks.createMeetingDocks();
   });
 }
 
@@ -601,8 +383,8 @@ async function runUpdateCycle({ force = false } = {}) {
       });
     }
 
-    updateStripColor(palette.accent_hex);
-    updateMeetingDocks();
+    strips.updateStripColor(palette.accent_hex);
+    meetingDocks.updateMeetingDocks();
 
     const allPinned = pinnedQueries.getAllPinned();
     const pinnedIds = new Set(allPinned.map((p) => p.task_id));
@@ -717,7 +499,7 @@ app.whenReady().then(() => {
 
   runUpdateCycle();
   setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
-  setInterval(updateMeetingDocks, MEETING_DOCK_CHECK_MS);
+  setInterval(() => meetingDocks.updateMeetingDocks(), MEETING_DOCK_CHECK_MS);
   setInterval(() => meetingFlyby.checkAndLaunch({ config, db, screen }), MEETING_DOCK_CHECK_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
 
@@ -746,41 +528,7 @@ app.whenReady().then(() => {
     firstRunHintPending = false;
   });
 
-  ipcMain.on('meeting-dock:open-link', (_event, url) => {
-    if (typeof url === 'string' && isSafeExternalUrl(url)) {
-      const googleAccount = config.sources?.google_calendar?.google_account;
-      const finalUrl = buildMeetUrl(url, googleAccount);
-      openExternalUrl(finalUrl, externalBrowserDependencies);
-    }
-  });
-
-  ipcMain.on('meeting-dock:set-ignore-mouse', (_event, ignore) => {
-    // On Linux, click-through with forwarding is disabled (see createMeetingDocks),
-    // so toggling ignore mouse events is unnecessary.
-    if (process.platform === 'linux') {
-      return;
-    }
-    const senderWin = BrowserWindow.fromWebContents(_event.sender);
-    if (senderWin && !senderWin.isDestroyed()) {
-      if (ignore) {
-        senderWin.setIgnoreMouseEvents(true, { forward: true });
-      } else {
-        senderWin.setIgnoreMouseEvents(false);
-      }
-    }
-  });
-
-  ipcMain.on('meeting-dock:set-visible', (_event, visible) => {
-    for (const win of meetingDockWindows.values()) {
-      if (win && !win.isDestroyed()) {
-        if (visible && !win.isVisible()) {
-          win.showInactive();
-        } else if (!visible && win.isVisible()) {
-          win.hide();
-        }
-      }
-    }
-  });
+  meetingDocks.registerIpc(ipcMain);
 
   ipcMain.on('sync:run', () => {
     runManualSync();
@@ -944,7 +692,7 @@ app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
   clearInterval(dataSyncTimer);
   meetingFlyby.destroyAll();
-  destroyStrips();
+  strips.destroyStrips();
   db.close();
   app.quit();
 });

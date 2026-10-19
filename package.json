@@ -76,6 +76,7 @@
       "ai/**",
       "config/**",
       "core/**",
+      "main-process/**",
       "i18n/**",
       "integrations/**",
       "renderer/**",
