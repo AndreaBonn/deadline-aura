@@ -2,8 +2,8 @@
 
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
-   priorityKey, formatScore100, withoutFavorites, flybyStateKey, formatSyncStatus, escapeHtml,
-   urgencyToTextColor,
+   priorityKey, formatScore100, withoutFavorites, flybyStateKey, formatSyncStatus,
+   urgencyToTextColor, buildScoreBreakdownHtml,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
 const COLLAPSED_LIMIT = 5;
@@ -1505,188 +1505,11 @@ function renderClinicalNote(note) {
   el.textContent = note;
 }
 
-const SOURCE_LABEL_KEYS = {
-  gcal: 'sidebar.google_calendar',
-  gtasks: 'sidebar.google_tasks',
-  jira: 'sidebar.jira',
-  local: 'sidebar.local',
-  outlook: 'sidebar.outlook',
-};
-
-function formatHoursRemaining(hours) {
-  if (hours === null || hours === undefined) {
-    return '—';
-  }
-  if (hours < 0) {
-    return t('postit.expired');
-  }
-  if (hours < 1) {
-    const minutes = Math.round(hours * 60);
-    return minutes < 60 ? `${minutes}m` : '1h';
-  }
-  if (hours < 24) {
-    return `${Math.floor(hours)}h`;
-  }
-  return `${Math.round(hours / 24)}${t('countdown.days_short')}`;
-}
-
-function buildBreakdownSection(titleKey, bodyHtml) {
-  return `
-    <div class="breakdown-section">
-      <div class="breakdown-section-title">${t(titleKey)}</div>
-      ${bodyHtml}
-    </div>
-  `;
-}
-
-function buildAiSection(breakdown) {
-  const ai = breakdown.ai;
-  if (!ai) {
-    return buildBreakdownSection(
-      'score_breakdown.ai_title',
-      `<div class="breakdown-empty">${t('score_breakdown.ai_unavailable')}</div>`,
-    );
-  }
-  const weightPct = Math.round(breakdown.blend.ai_weight * 100);
-  const freshness = ai.fresh
-    ? ''
-    : `<div class="breakdown-warning">${t('score_breakdown.ai_stale')}</div>`;
-  const formula = ai.fresh
-    ? `<div class="breakdown-formula">${ai.global_stress}/10 × ${weightPct}%</div>`
-    : '';
-  return buildBreakdownSection(
-    'score_breakdown.ai_title',
-    `<div class="breakdown-row">
-       <span class="breakdown-label">${t('score_breakdown.ai_global')}</span>
-       <span class="breakdown-value">${ai.global_stress}/10</span>
-     </div>
-     <div class="breakdown-row">
-       <span class="breakdown-label">${t('score_breakdown.weight')}</span>
-       <span class="breakdown-value">${weightPct}%</span>
-     </div>
-     ${formula}
-     ${freshness}`,
-  );
-}
-
-function buildMechanicalSection(breakdown) {
-  const mech = breakdown.mechanical;
-  const weightPct = Math.round(breakdown.blend.mechanical_weight * 100);
-  const reasonLabel = t(`score_breakdown.reason_${mech.reason_key}`);
-  const ampLine = mech.volume_amp_applied
-    ? `<div class="breakdown-row">
-         <span class="breakdown-label">${t('score_breakdown.volume_amp')}</span>
-         <span class="breakdown-value">${t('score_breakdown.volume_amp_yes')}</span>
-       </div>`
-    : `<div class="breakdown-row">
-         <span class="breakdown-label">${t('score_breakdown.volume_amp')}</span>
-         <span class="breakdown-value breakdown-muted">${t('score_breakdown.volume_amp_no')}</span>
-       </div>`;
-  const oooLine =
-    mech.ooo_filtered_count > 0
-      ? `<div class="breakdown-row">
-           <span class="breakdown-label">${t('score_breakdown.ooo_filtered')}</span>
-           <span class="breakdown-value">${mech.ooo_filtered_count}</span>
-         </div>`
-      : '';
-  return buildBreakdownSection(
-    'score_breakdown.mechanical_title',
-    `<div class="breakdown-row">
-       <span class="breakdown-label">${t('score_breakdown.score')}</span>
-       <span class="breakdown-value">${mech.score.toFixed(2)}</span>
-     </div>
-     <div class="breakdown-row">
-       <span class="breakdown-label">${t('score_breakdown.weight')}</span>
-       <span class="breakdown-value">${weightPct}%</span>
-     </div>
-     ${ampLine}
-     ${oooLine}
-     <div class="breakdown-reason">${reasonLabel}</div>`,
-  );
-}
-
-function buildTopDriversSection(breakdown) {
-  if (!breakdown.top_drivers || breakdown.top_drivers.length === 0) {
-    return '';
-  }
-  const rows = breakdown.top_drivers
-    .map((d) => {
-      const sourceKey = SOURCE_LABEL_KEYS[d.source] || null;
-      const sourceLabel = sourceKey ? t(sourceKey) : d.source;
-      const aiTag =
-        d.ai_stress !== null ? `<span class="breakdown-driver-ai">AI ${d.ai_stress}/10</span>` : '';
-      const eta = formatHoursRemaining(d.hours_remaining);
-      const safeTitle = escapeHtml(d.title);
-      const openBtn = d.web_url
-        ? `<button type="button" class="breakdown-open" data-url="${escapeHtml(d.web_url)}">${t('score_breakdown.open')}</button>`
-        : '';
-      return `
-        <div class="breakdown-driver">
-          <div class="breakdown-driver-main">
-            <span class="breakdown-driver-title" title="${safeTitle}">${safeTitle}</span>
-            <span class="breakdown-driver-urgency">${(d.urgency_score * 100).toFixed(0)}%</span>
-          </div>
-          <div class="breakdown-driver-meta">
-            <span>${sourceLabel}</span>
-            <span>${eta}</span>
-            ${aiTag}
-            ${openBtn}
-          </div>
-        </div>
-      `;
-    })
-    .join('');
-  return buildBreakdownSection('score_breakdown.drivers_title', rows);
-}
-
-// Plain-language reading of the score; the formula stays one click away.
-function buildWhySection(breakdown) {
-  const ai = breakdown.ai;
-  const aiLine =
-    ai && ai.fresh
-      ? t('score_breakdown.ai_sentence', { n: ai.global_stress })
-      : t('score_breakdown.ai_off_sentence');
-  const reasonLine = t(`score_breakdown.reason_${breakdown.mechanical.reason_key}`);
-  return buildBreakdownSection(
-    'score_breakdown.why_title',
-    `<p class="breakdown-plain">${escapeHtml(aiLine)}</p>
-     <p class="breakdown-plain">${escapeHtml(reasonLine)}</p>`,
-  );
-}
-
-function buildBlendFooter(breakdown) {
-  const aiW = Math.round(breakdown.blend.ai_weight * 100);
-  const mechW = Math.round(breakdown.blend.mechanical_weight * 100);
-  const total = breakdown.global_score.toFixed(2);
-  return `
-    <div class="breakdown-footer">
-      <span>${t('score_breakdown.total')}</span>
-      <span class="breakdown-footer-value">${total}</span>
-      <span class="breakdown-footer-formula">(AI ${aiW}% + Mech ${mechW}%)</span>
-    </div>
-  `;
-}
-
 function renderScoreBreakdown(payload) {
   const panel = document.getElementById('scoreBreakdownPanel');
-  if (!panel) {
-    return;
+  if (panel) {
+    panel.innerHTML = buildScoreBreakdownHtml(payload, t);
   }
-  if (!payload || !payload.breakdown) {
-    panel.innerHTML = `<div class="breakdown-empty">${t('score_breakdown.unavailable')}</div>`;
-    return;
-  }
-  const { breakdown } = payload;
-  panel.innerHTML = [
-    buildTopDriversSection(breakdown),
-    buildWhySection(breakdown),
-    `<details class="breakdown-details">
-       <summary>${t('score_breakdown.how_title')}</summary>
-       ${buildAiSection(breakdown)}
-       ${buildMechanicalSection(breakdown)}
-       ${buildBlendFooter(breakdown)}
-     </details>`,
-  ].join('');
 }
 
 document.getElementById('scoreBreakdownPanel').addEventListener('click', function (e) {

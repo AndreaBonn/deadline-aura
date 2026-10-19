@@ -74,6 +74,7 @@ module.exports = [
       'store/db.js',
       'store/migrations.js',
       'integrations/google-auth.js',
+      'renderer/sidebar-score-breakdown.js',
     ],
     rules: {
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
