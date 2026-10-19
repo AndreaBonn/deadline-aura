@@ -3,7 +3,7 @@
 const { google } = require('googleapis');
 const { getAuthenticatedClient, resolveGoogleOAuth } = require('./google-auth');
 
-const DEFAULT_PRIORITY = 3;
+const { DEFAULT_PRIORITY } = require('../core/task-priority');
 const HIGH_PRIORITY = 2;
 const HIGH_PRIORITY_KEYWORDS = ['urgent', 'deadline', 'critico', 'asap', 'importante'];
 

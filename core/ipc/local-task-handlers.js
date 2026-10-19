@@ -2,7 +2,7 @@
 
 const { validateLocalTaskCreate, validateLocalTaskUpdate } = require('../local-task-validation');
 
-const DEFAULT_PRIORITY = 3;
+const { DEFAULT_PRIORITY } = require('../task-priority');
 const INVALID_ID = { ok: false, error: 'INVALID_ID' };
 
 function isValidId(taskId) {

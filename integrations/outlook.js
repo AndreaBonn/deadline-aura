@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const { parseIcs } = require('../core/ics-parser');
 const { isPrivateHost } = require('../core/url-safety');
+const { DEFAULT_PRIORITY } = require('../core/task-priority');
 const { getLookaheadEnd } = require('../core/deadline-engine');
 
 const FETCH_TIMEOUT_MS = 20000;
@@ -18,7 +19,6 @@ const OUTLOOK_HIGH_IMPORTANCE = 2;
 
 const PRIORITY_HIGH = 1;
 const PRIORITY_KEYWORD = 2;
-const PRIORITY_DEFAULT = 3;
 
 /**
  * Validate and normalize a feed url before it is fetched.
@@ -145,7 +145,7 @@ function assignPriority(occurrence, priorityKeywords) {
     }
   }
 
-  return PRIORITY_DEFAULT;
+  return DEFAULT_PRIORITY;
 }
 
 /**

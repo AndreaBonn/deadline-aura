@@ -1,6 +1,7 @@
 'use strict';
 
 const net = require('net');
+const { DEFAULT_PRIORITY } = require('../core/task-priority');
 
 const PRIORITY_MAP = {
   highest: 1,
@@ -17,9 +18,9 @@ const RETRY_DELAYS = [2000, 4000, 8000];
 
 function mapJiraPriority(priorityName) {
   if (!priorityName) {
-    return 3;
+    return DEFAULT_PRIORITY;
   }
-  return PRIORITY_MAP[priorityName.toLowerCase()] || 3;
+  return PRIORITY_MAP[priorityName.toLowerCase()] || DEFAULT_PRIORITY;
 }
 
 function buildAuthHeader(email, apiToken) {

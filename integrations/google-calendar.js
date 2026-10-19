@@ -10,6 +10,7 @@ const {
 
 const { getLookaheadEnd } = require('../core/deadline-engine');
 const { eventBoundaryMs, extractMeetUrl } = require('../core/event-fields');
+const { DEFAULT_PRIORITY } = require('../core/task-priority');
 
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
@@ -31,7 +32,7 @@ function assignPriority(event, priorityKeywords) {
     }
   }
 
-  return 3;
+  return DEFAULT_PRIORITY;
 }
 
 function isDeclinedByUser(event) {
