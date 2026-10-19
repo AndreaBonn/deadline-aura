@@ -203,11 +203,18 @@ function submitTimeLog(task, fields, summary, controls) {
       if (result.ok) {
         finishTimeLog(task, values.calendarId);
       } else {
-        controls.send.disabled = false;
-        controls.send.textContent = t('sidebar.log_time');
-        controls.error.show(t('sidebar.log_failed', { error: result.error || '?' }));
+        showTimeLogFailure(controls, result.error);
       }
+    })
+    .catch(function (err) {
+      showTimeLogFailure(controls, err.message);
     });
+}
+
+function showTimeLogFailure(controls, reason) {
+  controls.send.disabled = false;
+  controls.send.textContent = t('sidebar.log_time');
+  controls.error.show(t('sidebar.log_failed', { error: reason || '?' }));
 }
 
 function appendTimeLogActions(form, task, fields, summary) {

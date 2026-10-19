@@ -41,3 +41,25 @@ describe('meeting flyby icon at page load', () => {
     expect($('#flybyToggle').getAttribute('aria-label')).toBe('Avvisi call attivi');
   });
 });
+
+describe('time log form when the IPC call rejects', () => {
+  it('re-enables the send button and shows the reason, like a failed result', async () => {
+    await load();
+    const { chooseMenuItem, findCard } = require('./harness');
+    chooseMenuItem(findCard(page.document, 'Write report'), 'Registra tempo');
+    await page.flush();
+    page.bridge.answer('logTimeToCalendar', () => {
+      throw new Error('ipc down');
+    });
+    $('.time-log-calendar-select').value = 'work';
+
+    $('.time-log-send').click();
+    await page.flush();
+
+    expect($('.time-log-send').disabled).toBe(false);
+    expect($('.time-log-send').textContent).toBe('Registra tempo');
+    expect($('.time-log-error').hidden).toBe(false);
+    expect($('.time-log-error').textContent).toBe('Registrazione non riuscita: ipc down');
+    expect($('.task-logged')).toBeNull();
+  });
+});
