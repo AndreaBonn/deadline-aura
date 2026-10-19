@@ -39,11 +39,12 @@ const gcal = require('./integrations/google-calendar');
 const jira = require('./integrations/jira');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
-const { applyFlybyAction } = require('./core/flyby-snooze');
 const { isSafeExternalUrl } = require('./core/url-safety');
 const { registerIpc } = require('./core/ipc/register-ipc');
 const { createLocalTaskHandlers } = require('./core/ipc/local-task-handlers');
 const { createCalendarHandlers } = require('./core/ipc/calendar-handlers');
+const { createSettingsHandlers } = require('./core/ipc/settings-handlers');
+const { createFlybyHandlers } = require('./core/ipc/flyby-handlers');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
@@ -785,11 +786,6 @@ app.whenReady().then(() => {
     runManualSync();
   });
 
-  ipcMain.handle('settings:source-status', () => ({
-    at: lastSyncStatus ? lastSyncStatus.at : null,
-    sources: describeSourceStatus(collectSourceFacts(config, { gcal, jira, lastSyncStatus })),
-  }));
-
   ipcMain.handle('google:authorize', async () => {
     const result = await gcal.authorizeGoogle(config);
     if (result.ok && !result.alreadyAuthorized) {
@@ -797,26 +793,6 @@ app.whenReady().then(() => {
       runManualSync();
     }
     return result;
-  });
-
-  ipcMain.handle('jira:verify', (_event, { instance }) => {
-    // Match the saved instance by site and account, not by position: unsaved removals
-    // shift positions, and a token must only go back to the site it was saved for.
-    const savedIndex = (config.sources.jira.instances || []).findIndex(
-      (inst) => inst.domain === instance.domain && inst.email === instance.email,
-    );
-    const saved = config.sources.jira.instances?.[savedIndex];
-    const maskedSaved = maskConfigForRenderer(config).sources.jira.instances?.[savedIndex];
-    const apiToken = jira.pickVerifyToken(instance, saved, maskedSaved?.api_token);
-    if (!apiToken) {
-      return { ok: false, error: 'MISSING_FIELDS' };
-    }
-    return jira.verifyJiraInstance({
-      domain: instance.domain,
-      email: instance.email,
-      apiToken,
-      jql: instance.jql || config.sources.jira.jql || DEFAULTS.sources.jira.jql,
-    });
   });
 
   ipcMain.on('shell:open-link', (_event, url) => {
@@ -844,59 +820,6 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
-
-  function readFlybyState() {
-    return {
-      enabled: config.meeting_flyby?.enabled !== false,
-      snoozed_until: config.meeting_flyby?.snoozed_until ?? null,
-    };
-  }
-
-  ipcMain.handle('flyby:get-state', () => readFlybyState());
-
-  ipcMain.handle('flyby:set-state', (_event, action) => {
-    const next = applyFlybyAction(config, action, Date.now());
-    if (!next) {
-      return { ok: false, error: 'INVALID_ACTION' };
-    }
-    const result = configSchema.safeParse(next);
-    if (!result.success) {
-      return { ok: false, error: 'VALIDATION_ERROR' };
-    }
-    saveConfig(result.data);
-    config = loadConfig();
-    if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-      sidebarWindow.webContents.send('config-changed', config);
-    }
-    return { ok: true, state: readFlybyState() };
-  });
-  ipcMain.handle('settings:get-config', () => maskConfigForRenderer(config));
-  ipcMain.handle('settings:get-defaults', () => DEFAULTS);
-  ipcMain.handle('settings:save-config', (_event, newConfig) => {
-    restoreTokens(newConfig, config);
-    const result = configSchema.safeParse(newConfig);
-    if (!result.success) {
-      return {
-        ok: false,
-        errors: result.error.flatten().fieldErrors,
-        // Full paths let the settings window name the tab and field to fix.
-        issues: result.error.issues.map((issue) => ({
-          path: issue.path.join('.'),
-          code: issue.code,
-          minimum: issue.minimum,
-          maximum: issue.maximum,
-          message: issue.message,
-        })),
-      };
-    }
-    saveConfig(result.data);
-    config = loadConfig();
-    scheduleDataSync();
-    if (sidebarWindow && !sidebarWindow.isDestroyed()) {
-      sidebarWindow.webContents.send('config-changed', config);
-    }
-    return { ok: true };
-  });
 
   ipcMain.handle('ai-usage:capture-status', () =>
     runCaptureCommand('status', { home: os.homedir() }),
@@ -971,6 +894,36 @@ app.whenReady().then(() => {
     handle: {
       ...createLocalTaskHandlers({ localQueries, refresh: runUpdateCycle }),
       ...createCalendarHandlers({ gcal, getConfig: () => config, saveConfig }),
+      ...createSettingsHandlers({
+        getConfig: () => config,
+        defaults: DEFAULTS,
+        maskConfigForRenderer,
+        restoreTokens,
+        configSchema,
+        describeSourceStatus,
+        collectSourceFacts,
+        gcal,
+        jira,
+        getLastSyncStatus: () => lastSyncStatus,
+        applyConfig: (data) => {
+          saveConfig(data);
+          config = loadConfig();
+          scheduleDataSync();
+          if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+            sidebarWindow.webContents.send('config-changed', config);
+          }
+        },
+      }),
+      ...createFlybyHandlers({
+        getConfig: () => config,
+        applyConfig: (data) => {
+          saveConfig(data);
+          config = loadConfig();
+          if (sidebarWindow && !sidebarWindow.isDestroyed()) {
+            sidebarWindow.webContents.send('config-changed', config);
+          }
+        },
+      }),
     },
   });
 
