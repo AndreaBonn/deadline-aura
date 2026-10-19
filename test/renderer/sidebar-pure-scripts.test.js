@@ -12,6 +12,7 @@ it('loads pure sidebar scripts in page order without CommonJS and exposes workin
     'sidebar-score-breakdown.js',
     'sidebar-task-groups.js',
     'sidebar-timer.js',
+    'sidebar-task-card.js',
     'sidebar-form-values.js',
     'sidebar-ai-panel.js',
   ]);
@@ -36,6 +37,11 @@ it('loads pure sidebar scripts in page order without CommonJS and exposes workin
     }).isEmpty,
   ).toBe(true);
   expect(context.parseStoredTimer('{broken')).toBeNull();
+  expect(
+    context
+      .taskMenuModel({ source: 'jira' }, { isPinned: true, googleCalendarReady: false })
+      .map((item) => item.id),
+  ).toEqual(['unpin', 'connect-google']);
   expect(context.readTaskFormValues({ title: ' Task ', date: '', priority: '2' })).toEqual({
     title: 'Task',
     dueAt: null,

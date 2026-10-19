@@ -86,6 +86,8 @@ module.exports = [
       'core/data-sync.js',
       'core/first-run-hint.js',
       'core/update-cycle.js',
+      'renderer/sidebar-task-card.js',
+      'renderer/sidebar-sections.js',
       'renderer/sidebar-task-forms.js',
       'renderer/sidebar-time-log.js',
       'renderer/sidebar-form-values.js',
