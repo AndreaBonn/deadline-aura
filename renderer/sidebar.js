@@ -101,7 +101,9 @@ timerController.restore();
 
 // Init i18n before first render. The flyby icon was first painted by getFlybyState, usually
 // before the translations arrive: repaint it once they are in, instead of waiting for the clock.
-initI18n(window.deadlineAura).then(applyFlybyIcon);
+initI18n(window.deadlineAura)
+  .then(applyFlybyIcon)
+  .catch((err) => console.error('i18n init failed:', err.message));
 
 // Load work shift config and listen for changes
 window.deadlineAura.getWorkShiftConfig().then((cfg) => {

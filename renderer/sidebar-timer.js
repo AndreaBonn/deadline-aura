@@ -54,6 +54,7 @@ class TimerController {
         state.activeTimer = saved;
         this.startIntervals();
       } else if (raw) {
+        console.error('stored timer is not valid, discarded:', raw);
         storage.removeItem(TIMER_STORAGE_KEY);
       }
     } catch {
@@ -130,10 +131,7 @@ class TimerController {
       })
       .then(
         (result) => this.onEventLogged(result, timer),
-        (err) => {
-          console.error('timer start failed:', err.message);
-          this.onEventLogged({ ok: false }, timer);
-        },
+        (err) => this.onEventLogged({ ok: false, error: err.message }, timer),
       );
   }
 
@@ -148,10 +146,14 @@ class TimerController {
     if (result.ok && result.eventId) {
       state.activeTimer.eventId = result.eventId;
       this.save();
-      getApi().setDefaultLogCalendar(timer.calendarId);
+      // A preference: failing to store it must not disturb the running timer.
+      Promise.resolve(getApi().setDefaultLogCalendar(timer.calendarId)).catch((err) =>
+        console.error('saving the default calendar failed:', err.message),
+      );
       this.startIntervals();
       return;
     }
+    console.error('timer start failed:', result.error);
     state.activeTimer = null;
     this.save();
     this.clearIntervals();
@@ -162,6 +164,7 @@ class TimerController {
   // moment of the stop, as stop() would have, so it is not left at the default 30 minutes.
   closeEventOfStoppedTimer(result, timer) {
     if (!result.ok || !result.eventId) {
+      console.error('late timer answer has no event to close:', result.error);
       return;
     }
     this.deps

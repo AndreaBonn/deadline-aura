@@ -1,7 +1,8 @@
 'use strict';
 
 /* global t, sidebarState, rerender, extractJiraKey, buildEventSummary,
-   defaultLogStart, validateTimeLog, formatCountdown, createIconButton */
+   defaultLogStart, validateTimeLog, formatCountdown, createIconButton, createTimeLogCalendarSelect,
+   saveDefaultLogCalendar */
 
 const DURATION_PRESETS_MIN = [15, 30, 60, 90];
 const LOGGED_BADGE_MS = 3000;
@@ -124,13 +125,6 @@ function createTimeLogPresets(input) {
   return presets;
 }
 
-function createTimeLogCalendarSelect() {
-  const select = createTimeLogElement('select', 'time-log-calendar-select');
-  select.appendChild(createTimeLogOption('', t('sidebar.select_calendar')));
-  loadCalendarOptions(select);
-  return select;
-}
-
 function appendTimeLogFields(form, idBase) {
   const start = defaultLogStart(new Date());
   const date = createTimeLogInput('date', start.slice(0, 10));
@@ -159,7 +153,7 @@ function appendTimeLogFields(form, idBase) {
 }
 
 function finishTimeLog(task, calendarId) {
-  window.deadlineAura.setDefaultLogCalendar(calendarId);
+  saveDefaultLogCalendar(calendarId);
   sidebarState.timeLogTaskId = null;
   sidebarState.temporaryLoggedTaskId = task.id;
   rerender();
@@ -271,32 +265,6 @@ function createFormError() {
       error.hidden = true;
     },
   };
-}
-
-function loadCalendarOptions(selectEl) {
-  if (sidebarState.cachedCalendars) {
-    populateCalendarSelect(selectEl, sidebarState.cachedCalendars);
-    return;
-  }
-  window.deadlineAura.listCalendars().then(function (result) {
-    if (result.ok && result.calendars) {
-      sidebarState.cachedCalendars = result.calendars;
-      populateCalendarSelect(selectEl, result.calendars);
-    }
-  });
-}
-
-function populateCalendarSelect(selectEl, calendars) {
-  selectEl.innerHTML = '';
-  selectEl.appendChild(createTimeLogOption('', t('sidebar.select_calendar')));
-  for (const calendar of calendars) {
-    selectEl.appendChild(createTimeLogOption(calendar.id, calendar.summary));
-  }
-  window.deadlineAura.getDefaultLogCalendar().then(function (result) {
-    if (result.ok && result.calendarId) {
-      selectEl.value = result.calendarId;
-    }
-  });
 }
 
 if (typeof module !== 'undefined') {

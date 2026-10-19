@@ -21,7 +21,12 @@ beforeEach(() => {
   function t(key) { return key; }`,
     win,
   );
-  for (const file of ['sidebar-utils.js', 'sidebar-form-values.js', 'sidebar-time-log.js']) {
+  for (const file of [
+    'sidebar-utils.js',
+    'sidebar-form-values.js',
+    'sidebar-time-log.js',
+    'sidebar-time-log-calendar.js',
+  ]) {
     vm.runInContext(fs.readFileSync('renderer/' + file, 'utf8'), win, {
       filename: require('node:path').resolve('renderer/' + file),
     });
@@ -97,4 +102,72 @@ it('caches calendar choices and restores the default in each select', async () =
   expect(second.value).toBe('work');
   expect(win.deadlineAura.listCalendars).toHaveBeenCalledOnce();
   expect(win.deadlineAura.getDefaultLogCalendar).toHaveBeenCalledTimes(2);
+});
+
+describe('calendar loading failures leave a trace', () => {
+  let log;
+  beforeEach(() => {
+    log = vi.spyOn(win.console, 'error').mockImplementation(() => {});
+    vm.runInContext('function rerender() {}', win);
+  });
+  afterEach(() => log.mockRestore());
+
+  const optionValues = (select) => [...select.options].map((option) => option.value);
+
+  it('logs a refused calendar list and keeps only the placeholder', async () => {
+    win.deadlineAura.listCalendars.mockResolvedValue({ ok: false, error: 'not authorized' });
+    const select = vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    expect(log).toHaveBeenCalledWith('calendar list failed:', 'not authorized');
+    expect(optionValues(select)).toEqual(['']);
+  });
+
+  it('logs a rejected calendar list call', async () => {
+    win.deadlineAura.listCalendars.mockRejectedValue(new Error('ipc down'));
+    const select = vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    expect(log).toHaveBeenCalledWith('calendar list failed:', 'ipc down');
+    expect(optionValues(select)).toEqual(['']);
+  });
+
+  it('does not cache a failed list, so the next form asks again and gets the calendars', async () => {
+    win.deadlineAura.listCalendars.mockResolvedValueOnce({ ok: false, error: 'offline' });
+    vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    const retry = vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    expect(win.deadlineAura.listCalendars).toHaveBeenCalledTimes(2);
+    expect(optionValues(retry)).toEqual(['', 'work']);
+  });
+
+  it('logs nothing when the calendars load', async () => {
+    const select = vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    expect(optionValues(select)).toEqual(['', 'work']);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it('logs a rejected default-calendar lookup and still lists the calendars', async () => {
+    win.deadlineAura.getDefaultLogCalendar.mockRejectedValue(new Error('ipc down'));
+    const select = vm.runInContext('createTimeLogCalendarSelect()', win);
+    await flush();
+    expect(optionValues(select)).toEqual(['', 'work']);
+    expect(log).toHaveBeenCalledWith('default calendar lookup failed:', 'ipc down');
+  });
+
+  it('logs when saving the default calendar after a logged event rejects', async () => {
+    win.deadlineAura.setDefaultLogCalendar = vi.fn().mockRejectedValue(new Error('ipc down'));
+    vm.runInContext("finishTimeLog({ id: 'T1' }, 'work')", win);
+    await flush();
+    expect(win.deadlineAura.setDefaultLogCalendar).toHaveBeenCalledWith('work');
+    expect(log).toHaveBeenCalledWith('saving the default calendar failed:', 'ipc down');
+  });
+
+  it('logs nothing when saving the default calendar succeeds', async () => {
+    win.deadlineAura.setDefaultLogCalendar = vi.fn().mockResolvedValue({ ok: true });
+    vm.runInContext("finishTimeLog({ id: 'T1' }, 'work')", win);
+    await flush();
+    expect(win.deadlineAura.setDefaultLogCalendar).toHaveBeenCalledWith('work');
+    expect(log).not.toHaveBeenCalled();
+  });
 });
