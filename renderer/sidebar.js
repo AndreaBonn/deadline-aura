@@ -3,6 +3,7 @@
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
    priorityKey, formatScore100, flybyStateKey, formatSyncStatus, isFlybySuppressed,
+   readTaskFormValues, toDateTimeLocalValue, defaultLogStart, validateTimeLog, buildForecastColumns,
    urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections, parseStoredTimer, createTimerState,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
@@ -336,20 +337,7 @@ function createEditForm(task) {
   dateInput.type = 'datetime-local';
   dateInput.className = 'quick-add-date';
   if (task.due_at) {
-    const d = new Date(task.due_at);
-    const pad = function (n) {
-      return String(n).padStart(2, '0');
-    };
-    dateInput.value =
-      d.getFullYear() +
-      '-' +
-      pad(d.getMonth() + 1) +
-      '-' +
-      pad(d.getDate()) +
-      'T' +
-      pad(d.getHours()) +
-      ':' +
-      pad(d.getMinutes());
+    dateInput.value = toDateTimeLocalValue(new Date(task.due_at));
   }
 
   const prioritySelect = document.createElement('select');
@@ -374,18 +362,18 @@ function createEditForm(task) {
   saveBtn.className = 'quick-add-save';
   saveBtn.textContent = t('common.save');
   saveBtn.addEventListener('click', function () {
-    const title = titleInput.value.trim();
-    if (!title) {
+    const values = readTaskFormValues({
+      title: titleInput.value,
+      date: dateInput.value,
+      priority: prioritySelect.value,
+    });
+    if (values.error) {
       titleInput.focus();
       return;
     }
-    const dueAt = dateInput.value ? new Date(dateInput.value).getTime() : null;
-    const priority = parseInt(prioritySelect.value, 10);
     window.deadlineAura.updateLocalTask({
       id: task.id,
-      title: title,
-      dueAt: dueAt,
-      priority: priority,
+      ...values,
     });
     editingTaskId = null;
   });
@@ -418,10 +406,6 @@ function createEditForm(task) {
   form.appendChild(row);
 
   return form;
-}
-
-function padTwo(n) {
-  return String(n).padStart(2, '0');
 }
 
 const DURATION_PRESETS_MIN = [15, 30, 60, 90];
@@ -551,20 +535,17 @@ function createTimeLogForm(task) {
     form.appendChild(picker.element);
   }
 
-  const now = new Date();
-  const roundedMinutes = Math.floor(now.getMinutes() / 15) * 15;
-  now.setMinutes(roundedMinutes, 0, 0);
+  const logStart = defaultLogStart(new Date());
 
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
   dateInput.className = 'time-log-date';
-  dateInput.value =
-    now.getFullYear() + '-' + padTwo(now.getMonth() + 1) + '-' + padTwo(now.getDate());
+  dateInput.value = logStart.slice(0, 10);
 
   const timeInput = document.createElement('input');
   timeInput.type = 'time';
   timeInput.className = 'time-log-time';
-  timeInput.value = padTwo(now.getHours()) + ':' + padTwo(now.getMinutes());
+  timeInput.value = logStart.slice(11);
 
   const row1 = document.createElement('div');
   row1.className = 'time-log-row';
@@ -640,25 +621,19 @@ function createTimeLogForm(task) {
 
   sendBtn.addEventListener('click', function () {
     error.clear();
-    const duration = parseInt(durationInput.value, 10);
-    if (!duration || duration < 1) {
-      error.show(t('sidebar.error_duration'));
-      durationInput.focus();
+    const values = validateTimeLog({
+      duration: durationInput.value,
+      calendarId: calendarSelect.value,
+      date: dateInput.value,
+      time: timeInput.value,
+    });
+    if (values.error) {
+      error.show(t(values.error));
+      const fields = { duration: durationInput, calendar: calendarSelect, date: dateInput };
+      fields[values.field].focus();
       return;
     }
-    const calId = calendarSelect.value;
-    if (!calId) {
-      error.show(t('sidebar.error_calendar'));
-      calendarSelect.focus();
-      return;
-    }
-    const start = new Date(dateInput.value + 'T' + timeInput.value + ':00');
-    if (Number.isNaN(start.getTime())) {
-      error.show(t('sidebar.error_start'));
-      dateInput.focus();
-      return;
-    }
-    const startTime = start.toISOString();
+    const { duration, calendarId: calId, startTime } = values;
 
     sendBtn.disabled = true;
     sendBtn.textContent = t('sidebar.logging');
@@ -1288,14 +1263,16 @@ function createQuickAddForm() {
   saveBtn.className = 'quick-add-save';
   saveBtn.textContent = t('common.add');
   saveBtn.addEventListener('click', function () {
-    const title = titleInput.value.trim();
-    if (!title) {
+    const values = readTaskFormValues({
+      title: titleInput.value,
+      date: dateInput.value,
+      priority: prioritySelect.value,
+    });
+    if (values.error) {
       titleInput.focus();
       return;
     }
-    const dueAt = dateInput.value ? new Date(dateInput.value).getTime() : null;
-    const priority = parseInt(prioritySelect.value, 10);
-    window.deadlineAura.createLocalTask({ title: title, dueAt: dueAt, priority: priority });
+    window.deadlineAura.createLocalTask(values);
     addFormVisible = false;
   });
 
@@ -1481,11 +1458,6 @@ async function toggleScoreBreakdown() {
   }
 }
 
-function stressToColor(stress) {
-  const score = Math.max(0, Math.min(stress, 10)) / 10;
-  return urgencyToColor(score);
-}
-
 function renderStressForecast(dailyBreakdown) {
   const container = document.getElementById('stressForecast');
   if (!container) {
@@ -1499,32 +1471,29 @@ function renderStressForecast(dailyBreakdown) {
   }
   container.style.display = 'flex';
 
-  const days = dailyBreakdown.slice(0, 5);
   const todayStr = new Date().toISOString().slice(0, 10);
   const rawLocale = _i18nReady ? t('meta.dateLocale') : 'it-IT';
-  const locale = rawLocale.includes('-') ? rawLocale : 'it-IT';
+  const columns = buildForecastColumns(dailyBreakdown, { todayKey: todayStr, locale: rawLocale });
 
-  for (let i = 0; i < days.length; i++) {
-    const day = days[i];
+  for (const column of columns) {
     const col = document.createElement('div');
     col.className = 'forecast-col';
 
     const value = document.createElement('div');
     value.className = 'forecast-value';
-    value.textContent = `${day.stress * 10}%`;
-    value.style.color = stressToColor(day.stress);
+    value.textContent = column.value;
+    value.style.color = column.color;
 
     const labelEl = document.createElement('div');
     labelEl.className = 'forecast-label';
-    const dateObj = new Date(day.date + 'T00:00:00');
-    labelEl.textContent = dateObj.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 3);
+    labelEl.textContent = column.label;
 
-    if (day.date === todayStr) {
+    if (column.isToday) {
       col.classList.add('forecast-today');
     }
 
-    if (day.reasoning) {
-      col.title = day.reasoning;
+    if (column.title) {
+      col.title = column.title;
     }
 
     col.appendChild(value);
