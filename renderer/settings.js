@@ -1,13 +1,11 @@
 'use strict';
 
 /* global settingsApi, createToggle, createNumberInput, createRangeWithValue,
-   createSelect, createTextInput, createTagInput, createPriorityList,
-   createField, createFieldGroup, createCheckboxGroup, createDateList,
-   createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t,
-   renderCaptureControl, isConfigDirty, tabForIssuePath, isGoogleConfigured,
-   isJiraConfigured, hasAnyAiKey, createNotice, createCollapsible, createGoogleSteps,
-   createProviderLabel, AI_PROVIDERS, describeSaveError, createSourceStatusBox,
-   createActionWithResult, googleAuthMessage, jiraVerifyMessage */
+   createSelect, createTextInput, createPriorityList, createField, createFieldGroup,
+   createCheckboxGroup, createDateList, createTimeSlotList, createVariableMonthGrid,
+   createSecretInput, initI18n, t, renderCaptureControl, isConfigDirty, tabForIssuePath,
+   hasAnyAiKey, createNotice, createCollapsible, createProviderLabel, AI_PROVIDERS,
+   describeSaveError, refreshSourceStatus, renderSorgenti */
 
 let config = {};
 let savedConfig = {};
@@ -96,21 +94,13 @@ document.getElementById('settingsNav').addEventListener('click', (e) => {
   selectTab(btn.dataset.tab);
 });
 
-// Rebuilds the status box in place, without re-rendering the fields being edited.
-function refreshSourceStatus() {
-  const slot = document.getElementById('sourceStatusSlot');
-  if (slot) {
-    slot.replaceChildren(createSourceStatusBox(settingsApi));
-  }
-}
-
 async function saveSettings() {
   const result = await settingsApi.saveConfig(config);
   if (result.ok) {
     savedConfig = JSON.parse(JSON.stringify(config));
     userTouched = false;
     updateDirtyState();
-    refreshSourceStatus();
+    refreshSourceStatus(settingsApi);
     feedback.classList.remove('save-feedback--error');
     feedback.textContent = t('settings.saved');
     setTimeout(() => {
@@ -177,7 +167,9 @@ document.getElementById('btnReset').addEventListener('click', () => {
 });
 
 // Section renderers
-function renderGenerale() {
+function renderGenerale(ctx) {
+  const { defaults } = ctx;
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.sync_group'));
   group.append(
     createField(
@@ -202,275 +194,9 @@ function renderGenerale() {
   return [group];
 }
 
-function renderSorgenti() {
-  if (!config.sources.google_calendar.oauth) {
-    config.sources.google_calendar.oauth = { client_id: '', client_secret: '' };
-  }
-  const gcalCfg = config.sources.google_calendar;
-  const gcal = createFieldGroup(t('sidebar.google_calendar'));
-  gcal.appendChild(
-    createField(
-      t('common.enabled'),
-      createToggle(gcalCfg.enabled, (v) => {
-        gcalCfg.enabled = v;
-        renderTab();
-      }),
-    ),
-  );
-  if (gcalCfg.enabled && !isGoogleConfigured(gcalCfg)) {
-    gcal.appendChild(createNotice(t('settings.source_needs_setup'), 'warn'));
-  }
-  if (!isGoogleConfigured(gcalCfg)) {
-    gcal.appendChild(createGoogleSteps(settingsApi));
-  }
-  // Filling both credentials switches the source on: that is why they were typed in.
-  const enableWhenConfigured = () => {
-    if (!gcalCfg.enabled && isGoogleConfigured(gcalCfg)) {
-      gcalCfg.enabled = true;
-      renderTabSoon();
-    }
-  };
-  gcal.append(
-    createField(
-      t('settings.google_client_id'),
-      createTextInput(
-        gcalCfg.oauth.client_id || '',
-        { placeholder: t('settings.google_client_id_placeholder') },
-        (v) => {
-          gcalCfg.oauth.client_id = v;
-          enableWhenConfigured();
-        },
-      ),
-      t('settings.google_oauth_hint'),
-    ),
-    createField(
-      t('settings.google_client_secret'),
-      createSecretInput(
-        gcalCfg.oauth.client_secret || '',
-        { placeholder: t('settings.client_secret_placeholder') },
-        (v) => {
-          gcalCfg.oauth.client_secret = v;
-          enableWhenConfigured();
-        },
-      ),
-    ),
-    createField(
-      t('settings.google_authorize'),
-      createActionWithResult({
-        label: t('settings.google_authorize_btn'),
-        busyLabel: t('settings.google_authorize_wait'),
-        run: async () => {
-          // Authorization uses the saved credentials: save pending edits first.
-          if (updateDirtyState() && !(await saveSettings())) {
-            return null;
-          }
-          const outcome = googleAuthMessage(await settingsApi.authorizeGoogle(), t);
-          refreshSourceStatus();
-          return outcome;
-        },
-      }),
-      t('settings.google_authorize_hint'),
-    ),
-    createCollapsible(t('settings.more_options'), t('settings.google_more_options'), [
-      createField(
-        t('settings.calendars'),
-        createTagInput(
-          gcalCfg.calendars,
-          { placeholder: t('settings.calendar_id_placeholder') },
-          (v) => {
-            gcalCfg.calendars = v;
-          },
-        ),
-      ),
-      createField(
-        t('settings.priority_keywords'),
-        createTagInput(
-          gcalCfg.priority_keywords,
-          { placeholder: t('settings.keyword_placeholder') },
-          (v) => {
-            gcalCfg.priority_keywords = v;
-          },
-        ),
-      ),
-      createField(
-        t('settings.google_account'),
-        createTextInput(
-          gcalCfg.google_account || '',
-          { placeholder: t('settings.google_account_placeholder') },
-          (v) => {
-            gcalCfg.google_account = v;
-          },
-        ),
-        t('settings.google_account_hint'),
-      ),
-    ]),
-  );
-
-  if (!config.sources.outlook) {
-    config.sources.outlook = { enabled: false, ics_url: '', priority_keywords: [] };
-  }
-  const outlook = createFieldGroup(t('sidebar.outlook'));
-  outlook.append(
-    createField(
-      t('common.enabled'),
-      createToggle(config.sources.outlook.enabled, (v) => {
-        config.sources.outlook.enabled = v;
-      }),
-    ),
-    createField(
-      t('settings.outlook_ics_url'),
-      createSecretInput(
-        config.sources.outlook.ics_url || '',
-        { placeholder: t('settings.outlook_ics_url_placeholder') },
-        (v) => {
-          config.sources.outlook.ics_url = v;
-          if (v.trim() && !config.sources.outlook.enabled) {
-            config.sources.outlook.enabled = true;
-            renderTabSoon();
-          }
-        },
-      ),
-      t('settings.outlook_ics_url_hint'),
-    ),
-    createField(
-      t('settings.priority_keywords'),
-      createTagInput(
-        config.sources.outlook.priority_keywords,
-        { placeholder: t('settings.keyword_placeholder') },
-        (v) => {
-          config.sources.outlook.priority_keywords = v;
-        },
-      ),
-    ),
-  );
-
-  const status = document.createElement('div');
-  status.id = 'sourceStatusSlot';
-  status.appendChild(createSourceStatusBox(settingsApi));
-  return [status, gcal, outlook, renderJiraGroup()];
-}
-
-function renderJiraGroup() {
-  const jiraCfg = config.sources.jira;
-  if (!jiraCfg.instances) {
-    jiraCfg.instances = [];
-  }
-  const instances = jiraCfg.instances;
-  const jira = createFieldGroup(t('sidebar.jira'));
-  jira.appendChild(
-    createField(
-      t('common.enabled'),
-      createToggle(jiraCfg.enabled, (v) => {
-        jiraCfg.enabled = v;
-        renderTab();
-      }),
-    ),
-  );
-  if (jiraCfg.enabled && !isJiraConfigured(jiraCfg)) {
-    jira.appendChild(createNotice(t('settings.jira_needs_instance'), 'warn'));
-  }
-
-  const jqlInput = createTextInput(
-    jiraCfg.jql,
-    { placeholder: t('settings.jql_placeholder') },
-    (v) => {
-      jiraCfg.jql = v;
-    },
-  );
-  const jqlWrap = document.createElement('div');
-  jqlWrap.className = 'field-input field-input--stack';
-  const jqlReset = document.createElement('button');
-  jqlReset.type = 'button';
-  jqlReset.className = 'link-btn';
-  jqlReset.textContent = t('settings.jql_reset');
-  jqlReset.addEventListener('click', () => {
-    jiraCfg.jql = defaults.sources.jira.jql;
-    renderTab();
-  });
-  jqlWrap.append(jqlInput, jqlReset);
-  jira.appendChild(createField(t('settings.jql'), jqlWrap, t('settings.jql_hint')));
-
-  const enableWhenConfigured = () => {
-    if (!jiraCfg.enabled && isJiraConfigured(jiraCfg)) {
-      jiraCfg.enabled = true;
-      renderTabSoon();
-    }
-  };
-  for (let i = 0; i < instances.length; i++) {
-    const card = document.createElement('div');
-    card.className = 'instance-card';
-    const header = document.createElement('div');
-    header.className = 'instance-header';
-    const title = document.createElement('span');
-    title.className = 'instance-title';
-    title.textContent = t('settings.instance_n', { n: i + 1 });
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'btn btn--danger';
-    removeBtn.textContent = t('common.remove');
-    removeBtn.addEventListener('click', () => {
-      instances.splice(i, 1);
-      renderTab();
-    });
-    header.append(title, removeBtn);
-    card.appendChild(header);
-    card.append(
-      createField(
-        t('settings.jira_domain'),
-        createTextInput(instances[i].domain, { placeholder: 'azienda.atlassian.net' }, (v) => {
-          instances[i].domain = v;
-          enableWhenConfigured();
-        }),
-      ),
-      createField(
-        t('settings.jira_email'),
-        createTextInput(instances[i].email, {}, (v) => {
-          instances[i].email = v;
-          enableWhenConfigured();
-        }),
-      ),
-      createField(
-        t('settings.jira_api_token'),
-        createSecretInput(
-          instances[i].api_token,
-          { placeholder: t('settings.api_key_placeholder') },
-          (v) => {
-            instances[i].api_token = v;
-            enableWhenConfigured();
-          },
-        ),
-      ),
-    );
-    card.appendChild(
-      createActionWithResult({
-        label: t('settings.jira_verify_btn'),
-        busyLabel: t('settings.jira_verify_wait'),
-        run: async () => {
-          const inst = instances[i];
-          const result = await settingsApi.verifyJira(i, {
-            domain: inst.domain,
-            email: inst.email,
-            api_token: inst.api_token,
-            jql: jiraCfg.jql,
-          });
-          return jiraVerifyMessage(result, t);
-        },
-      }),
-    );
-    jira.appendChild(card);
-  }
-
-  const addBtn = document.createElement('button');
-  addBtn.className = 'btn btn--secondary btn--small';
-  addBtn.textContent = t('settings.add_instance');
-  addBtn.addEventListener('click', () => {
-    instances.push({ domain: '', email: '', api_token: '' });
-    renderTab();
-  });
-  jira.appendChild(addBtn);
-  return jira;
-}
-
-function renderAI() {
+function renderAI(ctx) {
+  const { api, rerender } = ctx;
+  const config = ctx.getConfig();
   if (!config.ai.api_keys) {
     config.ai.api_keys = { groq: '', gemini: '', openai: '', anthropic: '' };
   }
@@ -490,7 +216,7 @@ function renderAI() {
     const field = document.createElement('div');
     field.className = 'field';
     field.append(
-      createProviderLabel(provider, settingsApi),
+      createProviderLabel(provider, api),
       createSecretInput(
         config.ai.api_keys[provider.id] || '',
         { placeholder: t('settings.api_key_placeholder') },
@@ -509,7 +235,7 @@ function renderAI() {
       t('common.enabled'),
       createToggle(config.ai.enabled, (v) => {
         config.ai.enabled = v;
-        renderTab();
+        rerender();
       }),
     ),
     createField(
@@ -549,7 +275,9 @@ function renderAI() {
   return groups;
 }
 
-function renderWallpaper() {
+function renderWallpaper(ctx) {
+  const { rerender } = ctx;
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.tabs.wallpaper'));
   group.append(
     createField(
@@ -595,7 +323,7 @@ function renderWallpaper() {
           if (v === 'auto') {
             config.wallpaper.resolution = 'auto';
           }
-          renderTab();
+          rerender();
         },
       ),
     ),
@@ -631,7 +359,9 @@ function renderWallpaper() {
 }
 
 // Claude/Codex usage band and its statusline capture: a niche, kept out of Wallpaper.
-function renderLimiti() {
+function renderLimiti(ctx) {
+  const { api } = ctx;
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.tabs.ai_usage'));
   group.appendChild(
     createField(
@@ -642,12 +372,13 @@ function renderLimiti() {
     ),
   );
   const captureContainer = document.createElement('div');
-  renderCaptureControl(captureContainer, settingsApi, t);
+  renderCaptureControl(captureContainer, api, t);
   group.appendChild(captureContainer);
   return [group];
 }
 
-function renderSidebar() {
+function renderSidebar(ctx) {
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.tabs.sidebar'));
   group.append(
     createField(
@@ -680,7 +411,8 @@ function renderSidebar() {
   return [group];
 }
 
-function renderNotifiche() {
+function renderNotifiche(ctx) {
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.notifications_group'));
   group.append(
     createField(
@@ -731,7 +463,8 @@ function renderNotifiche() {
   return [group, dockGroup];
 }
 
-function renderUI() {
+function renderUI(ctx) {
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.ui_group'));
   group.append(
     createField(
@@ -779,7 +512,8 @@ function renderUI() {
   return [group];
 }
 
-function renderAvanzate() {
+function renderAvanzate(ctx) {
+  const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.engine'));
   group.append(
     createField(
@@ -811,15 +545,17 @@ function renderAvanzate() {
   return [group];
 }
 
-function ensureWorkShift() {
+function ensureWorkShift(config, defaults) {
   if (!config.work_shift) {
     config.work_shift = JSON.parse(JSON.stringify(defaults.work_shift));
   }
   return config.work_shift;
 }
 
-function renderTurno() {
-  const ws = ensureWorkShift();
+function renderTurno(ctx) {
+  const { defaults, rerender } = ctx;
+  const config = ctx.getConfig();
+  const ws = ensureWorkShift(config, defaults);
 
   const mainGroup = createFieldGroup(t('settings.work_shift_group'));
   mainGroup.append(
@@ -827,7 +563,7 @@ function renderTurno() {
       t('settings.work_shift_enabled'),
       createToggle(ws.enabled, (v) => {
         ws.enabled = v;
-        renderTab();
+        rerender();
       }),
       t('settings.work_shift_enabled_hint'),
     ),
@@ -848,7 +584,7 @@ function renderTurno() {
         ],
         (v) => {
           ws.mode = v;
-          renderTab();
+          rerender();
         },
       ),
     ),
@@ -930,9 +666,22 @@ const renderers = {
   avanzate: renderAvanzate,
 };
 
+// What every tab renderer receives. The config is read through getConfig() on each call
+// because settings.js reassigns it on load. Event handlers keep the config read at render
+// time, so any future reassignment of config must be followed by renderTab().
+function createTabContext() {
+  return {
+    getConfig: () => config,
+    defaults,
+    api: settingsApi,
+    rerender: renderTab,
+    rerenderSoon: renderTabSoon,
+  };
+}
+
 function renderTab() {
   content.innerHTML = '';
-  const groups = renderers[activeTab]();
+  const groups = renderers[activeTab](createTabContext());
   for (const g of groups) {
     content.appendChild(g);
   }
