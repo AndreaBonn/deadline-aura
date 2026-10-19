@@ -2,7 +2,7 @@
 
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
-   priorityKey, formatScore100, flybyStateKey, formatSyncStatus,
+   priorityKey, formatScore100, flybyStateKey, formatSyncStatus, isFlybySuppressed,
    urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections, parseStoredTimer, createTimerState,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
@@ -164,23 +164,6 @@ function stopTimer() {
 
 // Latest known flyby state, kept in sync via getFlybyState / onConfigChanged.
 let _flybyState = { enabled: true, snoozed_until: null };
-
-/**
- * Whether the flyby is suppressed right now. Mirrors the canonical rule in
- * core/flyby-snooze.js isFlybySuppressed(); the renderer sandbox (no require,
- * CSP script-src 'self') cannot share that module, so the two-term predicate is
- * duplicated here. Keep both in sync if the rule changes.
- *
- * @param {{enabled: boolean, snoozed_until: number|null}} state - Flyby state.
- * @param {number} now - Current epoch ms.
- * @returns {boolean} True when the flyby should not launch.
- */
-function isFlybySuppressed(state, now) {
-  if (!state.enabled) {
-    return true;
-  }
-  return typeof state.snoozed_until === 'number' && now < state.snoozed_until;
-}
 
 /**
  * Reflect the flyby state on the cat button: crossed out (is-snoozed) when the

@@ -175,6 +175,14 @@ function withoutFavorites(tasks, favoriteIds) {
   return tasks.filter((task) => !favoriteIds.has(task.id));
 }
 
+// Mirrors core/flyby-snooze.js; flyby-parity.test.js checks both predicates.
+function isFlybySuppressed(state, now) {
+  if (!state.enabled) {
+    return true;
+  }
+  return typeof state.snoozed_until === 'number' && now < state.snoozed_until;
+}
+
 /**
  * Returns the i18n key describing the meeting-flyby state shown in the cat menu.
  *
@@ -248,6 +256,7 @@ if (typeof module !== 'undefined') {
     formatScore100,
     withoutFavorites,
     flybyStateKey,
+    isFlybySuppressed,
     formatSyncStatus,
     escapeHtml,
   };
