@@ -17,7 +17,9 @@ beforeEach(() => {
     const record = (v) => window.changes.push(v);`,
     win,
   );
-  vm.runInContext(fs.readFileSync('renderer/settings-fields.js', 'utf8'), win);
+  vm.runInContext(fs.readFileSync('renderer/settings-fields.js', 'utf8'), win, {
+    filename: require('node:path').resolve('renderer/settings-fields.js'),
+  });
 });
 afterEach(() => win.close());
 
@@ -33,7 +35,9 @@ describe('settings-fields CommonJS export', () => {
   it('exposes the field builders to Node when module is defined', () => {
     const exported = {};
     const ctx = vm.createContext({ module: { exports: exported }, document: win.document });
-    vm.runInContext(fs.readFileSync('renderer/settings-fields.js', 'utf8'), ctx);
+    vm.runInContext(fs.readFileSync('renderer/settings-fields.js', 'utf8'), ctx, {
+      filename: require('node:path').resolve('renderer/settings-fields.js'),
+    });
     expect(Object.keys(ctx.module.exports).sort()).toEqual(
       [
         'createCheckboxGroup',

@@ -24,7 +24,9 @@ beforeEach(() => {
     }`,
     win,
   );
-  vm.runInContext(fs.readFileSync('renderer/sidebar-sections.js', 'utf8'), win);
+  vm.runInContext(fs.readFileSync('renderer/sidebar-sections.js', 'utf8'), win, {
+    filename: require('node:path').resolve('renderer/sidebar-sections.js'),
+  });
 });
 afterEach(() => {
   vi.useRealTimers();

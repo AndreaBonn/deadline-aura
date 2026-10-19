@@ -17,7 +17,9 @@ beforeEach(() => {
     win,
   );
   for (const file of ['sidebar-form-values.js', 'sidebar-task-forms.js']) {
-    vm.runInContext(fs.readFileSync('renderer/' + file, 'utf8'), win);
+    vm.runInContext(fs.readFileSync('renderer/' + file, 'utf8'), win, {
+      filename: require('node:path').resolve('renderer/' + file),
+    });
   }
 });
 afterEach(() => win.close());

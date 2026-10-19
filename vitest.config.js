@@ -15,19 +15,12 @@ module.exports = defineConfig({
         'config/**',
         'main-process/**',
         'i18n/**',
-        // Renderer scripts that export their pure logic for Node; the rest is DOM glue.
-        'renderer/sidebar-utils.js',
-        'renderer/settings-ai-capture.js',
+        // Sidebar and settings scripts: pure helpers are tested from Node, DOM code through
+        // module tests and the happy-dom page harnesses in test/renderer/page/.
+        'renderer/sidebar*.js',
+        'renderer/settings*.js',
         'renderer/i18n-renderer.js',
         'renderer/shift-countdown.js',
-        'renderer/settings-helpers.js',
-        'renderer/sidebar-task-forms.js',
-        'renderer/sidebar-time-log.js',
-        'renderer/sidebar-form-values.js',
-        'renderer/sidebar-ai-panel.js',
-        'renderer/sidebar-timer.js',
-        'renderer/sidebar-task-groups.js',
-        'renderer/sidebar-score-breakdown.js',
       ],
       reporter: ['text', 'json-summary'],
       thresholds: {

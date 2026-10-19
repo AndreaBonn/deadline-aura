@@ -25,7 +25,9 @@ beforeEach(() => {
     'settings-sections.js',
     'settings-tab-ai.js',
   ]) {
-    vm.runInContext(fs.readFileSync(`renderer/${file}`, 'utf8'), win);
+    vm.runInContext(fs.readFileSync(`renderer/${file}`, 'utf8'), win, {
+      filename: require('node:path').resolve(`renderer/${file}`),
+    });
   }
 });
 afterEach(() => win.close());
