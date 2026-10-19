@@ -13,6 +13,7 @@ module.exports = defineConfig({
         'ai/**',
         'integrations/**',
         'config/**',
+        'main-process/**',
         'i18n/**',
         // Renderer scripts that export their pure logic for Node; the rest is DOM glue.
         'renderer/sidebar-utils.js',
