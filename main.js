@@ -41,25 +41,23 @@ const jira = require('./integrations/jira');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
 const { registerIpc } = require('./core/ipc/register-ipc');
-const { createLocalTaskHandlers } = require('./core/ipc/local-task-handlers');
-const { createCalendarHandlers } = require('./core/ipc/calendar-handlers');
-const { createSettingsHandlers } = require('./core/ipc/settings-handlers');
-const { createFlybyHandlers } = require('./core/ipc/flyby-handlers');
+const { createAppIpcGroups } = require('./main-process/app-ipc');
+const { createConfigApplier } = require('./core/ipc/config-applier');
 const { loadConfig, saveConfig } = require('./config/loader');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
 const { runSyncCycle } = require('./core/sync-runner');
-const { engineOptionsFromConfig, aiNotesFromCache } = require('./core/update-payload');
-const { describeSourceStatus, collectSourceFacts } = require('./core/source-status');
+const { createDataSync } = require('./core/data-sync');
+const { createUpdateCycle } = require('./core/update-cycle');
+const { createFirstRunHint } = require('./core/first-run-hint');
+const { createBurnoutCheck, burnoutIntervalMs } = require('./core/burnout-check');
+const { engineOptionsFromConfig } = require('./core/update-payload');
 const {
   onboardingMarkerPath,
   isFirstRun,
   markOnboardingDone,
   isWaylandSession,
 } = require('./core/onboarding');
-const { DEFAULTS } = require('./config/defaults');
-const { configSchema } = require('./config/schema');
-const { maskConfigForRenderer, restoreTokens } = require('./config/secret-masking');
 const i18n = require('./i18n');
 const { cleanupWorkShiftConfig } = require('./core/work-shift');
 const { collectUsage } = require('./core/ai-usage');
@@ -81,30 +79,37 @@ if (cleanedWorkShift.changed) {
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
-const DEFAULT_DATA_SYNC_MINUTES = 10;
 const MEETING_DOCK_CHECK_MS = 30000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const DESKTOP_CHECK_MS = 1000;
 const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
 
+const getConfig = () => config;
 const strips = createStripWindows({ BrowserWindow, screen });
 const meetingDocks = createMeetingDockWindows({
   BrowserWindow,
   screen,
-  getConfig: () => config,
+  getConfig,
   db,
   openExternalUrl,
   externalBrowserDependencies,
+});
+// Shown during the very first session, until the user dismisses the "this is the strip" hint.
+const firstRunHint = createFirstRunHint({
+  markerPath: onboardingMarkerPath(os.homedir()),
+  isFirstRun,
+  markDone: markOnboardingDone,
+  log: console,
 });
 const sidebar = createSidebarWindow({
   BrowserWindow,
   screen,
   strips,
-  getConfig: () => config,
+  getConfig,
   getDisplaysWithWindows,
   refresh: (options) => runUpdateCycle(options),
-  isFirstRunHintPending: () => firstRunHintPending,
-  onFirstRunShown: markOnboardingShown,
+  isFirstRunHintPending: firstRunHint.isPending,
+  onFirstRunShown: firstRunHint.markShown,
 });
 const settings = createSettingsWindow({ BrowserWindow, iconPath: APP_ICON_PATH });
 const overlay = createOverlayWindow({
@@ -115,67 +120,35 @@ const overlay = createOverlayWindow({
   withPostitCodes,
   refresh: (options) => runUpdateCycle(options),
 });
+const dataSync = createDataSync({
+  getConfig,
+  getSyncDaemon: () => require('./core/sync-daemon'),
+  runSyncCycle,
+  summarize: summarizeSync,
+  refresh: (...args) => runUpdateCycle(...args),
+  log: console,
+});
+const runUpdateCycle = createUpdateCycle({
+  getConfig,
+  runEngine: (current) => deadlineEngine.run(engineOptionsFromConfig(current)),
+  mapScoreToColor: colorMapper.mapScoreToColor,
+  wallpaperChanger,
+  db,
+  pinnedQueries,
+  favoriteQueries,
+  collectUsage,
+  getLanguage: i18n.getLanguage,
+  isGoogleCalendarReady: gcal.isGoogleCalendarReady,
+  screen,
+  strips,
+  meetingDocks,
+  sidebar,
+  getSyncStatus: dataSync.getLastStatus,
+  isFirstRunHintPending: firstRunHint.isPending,
+  now: Date.now,
+  log: console,
+});
 let desktopCheckInterval = null;
-let isUpdateCycleRunning = false;
-// Outcome of the last data sync, shown in the sidebar footer.
-let lastSyncStatus = null;
-let dataSyncTimer = null;
-// True during the very first session, until the user dismisses the "this is the strip" hint.
-let firstRunHintPending = false;
-let dataSyncIntervalMinutes = null;
-
-/**
- * (Re)starts the periodic data sync with the interval currently in the config.
- * Called at startup and after a settings save, so a new interval applies without a restart.
- */
-function runSyncAndRefresh(options) {
-  return runSyncCycle({
-    summarize: summarizeSync,
-    onStatus: (summary) => {
-      lastSyncStatus = summary;
-    },
-    refresh: runUpdateCycle,
-    log: console,
-    ...options,
-  });
-}
-
-function runManualSync() {
-  return runSyncAndRefresh({
-    tag: 'sync-now',
-    failureLabel: 'Manual sync error:',
-    sync: () => require('./core/sync-daemon').sync(config),
-  });
-}
-
-function scheduleDataSync() {
-  const minutes = config.sync.data_interval_minutes || DEFAULT_DATA_SYNC_MINUTES;
-  if (dataSyncTimer && minutes === dataSyncIntervalMinutes) {
-    return;
-  }
-  clearInterval(dataSyncTimer);
-  dataSyncIntervalMinutes = minutes;
-  const syncDaemonModule = require('./core/sync-daemon');
-  dataSyncTimer = setInterval(
-    () =>
-      runSyncAndRefresh({
-        tag: 'data-sync',
-        failureLabel: '[data-sync] error:',
-        sync: () => syncDaemonModule.sync(config),
-        force: true,
-      }),
-    minutes * 60000,
-  );
-}
-
-/** Written only once the sidebar is on screen, so a crash before this point retries. */
-function markOnboardingShown() {
-  try {
-    markOnboardingDone(onboardingMarkerPath(os.homedir()));
-  } catch (err) {
-    console.warn('onboarding: could not write marker:', err.message);
-  }
-}
 
 function initSidebar() {
   // Compute initial color before creating strips so they start with the correct palette
@@ -216,68 +189,56 @@ function syncCaptureBinSafely() {
   }
 }
 
-async function runUpdateCycle({ force = false } = {}) {
-  if (isUpdateCycleRunning) {
-    return;
-  }
-  isUpdateCycleRunning = true;
-  try {
-    const engineResult = deadlineEngine.run(engineOptionsFromConfig(config));
+function startPeriodicJobs() {
+  setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
+  setInterval(() => meetingDocks.updateMeetingDocks(), MEETING_DOCK_CHECK_MS);
+  setInterval(() => meetingFlyby.checkAndLaunch({ config, db, screen }), MEETING_DOCK_CHECK_MS);
+  setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
+  dataSync.scheduleDataSync();
+  const checkBurnout = createBurnoutCheck({ getConfig, db, burnoutDetector, notifier });
+  setInterval(checkBurnout, burnoutIntervalMs(config));
+}
 
-    const palette = colorMapper.mapScoreToColor(engineResult.global_score);
+function appIpcDependencies(applier) {
+  return {
+    sidebar,
+    settings,
+    getConfig,
+    deadlineEngine,
+    db,
+    i18n,
+    firstRunHint,
+    log: console,
+    gcal,
+    jira,
+    runManualSync: dataSync.runManualSync,
+    openLink: (url) => openExternalUrl(url, externalBrowserDependencies),
+    runCaptureCommand,
+    syncCaptureBin: syncCaptureBinSafely,
+    homedir: os.homedir,
+    favoriteQueries,
+    localQueries,
+    refresh: runUpdateCycle,
+    saveConfig,
+    getLastSyncStatus: dataSync.getLastStatus,
+    applySettings: applier.applySettings,
+    applyFlyby: applier.applyFlyby,
+  };
+}
 
-    if (config.wallpaper.enabled) {
-      const calendarEvents = db.getUpcomingCalendarEvents(ONE_DAY_MS);
-      let usageRows = [];
-      if (config.wallpaper.show_ai_usage) {
-        try {
-          usageRows = collectUsage({ nowMs: Date.now(), lang: i18n.getLanguage() });
-        } catch (err) {
-          console.warn('runUpdateCycle: failed to collect AI usage:', err.message);
-        }
-      }
-      await wallpaperChanger.update(palette, {
-        engineResult,
-        force,
-        electronScreen: screen,
-        calendarEvents,
-        usageRows,
-      });
-    }
-
-    strips.updateStripColor(palette.accent_hex);
-    meetingDocks.updateMeetingDocks();
-
-    const allPinned = pinnedQueries.getAllPinned();
-    const pinnedIds = new Set(allPinned.map((p) => p.task_id));
-    const favoriteIds = favoriteQueries.getAllFavoriteIds();
-
-    const aiResponse = db.getLatestAiCacheResponse();
-    const { clinicalNote, stressForecast } = aiNotesFromCache(aiResponse);
-
-    sidebar.sendWhenReady('update', () => ({
-      engineResult,
-      palette,
-      pinnedTaskIds: Array.from(pinnedIds),
-      favoriteTaskIds: favoriteIds,
-      clinicalNote,
-      stressForecast,
-      syncStatus: lastSyncStatus,
-      googleCalendarReady: gcal.isGoogleCalendarReady(config),
-      showFirstRunHint: firstRunHintPending,
-    }));
-
-    return { engineResult, palette };
-  } catch (err) {
-    try {
-      console.error('Update cycle error:', err.message);
-    } catch {
-      // EPIPE — pipe closed, ignore logging failure
-    }
-    return null;
-  } finally {
-    isUpdateCycleRunning = false;
-  }
+function registerAppIpc() {
+  const applier = createConfigApplier({
+    saveConfig,
+    loadConfig,
+    setConfig: (next) => {
+      config = next;
+    },
+    scheduleDataSync: dataSync.scheduleDataSync,
+    notifySidebar: (next) => sidebar.send('config-changed', next),
+  });
+  meetingDocks.registerIpc(ipcMain);
+  overlay.registerIpc(ipcMain);
+  registerIpc(ipcMain, createAppIpcGroups(appIpcDependencies(applier)));
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -295,9 +256,7 @@ app.whenReady().then(() => {
 
   syncCaptureBinSafely();
 
-  if (isFirstRun(onboardingMarkerPath(os.homedir()))) {
-    firstRunHintPending = true;
-  }
+  firstRunHint.init();
   if (isWaylandSession(process.env)) {
     notifier.sendSystemNotice(
       i18n.t('notifications.wayland_title'),
@@ -310,156 +269,14 @@ app.whenReady().then(() => {
   meetingFlyby.init();
 
   runUpdateCycle();
-  setInterval(runUpdateCycle, UPDATE_INTERVAL_MS);
-  setInterval(() => meetingDocks.updateMeetingDocks(), MEETING_DOCK_CHECK_MS);
-  setInterval(() => meetingFlyby.checkAndLaunch({ config, db, screen }), MEETING_DOCK_CHECK_MS);
-  setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
-
-  scheduleDataSync();
-
-  const burnoutIntervalMs = (config.burnout?.check_interval_hours || 2) * 3600000;
-  setInterval(() => {
-    if (!config.burnout?.enabled) {
-      return;
-    }
-    const aiCacheHistory = db.getAiCacheHistory(7);
-    const warning = burnoutDetector.detectBurnoutRisk(aiCacheHistory, {
-      stress_threshold: config.burnout?.stress_threshold,
-      consecutive_days: config.burnout?.consecutive_days,
-    });
-    if (warning.isAtRisk) {
-      notifier.sendBurnoutWarning(warning, config);
-    }
-  }, burnoutIntervalMs);
-
-  ipcMain.on('sidebar:toggle', () => {
-    sidebar.toggle();
-  });
-
-  ipcMain.on('onboarding:dismiss-hint', () => {
-    firstRunHintPending = false;
-  });
-
-  meetingDocks.registerIpc(ipcMain);
-
-  ipcMain.on('sync:run', () => {
-    runManualSync();
-  });
-
-  ipcMain.handle('google:authorize', async () => {
-    const result = await gcal.authorizeGoogle(config);
-    if (result.ok && !result.alreadyAuthorized) {
-      // Fill the sidebar right away instead of waiting for the next scheduled sync.
-      runManualSync();
-    }
-    return result;
-  });
-
-  ipcMain.on('shell:open-link', (_event, url) => {
-    openExternalUrl(url, externalBrowserDependencies);
-  });
-
-  ipcMain.on('settings:open', () => {
-    settings.open();
-  });
-
-  ipcMain.handle('i18n:get-translations', () => i18n.getTranslations());
-
-  ipcMain.handle('score:get-breakdown', () => {
-    try {
-      const result = deadlineEngine.run(engineOptionsFromConfig(config));
-      const aiResponse = db.getLatestAiCacheResponse();
-      return {
-        breakdown: result.breakdown,
-        ai_daily_breakdown: aiResponse?.daily_breakdown || null,
-      };
-    } catch (err) {
-      console.error('[score:get-breakdown] error:', err.message);
-      return null;
-    }
-  });
-
-  ipcMain.handle('config:get-work-shift', () => config.work_shift || null);
-
-  ipcMain.handle('ai-usage:capture-status', () =>
-    runCaptureCommand('status', { home: os.homedir() }),
-  );
-
-  ipcMain.handle('ai-usage:capture-install', () => {
-    syncCaptureBinSafely();
-    return runCaptureCommand('install', { home: os.homedir() });
-  });
-
-  ipcMain.handle('ai-usage:capture-uninstall', () => {
-    syncCaptureBinSafely();
-    return runCaptureCommand('uninstall', { home: os.homedir() });
-  });
-
-  ipcMain.on('settings:close', () => {
-    settings.close();
-  });
-
-  ipcMain.on('task:favorite', (_event, taskId) => {
-    favoriteQueries.favoriteTask(taskId);
-    runUpdateCycle({ force: true });
-  });
-
-  ipcMain.on('task:unfavorite', (_event, taskId) => {
-    favoriteQueries.unfavoriteTask(taskId);
-    runUpdateCycle({ force: true });
-  });
-
-  overlay.registerIpc(ipcMain);
-
-  registerIpc(ipcMain, {
-    handle: {
-      ...createLocalTaskHandlers({ localQueries, refresh: runUpdateCycle }),
-      ...createCalendarHandlers({ gcal, getConfig: () => config, saveConfig }),
-      ...createSettingsHandlers({
-        getConfig: () => config,
-        defaults: DEFAULTS,
-        maskConfigForRenderer,
-        restoreTokens,
-        configSchema,
-        describeSourceStatus,
-        collectSourceFacts,
-        gcal,
-        jira,
-        getLastSyncStatus: () => lastSyncStatus,
-        applyConfig: (data) => {
-          saveConfig(data);
-          config = loadConfig();
-          scheduleDataSync();
-          sidebar.send('config-changed', config);
-        },
-      }),
-      ...createFlybyHandlers({
-        getConfig: () => config,
-        applyConfig: (data) => {
-          saveConfig(data);
-          config = loadConfig();
-          sidebar.send('config-changed', config);
-        },
-      }),
-    },
-  });
-
-  const syncDaemon = require('./core/sync-daemon');
-  runSyncAndRefresh({
-    tag: 'startup-sync',
-    failureLabel: '[startup-sync] failed:',
-    sync: () =>
-      syncDaemon.sync(config).then((syncResult) => {
-        console.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
-        return syncResult;
-      }),
-    force: true,
-  });
+  startPeriodicJobs();
+  registerAppIpc();
+  dataSync.startupSync();
 });
 
 app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
-  clearInterval(dataSyncTimer);
+  dataSync.stop();
   meetingFlyby.destroyAll();
   strips.destroyStrips();
   db.close();

@@ -27,4 +27,26 @@ function aiNotesFromCache(aiResponse) {
   };
 }
 
-module.exports = { engineOptionsFromConfig, aiNotesFromCache };
+/**
+ * Assembles the payload of the sidebar "update" message.
+ *
+ * @param {object} parts - Engine result, palette, pinned id set, favorite ids, cached AI
+ *   response, last sync status, Google readiness and first-run hint flag.
+ * @returns {object} Sidebar update payload.
+ */
+function buildSidebarUpdate(parts) {
+  const { clinicalNote, stressForecast } = aiNotesFromCache(parts.aiResponse);
+  return {
+    engineResult: parts.engineResult,
+    palette: parts.palette,
+    pinnedTaskIds: Array.from(parts.pinnedIds),
+    favoriteTaskIds: parts.favoriteIds,
+    clinicalNote,
+    stressForecast,
+    syncStatus: parts.syncStatus,
+    googleCalendarReady: parts.googleCalendarReady,
+    showFirstRunHint: parts.showFirstRunHint,
+  };
+}
+
+module.exports = { engineOptionsFromConfig, aiNotesFromCache, buildSidebarUpdate };

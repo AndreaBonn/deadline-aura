@@ -4,6 +4,11 @@ const { createLocalTaskHandlers } = require('../../../core/ipc/local-task-handle
 const { createCalendarHandlers } = require('../../../core/ipc/calendar-handlers');
 const { createSettingsHandlers } = require('../../../core/ipc/settings-handlers');
 const { createFlybyHandlers } = require('../../../core/ipc/flyby-handlers');
+const { createAppStateHandlers } = require('../../../core/ipc/app-state-handlers');
+const { createIntegrationHandlers } = require('../../../core/ipc/integration-handlers');
+const { createAiUsageHandlers } = require('../../../core/ipc/ai-usage-handlers');
+const { createTaskFavoriteHandlers } = require('../../../core/ipc/task-favorite-handlers');
+const { createWindowHandlers } = require('../../../main-process/window-handlers');
 
 const ROOT = path.resolve(__dirname, '../../..');
 const INVOKE_PATTERN = /ipcRenderer\.(?:invoke|send)\(\s*'([^']+)'/g;
@@ -53,5 +58,23 @@ describe('IPC channel contract with preload scripts', () => {
       channelsWithPrefix(invoked, ['flyby:']),
     );
     expect(channelsWithPrefix(invoked, ['flyby:'])).toHaveLength(2);
+  });
+
+  it('app-level groups register request/response channels with handle and events with on', () => {
+    const invoked = preloadChannels(/ipcRenderer\.invoke\(\s*'([^']+)'/g);
+    const sent = preloadChannels(/ipcRenderer\.send\(\s*'([^']+)'/g);
+    const groups = [
+      createAppStateHandlers({}),
+      createIntegrationHandlers({}),
+      { handle: createAiUsageHandlers({}) },
+      createTaskFavoriteHandlers({}),
+      createWindowHandlers({}),
+    ];
+    const handle = groups.flatMap((g) => Object.keys(g.handle || {}));
+    const on = groups.flatMap((g) => Object.keys(g.on || {}));
+    expect(handle).toHaveLength(7);
+    expect(on).toHaveLength(8);
+    handle.forEach((channel) => expect(invoked.has(channel)).toBe(true));
+    on.forEach((channel) => expect(sent.has(channel)).toBe(true));
   });
 });

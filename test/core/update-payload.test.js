@@ -47,3 +47,38 @@ describe('aiNotesFromCache', () => {
     expect(aiNotesFromCache({ note: 'x', daily_breakdown: null }).stressForecast).toEqual([]);
   });
 });
+
+describe('buildSidebarUpdate', () => {
+  const { buildSidebarUpdate } = require('../../core/update-payload');
+  const base = {
+    engineResult: { global_score: 3 },
+    palette: { accent_hex: '#fff' },
+    pinnedIds: new Set(['a', 'b']),
+    favoriteIds: ['f'],
+    aiResponse: { note: 'N', daily_breakdown: [{ d: 1 }] },
+    syncStatus: { at: 1 },
+    googleCalendarReady: true,
+    showFirstRunHint: true,
+  };
+
+  it('assembles the sidebar update payload with the AI notes unpacked', () => {
+    expect(buildSidebarUpdate(base)).toEqual({
+      engineResult: { global_score: 3 },
+      palette: { accent_hex: '#fff' },
+      pinnedTaskIds: ['a', 'b'],
+      favoriteTaskIds: ['f'],
+      clinicalNote: 'N',
+      stressForecast: [{ d: 1 }],
+      syncStatus: { at: 1 },
+      googleCalendarReady: true,
+      showFirstRunHint: true,
+    });
+  });
+
+  it('copes with a missing AI response', () => {
+    const payload = buildSidebarUpdate({ ...base, aiResponse: null, syncStatus: null });
+    expect(payload.clinicalNote).toBeNull();
+    expect(payload.stressForecast).toEqual([]);
+    expect(payload.syncStatus).toBeNull();
+  });
+});

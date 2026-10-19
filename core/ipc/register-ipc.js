@@ -24,4 +24,28 @@ function registerIpc(ipcMain, { handle = {}, on = {} }) {
   }
 }
 
-module.exports = { registerIpc };
+function mergeSide(groups, side) {
+  const merged = {};
+  for (const group of groups) {
+    for (const [channel, handler] of Object.entries(group[side] || {})) {
+      if (channel in merged) {
+        throw new Error(`Duplicate IPC channel: ${channel}`);
+      }
+      merged[channel] = handler;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Combine handler groups into one `{handle, on}` for registerIpc. A channel
+ * defined twice on the same side throws: ipcMain would silently keep only one.
+ *
+ * @param {...{handle?: object, on?: object}} groups - Factory outputs.
+ * @returns {{handle: object, on: object}}
+ */
+function mergeIpcGroups(...groups) {
+  return { handle: mergeSide(groups, 'handle'), on: mergeSide(groups, 'on') };
+}
+
+module.exports = { registerIpc, mergeIpcGroups };
