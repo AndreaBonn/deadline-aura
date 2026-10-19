@@ -1,3 +1,31 @@
+## What's Changed in v1.8.0
+
+> This release makes the app easier to start and use on first run, shows the status of each connection in the settings, and surfaces sync and save errors that used to be dropped.
+
+### New features
+
+- Guided first run: the sidebar opens once with a hint about the strip, an empty sidebar shows "start here" steps, and Wayland sessions get a notice (ee7bc89, 315e4d1)
+- Clearer sidebar: secondary actions in a menu, priorities in words, delete with undo, last sync time and failing sources, score out of 100 (ee7bc89)
+- Score panel with openable top drivers and a plain-language explanation (ee7bc89)
+- Connections tab with the status of Google Calendar, Outlook and Jira, a "Connect Google account" button and a "Test connection" check per Jira instance (9145e60)
+- The configured sync interval now drives the real data refresh and applies without a restart (ee7bc89)
+
+### Bug fixes
+
+- A Jira instance that does not answer reports the failure instead of removing its tasks from the desktop (9145e60)
+- Show an error when saving or loading the settings fails (a0e7414)
+- Default fills no longer show as unsaved changes (f2c9299)
+- A missing browser or `xdg-open` no longer crashes the main process (f2d0a8d)
+- Keep the live timer consistent when the calendar fails or answers late (abd9193)
+- Recover the time-log form when the IPC call rejects (693faa6)
+- Escape every value in the score breakdown HTML (17e50e7)
+- Log calendar and i18n failures instead of dropping them; label the flyby cat icon as soon as translations load (a661d08, 00df25b)
+
+### Maintenance
+
+- Split `main.js`, `sidebar.js` and `settings.js` into smaller modules, with happy-dom characterization tests of the pages (16e0624, 6eb6433, 35efb6c)
+- Enforce the size limits through ESLint on all production code (ba48dd8)
+
 ## What's Changed in v1.7.1
 
 > This release fixes private IPv6 host blocking, a Jira sync failure caused by a single rate-limited instance, and the post-it labels in the overlay.
