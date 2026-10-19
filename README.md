@@ -30,7 +30,7 @@ If you only want to install the app and use it, the [user guide](./docs/USER-GUI
 
 <div align="center">
 <img src="assets/img-readme/desktop.png" alt="Deadline Aura desktop with wallpaper tint and post-it notes" width="800">
-<br><em>Desktop view: colored wallpaper tint, post-it task notes, and the urgency strip on the right edge</em>
+<br><em>Desktop view: next-24h agenda, post-it task notes and the Claude/Codex limit band drawn into the wallpaper</em>
 </div>
 
 ## Architecture
@@ -53,6 +53,7 @@ graph LR
   sidebar["Sidebar"]
   dock["Meeting Dock"]
   flyby["Meeting Flyby"]
+  usage["AI usage band<br/>Claude and Codex limits"]
 
   gcal --> sync
   gtasks --> sync
@@ -67,6 +68,7 @@ graph LR
   store --> flyby
   engine --> cmap
   cmap --> wallpaper
+  usage --> wallpaper
   cmap --> strip
   cmap --> sidebar
 
@@ -75,7 +77,7 @@ graph LR
   classDef ext fill:#6b7280,stroke:#4b5563,color:#fff
   classDef engine fill:#059669,stroke:#047857,color:#fff
 
-  class gcal,gtasks,outlook,jira ext
+  class gcal,gtasks,outlook,jira,usage ext
   class local,store data
   class sync,ai core
   class engine,cmap engine
@@ -91,10 +93,10 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - Wallpaper generated as a composite PNG spanning all displays, with per-task post-it notes at drag-and-drop positions stored as percentages
 - Urgency engine: exponential decay formula with priority weights and volume amplification above 5 concurrent events
 - AI scoring with provider failover (Groq → Gemini → OpenAI → Anthropic), hash-based cache, configurable refresh interval (default: 6 hours)
-- Google Calendar sync via OAuth2 (scope: `calendar` for full read and write access). The client ID and secret can be typed into Settings → Sources; the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables are used when those fields are empty
+- Google Calendar sync via OAuth2 (scope: `calendar` for full read and write access). The client ID and secret can be typed into Settings → Connections; the `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables are used when those fields are empty
 - Google Tasks sync, active as soon as the Google account is authorized: open tasks appear in their own sidebar section
 - Outlook sync from a published ICS feed: recurring series are expanded occurrence by occurrence, moved and cancelled instances are applied, and the events count as calendar commitments in the urgency engine and the AI prompt rather than as backlog
-- Priority from keywords: a Google Calendar event colored red is P1, an event whose title or description contains one of the priority keywords (default: `urgent`, `deadline`, `release`, `deploy`, `critico`) is P2, everything else is P3. Outlook applies the same keyword rule after the feed's own high priority and high importance flags. Both keyword lists are editable in Settings → Sources
+- Priority from keywords: a Google Calendar event colored red is P1, an event whose title or description contains one of the priority keywords (default: `urgent`, `deadline`, `release`, `deploy`, `critico`) is P2, everything else is P3. Outlook applies the same keyword rule after the feed's own high priority and high importance flags. Both keyword lists are editable in Settings → Connections → More options
 - Jira sync via API token with configurable JQL, across one or more instances, each with its own domain, email, token and optional JQL. A 429 response is retried after 2, 4 and 8 seconds; an instance that keeps failing is logged and skipped, while the other instances still sync
 - Multi-monitor support: one strip per display, single spanned wallpaper PNG
 - Daily agenda on the wallpaper: the top-left corner of each display lists the events and tasks due in the next 24 hours, with time, source badge and title, and a "+ N more" line when they do not fit
@@ -107,14 +109,15 @@ For detailed technical diagrams (sync pipeline, database schema, task lifecycle,
 - AI clinical note: natural-language assessment from a simulated occupational psychologist, plus a 5-day stress forecast chart, both visible in a collapsible panel toggled by clicking the urgency bar
 - Desktop notifications via `notify-send` with configurable score threshold and cooldown; critical urgency for burnout alerts
 - Bilingual interface (Italian/English) switchable from settings; translations loaded via IPC with dot-notation keys and placeholder interpolation
-- Settings panel with 9 configuration tabs (General, Sources, AI, Wallpaper, Sidebar, Notifications, Interface, Shift, Advanced) and per-section reset
+- Settings panel with 10 configuration tabs (Connections, AI, Notifications, Shift, Wallpaper, Claude/Codex limits, Sidebar, Interface, General, Advanced) and per-section reset. The Connections tab opens first and shows the status of Google Calendar, Outlook and Jira, with buttons to connect Google and to test a Jira instance; unsaved changes are flagged next to Save
+- First start for new users: the sidebar opens once with a hint about the strip, and while no source is connected it shows a "Start here" card with three steps (write a task, open connections, learn the colors). The sidebar footer shows the time of the last refresh and, when a source fails, a "Not responding" line with a link to settings
 - Auto-show sidebar on any display with no visible windows (detected via `wmctrl`)
 - Single-instance lock prevents duplicate widget processes
 - Dynamic lookahead window: events fetched for at least 7 days ahead, extended to the following Sunday; Jira and local tasks are always included regardless of due date
 - Jira favorites: star any Jira task to pin it in a dedicated "Favorites" section between Google Calendar and Jira in the sidebar; favorites persist across restarts
 - Time logging to Google Calendar: clock button on any task opens an inline form to create a calendar event with date, time, duration, and target calendar; events are formatted as `[JIRA-KEY] - Title` for compatibility with Tempo time tracking
 - Live timer: play/stop button on any Jira or local task starts a real-time timer that creates a Google Calendar event immediately and updates its end time every 60 seconds; pressing stop finalizes the event with the exact duration. Timer state persists in localStorage for crash recovery. An "In Progress" section at the top of the sidebar highlights the currently timed task
-- Meeting dock: a floating transparent bar at the bottom of each display shows upcoming meetings with clickable video call links (Meet, Teams, Zoom). Meetings appear from 10 minutes before to 5 minutes after the scheduled start time, checked every 30 seconds regardless of sync status. The × on a meeting hides it on that display only. Meet links open with the Google account set in Settings → Sources (`authuser` parameter), so the meeting does not start under the wrong profile
+- Meeting dock: a floating transparent bar at the bottom of each display shows upcoming meetings with clickable video call links (Meet, Teams, Zoom). Meetings appear from 10 minutes before to 5 minutes after the scheduled start time, checked every 30 seconds regardless of sync status. The × on a meeting hides it on that display only. Meet links open with the Google account set in Settings → Connections → More options (`authuser` parameter), so the meeting does not start under the wrong profile
 - Stale post-its: when a pinned task disappears from its source (closed in Jira, deleted from the calendar), its post-it stays on the desktop with a red border instead of vanishing. Stale tasks are deleted 48 hours later, and the × on each post-it in the layout overlay removes it from the desktop when you save
 - Database snapshot before every migration that rebuilds the tasks table, saved under `~/.local/share/deadlineaura/backups/` with the last 3 kept. If the snapshot fails, the migration is aborted
 - Meeting flyby: a pixel cat tows a banner with the meeting title and countdown across every display 60 seconds before the start (`meeting_flyby.trigger_seconds`), then flies off after 20 seconds. A cat button in the sidebar header snoozes the alerts for 1, 3 or 24 hours, switches them off indefinitely, or turns them back on
@@ -234,7 +237,7 @@ ANTHROPIC_API_KEYS=key1
 
 Fill in at minimum `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The AI keys are optional.
 
-The `.env` file is not the only option. The same OAuth client ID and secret can be typed into **Settings → Sources**, and the AI keys into **Settings → AI**; both are stored in `~/.config/deadlineaura/config.json`. The settings values win, and the environment variables are read only when those fields are left empty (`integrations/google-calendar.js:35`). If you installed from the `.deb` package, the settings window is the only route, since there is no project directory to put a `.env` file in.
+The `.env` file is not the only option. The same OAuth client ID and secret can be typed into **Settings → Connections**, and the AI keys into **Settings → AI**; both are stored in `~/.config/deadlineaura/config.json`. The settings values win, and the environment variables are read only when those fields are left empty (`integrations/google-calendar.js:35`). If you installed from the `.deb` package, the settings window is the only route, since there is no project directory to put a `.env` file in.
 
 ### Step 6 — First run and Google authorization
 
@@ -243,9 +246,9 @@ nvm use 20
 npm start
 ```
 
-On first run, a browser window opens for Google Calendar authorization. The app requests full calendar access (read and write) so it can both read events and create time log entries. Log in with the Google account whose calendar you want to sync and click Allow. The token is saved automatically to `~/.config/deadlineaura/google-token.json` with permissions `0600`. You will not be asked again unless the token is deleted or revoked.
+On first run, if the Google client ID and secret are set and Google Calendar is on, a browser window opens for authorization. You can also start it yourself with **Connect Google account** in **Settings → Connections**, which saves pending changes first and reports the outcome (connected, already connected, credentials missing, port 34567 busy). The app requests full calendar access (read and write) so it can both read events and create time log entries. Log in with the Google account whose calendar you want to sync and click Allow. The token is saved automatically to `~/.config/deadlineaura/google-token.json` with permissions `0600`. You will not be asked again unless the token is deleted or revoked.
 
-After authorization, the colored strip appears on the right edge of each display. Click it to open the sidebar.
+The colored strip appears on the right edge of each display as soon as the app starts. On the very first launch the sidebar opens by itself once, with a hint on how to open and close it by clicking the strip; **Got it** closes the hint and it does not come back.
 
 ### Step 7 — Configure Jira (optional)
 
@@ -264,7 +267,7 @@ Deadline Aura reads Outlook through the ICS feed the calendar publishes, so it n
 
 In Outlook on the web, open **Settings → Calendar → Shared calendars → Publish a calendar**, pick the calendar, set the permission to **Can view all details**, and publish. Copy the ICS link (the `webcal://` form is accepted and converted to `https://`).
 
-In Deadline Aura, open **Settings → Sources → Outlook**, switch the source on and paste the link.
+In Deadline Aura, open **Settings → Connections → Outlook**, switch the source on and paste the link.
 
 Treat that link like a password: anyone who has it can read the whole calendar without logging in. The app stores it in `config.json` alongside the other secrets, masks it in the settings window, and never writes it to the logs. Microsoft refreshes the published feed every few hours, so a meeting added minutes ago will not appear immediately.
 
@@ -309,7 +312,7 @@ Click the strip to open the sidebar. It shows your tasks grouped into sections:
 
 <div align="center">
 <img src="assets/img-readme/sidebar.png" alt="Sidebar with task sections" width="700">
-<br><em>Sidebar: AI clinical note, stress forecast, task sections with urgency scores, and action buttons</em>
+<br><em>Sidebar: shift countdown, urgency score, task sections by source and action buttons</em>
 </div>
 
 1. **In Progress** - the task whose live timer is running (appears only while a timer is active)
@@ -338,6 +341,10 @@ Holidays and months already in the past are removed from `config.json` at the ne
 ### Daily agenda on the wallpaper
 
 The top-left corner of each display shows a "NEXT 24H" list drawn into the wallpaper: start or due time, a source badge (`CAL`, `TASKS`, `JIRA`, `OUTLOOK`) and the title. When the list does not fit above the limit band, the last line reads "+ N more".
+
+### Claude and Codex limits
+
+A band at the bottom of the wallpaper shows one card per Claude account on the machine and one for Codex, each with the used share of the 5-hour and weekly limits and their reset time. Codex is read from its local session logs. Claude needs a one-time step: **Settings → Claude/Codex limits → Install capture**, which places a script in front of the Claude Code statusline (`python3` required) and backs up `~/.claude/settings.json` first. **Remove capture** puts the statusline back as it was. The band can be switched off in the same tab. The user guide describes the cards and their markers in detail.
 
 ### Local tasks
 
@@ -394,7 +401,7 @@ A floating transparent bar appears at the bottom of each display when you have u
 
 The dock uses a translucent glass effect (backdrop blur) and does not reserve screen space - it overlays the desktop only when meetings are imminent and hides automatically when there are none.
 
-The × on a meeting hides it on that display; the other displays keep showing it. If you use more than one Google account in the browser, type the right one in Settings → Sources → Google Account: Meet links then open with that account instead of the browser's default profile.
+The × on a meeting hides it on that display; the other displays keep showing it. If you use more than one Google account in the browser, type the right one in Settings → Connections → More options → Google Account: Meet links then open with that account instead of the browser's default profile.
 
 ### Meeting flyby
 
@@ -425,24 +432,29 @@ The burnout detector runs automatically in the background, analyzing 7 days of A
 
 ### Settings
 
-Click the gear icon in the sidebar to open the settings panel. It has 9 tabs:
+Click the gear icon in the sidebar to open the settings panel. It opens on the Connections tab and has 10 tabs:
 
 <div align="center">
 <img src="assets/img-readme/settings.png" alt="Settings panel" width="600">
-<br><em>Settings panel: 9 configuration tabs with per-section reset</em>
+<br><em>Settings panel: 10 configuration tabs with per-section reset</em>
 </div>
 
-| Tab           | What you can configure                                                                                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| General       | UI sync interval, data sync interval, lookahead window                                                                                                                   |
-| Sources       | Google OAuth client ID and secret, Google Calendar calendars and priority keywords, Google account for Meet links, Outlook ICS feed and keywords, Jira instances and JQL |
-| AI            | Provider API keys, provider priority order, refresh interval, timeout, temperature                                                                                       |
-| Wallpaper     | Enable/disable, background images, post-it settings                                                                                                                      |
-| Sidebar       | Position (left/right), width, opacity                                                                                                                                    |
-| Notifications | Enable/disable, score threshold, cooldown, meeting dock and its lead time                                                                                                |
-| Interface     | Language (Italian/English), max tasks shown, countdown format                                                                                                            |
-| Shift         | Work days, time slots, holidays, regular/variable shift modes                                                                                                            |
-| Advanced      | Urgency engine constants and priority weights                                                                                                                            |
+| Tab                 | What you can configure                                                                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connections         | Connection status, Google OAuth client ID and secret, calendars and priority keywords, Google account for Meet links, Outlook ICS feed and keywords, Jira instances and JQL |
+| AI                  | Provider API keys; under Advanced options the provider order, timeout and temperature                                                                                       |
+| Notifications       | Enable/disable, score threshold, cooldown, meeting dock and its lead time                                                                                                   |
+| Shift               | Work days, time slots, holidays, regular/variable shift modes                                                                                                               |
+| Wallpaper           | Enable/disable, background images, post-it settings                                                                                                                         |
+| Claude/Codex limits | Show or hide the limit band, install or remove the Claude capture                                                                                                           |
+| Sidebar             | Position (left/right), width, opacity                                                                                                                                       |
+| Interface           | Language (Italian/English), max tasks shown, countdown format                                                                                                               |
+| General             | UI refresh interval, data download interval, lookahead window                                                                                                               |
+| Advanced            | Urgency engine constants and priority weights                                                                                                                               |
+
+At the top of the Connections tab, **Connection status** shows, for Google Calendar, Outlook and Jira, one of: Connected, Off, Needs setup, Needs authorization, Error at the last refresh, with the time of the last refresh. It reflects the saved settings, not what you are still typing. **Connect Google account** starts the Google authorization, and each Jira instance has a **Test connection** button that reports how many issues the filter finds or what is wrong.
+
+While there are unsaved changes, **● Unsaved changes** appears next to Save, and closing the window asks whether to save, exit without saving or keep editing. If a save fails, the app names the tab and the limit that was exceeded and jumps to that tab.
 
 Each tab has a "Reset section" button to restore defaults for that section only.
 
@@ -492,7 +504,7 @@ npx electron-rebuild
 npm start
 ```
 
-Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, `integrations/`, and `renderer/`.
+Tests are in `test/` and mirror the structure of `core/`, `store/`, `ai/`, `integrations/`, `renderer/`, `main-process/`, `config/`, `i18n/`, and `scripts/`.
 
 To try the UI without connecting any source, `node scripts/seed-demo.js` fills the database with 6 demo tasks. It deletes every existing task and score first, so do not run it on the database you use day to day.
 

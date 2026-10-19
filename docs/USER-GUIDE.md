@@ -113,7 +113,7 @@ Open **Settings → Connections → Jira** and fill in:
 
 Completing an instance switches Jira on by itself. A source that is on but not yet configured shows **On but not connected**.
 
-Each instance has a **Verify connection** button: it reports how many issues the filter finds, or the problem (email or token not valid, site not found, filter not valid, site not reachable, domain must be just the address).
+Each instance has a **Test connection** button: it reports how many issues the filter finds, or the problem (email or token not valid, site not found, filter not valid, site not reachable, domain must be just the address).
 
 If you work on more than one Jira site, click **+ Add instance** and fill in a second set of fields. Each site can have its own filter. When a site is slow or refuses requests for a while, the app retries a few times and then skips it for that round: the other sites still update, and the tasks of the site that does not answer stay on your desktop as they were. The bottom of the sidebar shows “Not responding: Jira” until the site is reachable again.
 
@@ -288,7 +288,7 @@ Both files under `.config` are written readable by your account only. They are n
 
 **No desktop notifications.** They go through `notify-send`, from the `libnotify-bin` package. Install it if it is missing.
 
-**The calendar stays empty.** Check the **Updated HH:MM** time at the bottom of the sidebar and the orange **Not responding: ...** line, if there is one, then press the refresh button to force a round. Also open **Connection status** in **Settings → Connections**: it tells you which source is off, needs setup or is in error, and for Jira **Verify connection** gives the reason. If nothing changes, the usual cause is a mistyped redirect URI in the Google Cloud console: it has to be exactly `http://localhost:34567/oauth/callback`, with no trailing slash.
+**The calendar stays empty.** Check the **Updated HH:MM** time at the bottom of the sidebar and the orange **Not responding: ...** line, if there is one, then press the refresh button to force a round. Also open **Connection status** in **Settings → Connections**: it tells you which source is off, needs setup or is in error, and for Jira **Test connection** gives the reason. If nothing changes, the usual cause is a mistyped redirect URI in the Google Cloud console: it has to be exactly `http://localhost:34567/oauth/callback`, with no trailing slash.
 
 **Google stops working after a while.** If your Google Cloud consent screen is still in testing mode, Google expires the authorization periodically. Publishing the consent screen, or reauthorizing when it happens, both work.
 
