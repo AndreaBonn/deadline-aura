@@ -77,6 +77,22 @@ describe('db module exported functions', () => {
       const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get(SAMPLE_TASK.id);
       expect(row).toMatchObject({ title: 'Updated Title', priority: 2 });
     });
+
+    it('stores null for optional link columns the caller omits', () => {
+      db.upsertTask({
+        id: 'no_links',
+        source: 'local',
+        title: 'Task without links',
+        due_at: Date.now() + 3600000,
+        priority: 3,
+        is_done: 0,
+        raw_json: null,
+        synced_at: Date.now(),
+      });
+
+      const row = db.getDb().prepare('SELECT * FROM tasks WHERE id = ?').get('no_links');
+      expect(row).toMatchObject({ id: 'no_links', web_url: null, meet_url: null });
+    });
   });
 
   describe('getActiveTasks', () => {

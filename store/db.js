@@ -112,7 +112,7 @@ function upsertTask(task) {
       raw_json = @raw_json,
       synced_at = @synced_at
   `);
-  return stmt.run({ start_at: null, meet_url: null, ...task });
+  return stmt.run({ start_at: null, web_url: null, meet_url: null, ...task });
 }
 
 function markStale(source, activeIds) {
