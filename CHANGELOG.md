@@ -1,3 +1,54 @@
+## What's Changed in v1.8.0
+
+L'applicazione è ora più facile da avviare e usare per i nuovi utenti, con una migliore visibilità dello stato di sincronizzazione e connessione.
+
+### ✨ Nuove Funzionalità
+- feat(core): espone l'esito della sincronizzazione, la prontezza di Google e lo stato del primo avvio
+- feat(ui): rende l'app facile da avviare e usare per i nuovi utenti
+- feat(settings): mostra lo stato della connessione, permette di connettere Google e testare Jira
+
+### 🐛 Correzioni di Bug
+- fix(sidebar): esegue l'escape di ogni valore nell'HTML del riepilogo del punteggio
+- fix(sidebar): mantiene il timer in tempo reale coerente quando il calendario fallisce o risponde in ritardo
+- fix(sidebar): etichetta l'icona del gatto flyby non appena le traduzioni vengono caricate
+- fix(sidebar): recupera il modulo di registrazione del tempo quando la chiamata IPC viene rifiutata
+- fix(settings): impedisce che i riempimenti predefiniti mostrino modifiche non salvate
+- fix(main): impedisce che un browser o xdg-open mancante blocchi il processo principale
+- fix(sidebar): registra ogni fallimento del calendario e dell'i18n invece di ignorarlo
+- fix(settings): mostra un errore quando il salvataggio o il caricamento delle impostazioni fallisce
+
+### 📚 Documentazione
+- docs: documenta il conto alla rovescia del turno, l'agenda dello sfondo e altre funzionalità mancanti
+- docs(guide): aggiorna la guida utente per il nuovo primo avvio e le impostazioni
+- docs(specs): pianifica la decomposizione del "god-file" (005)
+
+### 🔧 Manutenzione
+- refactor(gcal): estrae eventBoundaryMs per l'inizio e la fine dell'evento
+- refactor(store): sposta le migrazioni dello schema fuori da db.js
+- refactor(gcal): sposta l'OAuth di Google in google-auth.js
+- refactor(main): sposta la pulizia della configurazione del turno di lavoro nel core
+- refactor(main): sposta la raccolta dei fatti della sorgente nel core
+- refactor(main): condivide un apri-URL esterno tra entrambi i gestori
+- refactor(main): costruisce le opzioni del motore e le note AI nel core
+- refactor(main): esegue la sincronizzazione manuale, periodica e all'avvio tramite un unico runner
+- refactor(ipc): registra i gestori di attività locali e calendario da core/ipc
+- refactor(ipc): sposta i gestori delle impostazioni e flyby in core/ipc
+- refactor(settings): estrae le celle della griglia mensile e il testo di errore di salvataggio come helper puri
+- refactor(sidebar): raggruppa le attività in sezioni in un modulo puro
+- refactor(sidebar): modella il timer in tempo reale in sidebar-timer.js
+- refactor(main): sposta le finestre strip e meeting-dock nel processo principale
+- refactor(sidebar): sposta isFlybySuppressed in sidebar-utils con un test di parità
+- refactor(sidebar): estrae i valori del modulo attività e i dati di previsione dello stress
+- refactor(main): sposta le finestre sidebar, overlay e impostazioni nel processo principale
+- refactor(sidebar): separa i moduli di attività e registrazione del tempo da sidebar.js
+- refactor(main): riduce main.js a bootstrap e cablaggio
+- refactor(gcal): nomina il filtro ended/cancelled/declined di normalizeEvent
+- refactor(core): trasforma le closure di createDataSync in una classe DataSync
+- refactor(sidebar): separa timer, scheda attività e sezioni da sidebar.js
+- refactor(settings): separa la griglia mensile, i campi del turno e la scheda Sorgenti
+- refactor(sidebar): lascia sidebar.js come shell della pagina
+- refactor(settings): lascia settings.js
+
 ## Versione 1.7.1
 
 > La release v1.7.1 corregge il blocco degli indirizzi IPv6 privati, l'interruzione della sincronizzazione Jira su un'istanza limitata e le etichette dei post-it nell'overlay.
