@@ -3,6 +3,83 @@
 const DEFAULT_DATA_SYNC_MINUTES = 10;
 const MINUTE_MS = 60000;
 
+class DataSync {
+  #deps;
+  #setIntervalFn;
+  #clearIntervalFn;
+  #lastStatus = null;
+  #timer = null;
+  #timerMinutes = null;
+
+  constructor(deps) {
+    this.#deps = deps;
+    this.#setIntervalFn = deps.setIntervalFn || setInterval;
+    this.#clearIntervalFn = deps.clearIntervalFn || clearInterval;
+  }
+
+  // Public methods are arrow fields: main.js passes them around detached.
+  runSyncAndRefresh = (options) => {
+    const { runSyncCycle, summarize, refresh, log } = this.#deps;
+    return runSyncCycle({
+      summarize,
+      onStatus: (summary) => {
+        this.#lastStatus = summary;
+      },
+      refresh: (...args) => refresh(...args),
+      log,
+      ...options,
+    });
+  };
+
+  runManualSync = () =>
+    this.runSyncAndRefresh({
+      tag: 'sync-now',
+      failureLabel: 'Manual sync error:',
+      sync: () => this.#deps.getSyncDaemon().sync(this.#deps.getConfig()),
+    });
+
+  /** (Re)starts the periodic sync; a changed interval applies without a restart. */
+  scheduleDataSync = () => {
+    const { getConfig, getSyncDaemon } = this.#deps;
+    const minutes = getConfig().sync.data_interval_minutes || DEFAULT_DATA_SYNC_MINUTES;
+    if (this.#timer && minutes === this.#timerMinutes) {
+      return;
+    }
+    this.#clearIntervalFn(this.#timer);
+    this.#timerMinutes = minutes;
+    const daemon = getSyncDaemon();
+    this.#timer = this.#setIntervalFn(
+      () =>
+        this.runSyncAndRefresh({
+          tag: 'data-sync',
+          failureLabel: '[data-sync] error:',
+          sync: () => daemon.sync(getConfig()),
+          force: true,
+        }),
+      minutes * MINUTE_MS,
+    );
+  };
+
+  startupSync = () => {
+    const { getConfig, getSyncDaemon, log } = this.#deps;
+    const daemon = getSyncDaemon();
+    return this.runSyncAndRefresh({
+      tag: 'startup-sync',
+      failureLabel: '[startup-sync] failed:',
+      sync: () =>
+        daemon.sync(getConfig()).then((syncResult) => {
+          log.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
+          return syncResult;
+        }),
+      force: true,
+    });
+  };
+
+  getLastStatus = () => this.#lastStatus;
+
+  stop = () => this.#clearIntervalFn(this.#timer);
+}
+
 /**
  * Data sync orchestration: manual, startup and periodic cycles plus the last status.
  *
@@ -15,80 +92,11 @@ const MINUTE_MS = 60000;
  * @param {{log: Function, error: Function}} deps.log - Logger.
  * @param {Function} [deps.setIntervalFn] - Timer factory.
  * @param {Function} [deps.clearIntervalFn] - Timer canceller.
- * @returns {object} runSyncAndRefresh, runManualSync, scheduleDataSync, startupSync,
+ * @returns {DataSync} runSyncAndRefresh, runManualSync, scheduleDataSync, startupSync,
  *   getLastStatus, stop.
  */
 function createDataSync(deps) {
-  const { getConfig, getSyncDaemon, runSyncCycle, summarize, refresh, log } = deps;
-  const setIntervalFn = deps.setIntervalFn || setInterval;
-  const clearIntervalFn = deps.clearIntervalFn || clearInterval;
-  let lastStatus = null;
-  let timer = null;
-  let timerMinutes = null;
-
-  function runSyncAndRefresh(options) {
-    return runSyncCycle({
-      summarize,
-      onStatus: (summary) => {
-        lastStatus = summary;
-      },
-      refresh: (...args) => refresh(...args),
-      log,
-      ...options,
-    });
-  }
-
-  function runManualSync() {
-    return runSyncAndRefresh({
-      tag: 'sync-now',
-      failureLabel: 'Manual sync error:',
-      sync: () => getSyncDaemon().sync(getConfig()),
-    });
-  }
-
-  /** (Re)starts the periodic sync; a changed interval applies without a restart. */
-  function scheduleDataSync() {
-    const minutes = getConfig().sync.data_interval_minutes || DEFAULT_DATA_SYNC_MINUTES;
-    if (timer && minutes === timerMinutes) {
-      return;
-    }
-    clearIntervalFn(timer);
-    timerMinutes = minutes;
-    const daemon = getSyncDaemon();
-    timer = setIntervalFn(
-      () =>
-        runSyncAndRefresh({
-          tag: 'data-sync',
-          failureLabel: '[data-sync] error:',
-          sync: () => daemon.sync(getConfig()),
-          force: true,
-        }),
-      minutes * MINUTE_MS,
-    );
-  }
-
-  function startupSync() {
-    const daemon = getSyncDaemon();
-    return runSyncAndRefresh({
-      tag: 'startup-sync',
-      failureLabel: '[startup-sync] failed:',
-      sync: () =>
-        daemon.sync(getConfig()).then((syncResult) => {
-          log.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
-          return syncResult;
-        }),
-      force: true,
-    });
-  }
-
-  return {
-    runSyncAndRefresh,
-    runManualSync,
-    scheduleDataSync,
-    startupSync,
-    getLastStatus: () => lastStatus,
-    stop: () => clearIntervalFn(timer),
-  };
+  return new DataSync(deps);
 }
 
 module.exports = { createDataSync };
