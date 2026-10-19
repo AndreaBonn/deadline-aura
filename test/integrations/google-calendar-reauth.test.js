@@ -3,13 +3,8 @@
 const fs = require('fs');
 const { google } = require('googleapis');
 
-const {
-  isInvalidGrant,
-  deleteToken,
-  fetchEvents,
-  fetchCalendarEvents,
-  TOKEN_PATH,
-} = require('../../integrations/google-calendar');
+const { isInvalidGrant, deleteToken, TOKEN_PATH } = require('../../integrations/google-auth');
+const { fetchEvents, fetchCalendarEvents } = require('../../integrations/google-calendar');
 
 const CONFIG = {
   sources: {

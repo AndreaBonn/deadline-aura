@@ -5,7 +5,7 @@ const http = require('http');
 const childProcess = require('child_process');
 const { EventEmitter } = require('events');
 const { google } = require('googleapis');
-const { getAuthenticatedClient, authorizeGoogle } = require('../../integrations/google-calendar');
+const { getAuthenticatedClient, authorizeGoogle } = require('../../integrations/google-auth');
 
 const TOKENS = { access_token: 'new-access', refresh_token: 'new-refresh' };
 

@@ -6,12 +6,10 @@ const {
   resolveGoogleOAuth,
   isInvalidGrant,
   deleteToken,
-  isGoogleCalendarReady,
-  authorizeGoogle,
-  TOKEN_PATH,
 } = require('./google-auth');
 
 const { getLookaheadEnd } = require('../core/deadline-engine');
+const { eventBoundaryMs, extractMeetUrl } = require('../core/event-fields');
 
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
@@ -36,53 +34,12 @@ function assignPriority(event, priorityKeywords) {
   return 3;
 }
 
-const MEETING_URL_PATTERN =
-  /https?:\/\/(?:teams\.microsoft\.com\/[\w./?=&%-]+|[\w.-]+\.zoom\.us\/j\/[\w?=&-]+|meet\.google\.com\/[\w-]+)/i;
-
-function extractMeetUrlFromText(text) {
-  if (!text) {
-    return null;
-  }
-  const match = text.match(MEETING_URL_PATTERN);
-  return match ? match[0] : null;
-}
-
-function extractMeetUrl(event) {
-  if (event.hangoutLink) {
-    return event.hangoutLink;
-  }
-  const entryPoints = event.conferenceData?.entryPoints;
-  if (Array.isArray(entryPoints)) {
-    const videoEntry = entryPoints.find((ep) => ep.entryPointType === 'video' && ep.uri);
-    if (videoEntry) {
-      return videoEntry.uri;
-    }
-  }
-  return extractMeetUrlFromText(event.description) || extractMeetUrlFromText(event.location);
-}
-
 function isDeclinedByUser(event) {
   if (!Array.isArray(event.attendees)) {
     return false;
   }
   const selfAttendee = event.attendees.find((a) => a.self === true);
   return selfAttendee?.responseStatus === 'declined';
-}
-
-/**
- * Converts a Google Calendar start/end object to epoch milliseconds.
- *
- * @param {{dateTime?: string, date?: string}|null|undefined} boundary - Event start or end.
- * @returns {number|null} dateTime as instant, all-day date as local midnight, null when absent.
- */
-function eventBoundaryMs(boundary) {
-  if (boundary?.dateTime) {
-    return new Date(boundary.dateTime).getTime();
-  }
-  if (boundary?.date) {
-    return new Date(boundary.date + 'T00:00:00').getTime();
-  }
-  return null;
 }
 
 // An all-day event counts as ended only after its last second, not at midnight.
@@ -275,15 +232,8 @@ module.exports = {
   isDeclinedByUser,
   assignPriority,
   extractMeetUrl,
-  getAuthenticatedClient,
-  resolveGoogleOAuth,
   listCalendars,
   createEvent,
   updateEvent,
-  isInvalidGrant,
-  deleteToken,
-  isGoogleCalendarReady,
-  authorizeGoogle,
   fetchCalendarEvents,
-  TOKEN_PATH,
 };

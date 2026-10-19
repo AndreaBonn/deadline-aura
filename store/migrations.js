@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const dbBackup = require('./db-backup');
+const { eventBoundaryMs, extractMeetUrl } = require('../core/event-fields');
 
 const TASKS_COLUMNS = `id, source, title, due_at, priority, is_done, is_stale,
     raw_json, synced_at, ai_stress, ai_category, ai_reasoning, ai_scored_at,
@@ -135,9 +136,6 @@ function backfillStartAt(database) {
   if (rows.length === 0) {
     return;
   }
-  // Lazy loading avoids db -> migrations -> google-calendar -> deadline-engine -> db
-  // capturing incomplete exports, and loads googleapis only when backfill is needed.
-  const { eventBoundaryMs } = require('../integrations/google-calendar');
   const update = database.prepare('UPDATE tasks SET start_at = ? WHERE id = ?');
   database.transaction((entries) => {
     for (const row of entries) {
@@ -169,8 +167,6 @@ function backfillMeetUrl(database) {
   if (rows.length === 0) {
     return;
   }
-  // Keep the same lazy dependency as backfillStartAt to avoid the require cycle.
-  const { extractMeetUrl } = require('../integrations/google-calendar');
   const update = database.prepare('UPDATE tasks SET meet_url = ? WHERE id = ?');
   database.transaction((entries) => {
     for (const row of entries) {
@@ -278,4 +274,4 @@ function runMigrations(database, { dbPath }) {
   extendOutlookSource(database, dbPath);
 }
 
-module.exports = { runMigrations, rebuildTasksTable, sourceCheckAccepts };
+module.exports = { runMigrations };

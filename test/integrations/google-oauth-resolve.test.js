@@ -1,6 +1,6 @@
 'use strict';
 
-const { resolveGoogleOAuth } = require('../../integrations/google-calendar');
+const { resolveGoogleOAuth } = require('../../integrations/google-auth');
 
 describe('google-calendar — resolveGoogleOAuth', () => {
   const originalEnv = { ...process.env };

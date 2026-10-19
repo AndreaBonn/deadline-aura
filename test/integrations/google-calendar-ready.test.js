@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { isGoogleCalendarReady } = require('../../integrations/google-calendar');
+const { isGoogleCalendarReady } = require('../../integrations/google-auth');
 
 function makeConfig({ enabled = true, clientId = 'id', clientSecret = 'secret' } = {}) {
   return {

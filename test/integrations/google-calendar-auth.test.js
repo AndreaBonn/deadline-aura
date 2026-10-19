@@ -2,7 +2,7 @@
 
 const fs = require('fs');
 const { google } = require('googleapis');
-const { getAuthenticatedClient, TOKEN_PATH } = require('../../integrations/google-calendar');
+const { getAuthenticatedClient, TOKEN_PATH } = require('../../integrations/google-auth');
 
 const SAVED_TOKEN = {
   access_token: 'fake-access-token',

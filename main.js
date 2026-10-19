@@ -36,7 +36,14 @@ const pinnedQueries = require('./store/pinned-queries');
 const localQueries = require('./store/local-queries');
 const favoriteQueries = require('./store/favorite-queries');
 const burnoutDetector = require('./core/burnout-detector');
+const googleAuth = require('./integrations/google-auth');
 const gcal = require('./integrations/google-calendar');
+const calendarApi = {
+  ...gcal,
+  resolveGoogleOAuth: googleAuth.resolveGoogleOAuth,
+  isGoogleCalendarReady: googleAuth.isGoogleCalendarReady,
+  authorizeGoogle: googleAuth.authorizeGoogle,
+};
 const jira = require('./integrations/jira');
 const notifier = require('./core/notifier');
 const meetingFlyby = require('./core/meeting-flyby');
@@ -138,7 +145,7 @@ const runUpdateCycle = createUpdateCycle({
   favoriteQueries,
   collectUsage,
   getLanguage: i18n.getLanguage,
-  isGoogleCalendarReady: gcal.isGoogleCalendarReady,
+  isGoogleCalendarReady: googleAuth.isGoogleCalendarReady,
   screen,
   strips,
   meetingDocks,
@@ -209,7 +216,7 @@ function appIpcDependencies(applier) {
     i18n,
     firstRunHint,
     log: console,
-    gcal,
+    gcal: calendarApi,
     jira,
     runManualSync: dataSync.runManualSync,
     openLink: (url) => openExternalUrl(url, externalBrowserDependencies),
