@@ -1,5 +1,6 @@
 'use strict';
 
+const { EventEmitter } = require('events');
 const { openExternalUrl } = require('../../core/open-external');
 
 const SAFE_URL = 'https://example.com/meeting';
@@ -8,7 +9,7 @@ function makeDependencies() {
   const unref = vi.fn();
   return {
     which: vi.fn(),
-    spawnDetached: vi.fn(() => ({ unref })),
+    spawnDetached: vi.fn(() => ({ unref, on: vi.fn() })),
     unref,
   };
 }
@@ -78,6 +79,7 @@ describe('openExternalUrl', () => {
       throw new Error('Spawn failed');
     });
     dependencies.spawnDetached.mockReturnValueOnce({
+      on: vi.fn(),
       unref: () => {
         throw new Error('Unref failed');
       },
@@ -91,7 +93,8 @@ describe('openExternalUrl', () => {
     expect(dependencies.unref).toHaveBeenCalledOnce();
   });
 
-  it('propagates fallback spawn errors', () => {
+  it('logs instead of throwing when the fallback spawn fails synchronously', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const dependencies = makeDependencies();
     dependencies.which.mockImplementation(() => {
       throw new Error('Not found');
@@ -99,6 +102,32 @@ describe('openExternalUrl', () => {
     dependencies.spawnDetached.mockImplementation(() => {
       throw new Error('Fallback failed');
     });
-    expect(() => openExternalUrl(SAFE_URL, dependencies)).toThrow('Fallback failed');
+    expect(() => openExternalUrl(SAFE_URL, dependencies)).not.toThrow();
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('xdg-open'));
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('Fallback failed'));
+    consoleError.mockRestore();
+  });
+
+  it.each([
+    ['browser', 'firefox', () => {}],
+    [
+      'xdg-open fallback',
+      'xdg-open',
+      (dependencies) =>
+        dependencies.which.mockImplementation(() => {
+          throw new Error('Not found');
+        }),
+    ],
+  ])('survives an asynchronous spawn error from the %s child', (_label, binary, arrange) => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const dependencies = makeDependencies();
+    const child = Object.assign(new EventEmitter(), { unref: dependencies.unref });
+    dependencies.spawnDetached.mockReturnValue(child);
+    arrange(dependencies);
+    openExternalUrl(SAFE_URL, dependencies);
+    expect(() => child.emit('error', new Error('spawn ENOENT'))).not.toThrow();
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining(binary));
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('spawn ENOENT'));
+    consoleError.mockRestore();
   });
 });
