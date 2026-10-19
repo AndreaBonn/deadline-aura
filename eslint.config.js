@@ -74,6 +74,8 @@ module.exports = [
       'store/db.js',
       'store/migrations.js',
       'integrations/google-auth.js',
+      'renderer/sidebar-task-forms.js',
+      'renderer/sidebar-time-log.js',
       'renderer/sidebar-form-values.js',
       'renderer/sidebar-ai-panel.js',
       'renderer/sidebar-timer.js',

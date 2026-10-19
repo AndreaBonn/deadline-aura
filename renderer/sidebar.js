@@ -3,38 +3,48 @@
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
    priorityKey, formatScore100, flybyStateKey, formatSyncStatus, isFlybySuppressed,
-   readTaskFormValues, toDateTimeLocalValue, defaultLogStart, validateTimeLog, buildForecastColumns,
+   createEditForm, createQuickAddForm, createTimeLogForm, createJiraKeyPicker,
+   createLabelledField, createFormError, loadCalendarOptions, buildForecastColumns,
    urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections, parseStoredTimer, createTimerState,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
+
+const sidebarState = {
+  jiraFilter: '',
+  lastTasks: null,
+  lastPalette: null,
+  pinnedTaskIds: new Set(),
+  favoriteTaskIds: new Set(),
+  timeLogTaskId: null,
+  temporaryLoggedTaskId: null,
+  cachedCalendars: null,
+  googleCalendarReady: true,
+  activeTimer: null,
+  timerUiInterval: null,
+  timerSyncInterval: null,
+  timerPickerTaskId: null,
+  _flybyState: { enabled: true, snoozed_until: null },
+  pendingDelete: null,
+  addFormVisible: false,
+  editingTaskId: null,
+  firstRunHintDismissed: false,
+};
+
+function rerender() {
+  renderTaskList(sidebarState.lastTasks, sidebarState.lastPalette);
+}
 
 const COLLAPSED_LIMIT = 5;
 const COLOR_ONGOING = '#4fc3f7';
 const COLOR_ENDED = '#888';
-
-let jiraFilter = '';
-let lastTasks = null;
-let lastPalette = null;
-let pinnedTaskIds = new Set();
-let favoriteTaskIds = new Set();
-let timeLogTaskId = null;
-let temporaryLoggedTaskId = null;
-let cachedCalendars = null;
-// Time logging and the live timer write to Google Calendar: without it they cannot work.
-let googleCalendarReady = true;
 
 // --- Live timer state ---
 const TIMER_STORAGE_KEY = 'deadlineaura_active_timer';
 const TIMER_UPDATE_INTERVAL_MS = 60 * 1000;
 const TIMER_DEFAULT_DURATION_MIN = 30;
 
-let activeTimer = null; // { taskId, startTime, calendarId, eventId, summary }
-let timerUiInterval = null;
-let timerSyncInterval = null;
-let timerPickerTaskId = null; // task id showing calendar picker before play
-
 function saveTimerState() {
-  if (activeTimer) {
-    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(activeTimer));
+  if (sidebarState.activeTimer) {
+    localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(sidebarState.activeTimer));
   } else {
     localStorage.removeItem(TIMER_STORAGE_KEY);
   }
@@ -45,7 +55,7 @@ function restoreTimerState() {
     const raw = localStorage.getItem(TIMER_STORAGE_KEY);
     const saved = parseStoredTimer(raw);
     if (saved) {
-      activeTimer = saved;
+      sidebarState.activeTimer = saved;
       startTimerIntervals();
     } else if (raw) {
       localStorage.removeItem(TIMER_STORAGE_KEY);
@@ -58,43 +68,45 @@ function restoreTimerState() {
 
 function startTimerIntervals() {
   clearTimerIntervals();
-  timerUiInterval = setInterval(function () {
+  sidebarState.timerUiInterval = setInterval(function () {
     updateTimerDisplay();
   }, 1000);
-  timerSyncInterval = setInterval(function () {
+  sidebarState.timerSyncInterval = setInterval(function () {
     syncTimerToCalendar();
   }, TIMER_UPDATE_INTERVAL_MS);
 }
 
 function clearTimerIntervals() {
-  if (timerUiInterval) {
-    clearInterval(timerUiInterval);
-    timerUiInterval = null;
+  if (sidebarState.timerUiInterval) {
+    clearInterval(sidebarState.timerUiInterval);
+    sidebarState.timerUiInterval = null;
   }
-  if (timerSyncInterval) {
-    clearInterval(timerSyncInterval);
-    timerSyncInterval = null;
+  if (sidebarState.timerSyncInterval) {
+    clearInterval(sidebarState.timerSyncInterval);
+    sidebarState.timerSyncInterval = null;
   }
 }
 
 function updateTimerDisplay() {
-  if (!activeTimer) {
+  if (!sidebarState.activeTimer) {
     return;
   }
-  const el = document.querySelector('.timer-elapsed[data-task-id="' + activeTimer.taskId + '"]');
+  const el = document.querySelector(
+    '.timer-elapsed[data-task-id="' + sidebarState.activeTimer.taskId + '"]',
+  );
   if (el) {
-    el.textContent = formatElapsed(activeTimer.startTime);
+    el.textContent = formatElapsed(sidebarState.activeTimer.startTime);
   }
 }
 
 function syncTimerToCalendar() {
-  if (!activeTimer || !activeTimer.eventId) {
+  if (!sidebarState.activeTimer || !sidebarState.activeTimer.eventId) {
     return;
   }
   window.deadlineAura
     .updateCalendarEvent({
-      calendarId: activeTimer.calendarId,
-      eventId: activeTimer.eventId,
+      calendarId: sidebarState.activeTimer.calendarId,
+      eventId: sidebarState.activeTimer.eventId,
       endTime: new Date().toISOString(),
     })
     .catch(function (err) {
@@ -107,10 +119,10 @@ function startTimer(task, calendarId) {
   const summary = buildEventSummary(jiraKey, task.title);
   const startTime = new Date().toISOString();
 
-  activeTimer = createTimerState(task, { startTime, calendarId, summary });
+  sidebarState.activeTimer = createTimerState(task, { startTime, calendarId, summary });
   saveTimerState();
-  timerPickerTaskId = null;
-  renderTaskList(lastTasks, lastPalette);
+  sidebarState.timerPickerTaskId = null;
+  rerender();
 
   window.deadlineAura
     .logTimeToCalendar({
@@ -121,26 +133,26 @@ function startTimer(task, calendarId) {
     })
     .then(function (result) {
       if (result.ok && result.eventId) {
-        activeTimer.eventId = result.eventId;
+        sidebarState.activeTimer.eventId = result.eventId;
         saveTimerState();
         window.deadlineAura.setDefaultLogCalendar(calendarId);
         startTimerIntervals();
       } else {
-        activeTimer = null;
+        sidebarState.activeTimer = null;
         saveTimerState();
         clearTimerIntervals();
-        renderTaskList(lastTasks, lastPalette);
+        rerender();
       }
     });
 }
 
 function stopTimer() {
-  if (!activeTimer) {
+  if (!sidebarState.activeTimer) {
     return;
   }
-  const timer = activeTimer;
+  const timer = sidebarState.activeTimer;
   clearTimerIntervals();
-  activeTimer = null;
+  sidebarState.activeTimer = null;
   saveTimerState();
 
   if (timer.eventId) {
@@ -151,20 +163,17 @@ function stopTimer() {
         endTime: new Date().toISOString(),
       })
       .then(function () {
-        temporaryLoggedTaskId = timer.taskId;
-        renderTaskList(lastTasks, lastPalette);
+        sidebarState.temporaryLoggedTaskId = timer.taskId;
+        rerender();
         setTimeout(function () {
-          temporaryLoggedTaskId = null;
-          renderTaskList(lastTasks, lastPalette);
+          sidebarState.temporaryLoggedTaskId = null;
+          rerender();
         }, 3000);
       });
   } else {
-    renderTaskList(lastTasks, lastPalette);
+    rerender();
   }
 }
-
-// Latest known flyby state, kept in sync via getFlybyState / onConfigChanged.
-let _flybyState = { enabled: true, snoozed_until: null };
 
 /**
  * Reflect the flyby state on the cat button: crossed out (is-snoozed) when the
@@ -178,7 +187,7 @@ function applyFlybyIcon() {
     return;
   }
   const now = Date.now();
-  const suppressed = isFlybySuppressed(_flybyState, now);
+  const suppressed = isFlybySuppressed(sidebarState._flybyState, now);
   toggle.classList.toggle('is-snoozed', suppressed);
   // "Reactivate" only makes sense when something is suspended.
   const reactivate = document.querySelector('.flyby-menu-item--reactivate');
@@ -189,14 +198,14 @@ function applyFlybyIcon() {
     toggle.setAttribute('aria-label', t(suppressed ? 'flyby_menu.suspended' : 'flyby_menu.active'));
     const stateEl = document.getElementById('flybyMenuState');
     if (stateEl) {
-      const until = _flybyState.snoozed_until
-        ? new Date(_flybyState.snoozed_until).toLocaleString([], {
+      const until = sidebarState._flybyState.snoozed_until
+        ? new Date(sidebarState._flybyState.snoozed_until).toLocaleString([], {
             weekday: 'short',
             hour: '2-digit',
             minute: '2-digit',
           })
         : '';
-      stateEl.textContent = t(flybyStateKey(_flybyState, now), { time: until });
+      stateEl.textContent = t(flybyStateKey(sidebarState._flybyState, now), { time: until });
     }
   }
 }
@@ -228,11 +237,11 @@ function renderUrgencyBar(globalScore, palette) {
 }
 
 function renderActiveTimerSection(container, tasks, palette) {
-  if (!activeTimer) {
+  if (!sidebarState.activeTimer) {
     return;
   }
   const timerTask = tasks.find(function (task) {
-    return task.id === activeTimer.taskId;
+    return task.id === sidebarState.activeTimer.taskId;
   });
   if (!timerTask) {
     return;
@@ -256,13 +265,13 @@ function renderTaskList(tasks, palette) {
 
   container.innerHTML = '';
 
-  lastTasks = tasks;
-  lastPalette = palette;
+  sidebarState.lastTasks = tasks;
+  sidebarState.lastPalette = palette;
 
-  if (pendingDelete) {
+  if (sidebarState.pendingDelete) {
     container.appendChild(
       createUndoToast(
-        t('sidebar.deleted_toast', { title: pendingDelete.task.title }),
+        t('sidebar.deleted_toast', { title: sidebarState.pendingDelete.task.title }),
         t('sidebar.undo'),
         undoPendingDelete,
       ),
@@ -279,13 +288,13 @@ function renderTaskList(tasks, palette) {
     gtasks: gtasksTasks,
     favorites: favoriteTasks,
   } = groupTasksForSections(tasks, {
-    pendingDeleteId: pendingDelete ? pendingDelete.task.id : null,
-    favoriteIds: favoriteTaskIds,
-    jiraFilter,
+    pendingDeleteId: sidebarState.pendingDelete ? sidebarState.pendingDelete.task.id : null,
+    favoriteIds: sidebarState.favoriteTaskIds,
+    jiraFilter: sidebarState.jiraFilter,
   });
 
   renderActiveTimerSection(container, visibleTasks, palette);
-  if (isEmpty && !addFormVisible) {
+  if (isEmpty && !sidebarState.addFormVisible) {
     container.appendChild(
       createStartCard({
         onNewTask: openQuickAdd,
@@ -308,7 +317,7 @@ function renderTaskList(tasks, palette) {
   if (favoriteTasks.length > 0) {
     renderSection(container, t('sidebar.jira_favorites'), favoriteTasks, palette, 'jira_favorites');
   }
-  if (jiraTasks.length > 0 || jiraFilter) {
+  if (jiraTasks.length > 0 || sidebarState.jiraFilter) {
     renderJiraSection(container, jiraTasks, palette);
   }
 
@@ -321,394 +330,8 @@ function renderTaskList(tasks, palette) {
   }
 }
 
-function createEditForm(task) {
-  const form = document.createElement('div');
-  form.className = 'task-card edit-form-card';
-
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.className = 'quick-add-input';
-  titleInput.value = task.title;
-
-  const row = document.createElement('div');
-  row.className = 'quick-add-row';
-
-  const dateInput = document.createElement('input');
-  dateInput.type = 'datetime-local';
-  dateInput.className = 'quick-add-date';
-  if (task.due_at) {
-    dateInput.value = toDateTimeLocalValue(new Date(task.due_at));
-  }
-
-  const prioritySelect = document.createElement('select');
-  prioritySelect.className = 'quick-add-priority';
-  const priorities = [
-    { value: '1', label: 'P1' },
-    { value: '2', label: 'P2' },
-    { value: '3', label: 'P3' },
-    { value: '4', label: 'P4' },
-  ];
-  for (let i = 0; i < priorities.length; i++) {
-    const opt = document.createElement('option');
-    opt.value = priorities[i].value;
-    opt.textContent = priorities[i].label;
-    if (String(task.priority) === priorities[i].value) {
-      opt.selected = true;
-    }
-    prioritySelect.appendChild(opt);
-  }
-
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'quick-add-save';
-  saveBtn.textContent = t('common.save');
-  saveBtn.addEventListener('click', function () {
-    const values = readTaskFormValues({
-      title: titleInput.value,
-      date: dateInput.value,
-      priority: prioritySelect.value,
-    });
-    if (values.error) {
-      titleInput.focus();
-      return;
-    }
-    window.deadlineAura.updateLocalTask({
-      id: task.id,
-      ...values,
-    });
-    editingTaskId = null;
-  });
-
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'local-action-btn';
-  cancelBtn.textContent = '\u2715';
-  cancelBtn.title = t('common.cancel');
-  cancelBtn.addEventListener('click', function () {
-    editingTaskId = null;
-    renderTaskList(lastTasks, lastPalette);
-  });
-
-  titleInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      saveBtn.click();
-    }
-    if (e.key === 'Escape') {
-      editingTaskId = null;
-      renderTaskList(lastTasks, lastPalette);
-    }
-  });
-
-  row.appendChild(dateInput);
-  row.appendChild(prioritySelect);
-  row.appendChild(saveBtn);
-  row.appendChild(cancelBtn);
-
-  form.appendChild(titleInput);
-  form.appendChild(row);
-
-  return form;
-}
-
-const DURATION_PRESETS_MIN = [15, 30, 60, 90];
-const LOGGED_BADGE_MS = 3000;
-
-// Optional link to a Jira issue for a personal task: collapsed until the user asks for it.
-function createJiraKeyPicker(task, onKeyChange) {
-  const wrap = document.createElement('div');
-  wrap.className = 'jira-key-picker';
-
-  const reveal = document.createElement('button');
-  reveal.type = 'button';
-  reveal.className = 'time-log-link';
-  reveal.textContent = t('sidebar.link_jira_optional');
-
-  const fields = document.createElement('div');
-  fields.hidden = true;
-
-  const jiraSelect = document.createElement('select');
-  jiraSelect.className = 'time-log-jira-select';
-  jiraSelect.setAttribute('aria-label', t('sidebar.select_jira_task'));
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = t('sidebar.select_jira_task');
-  jiraSelect.appendChild(placeholder);
-  const jiraTasks = (lastTasks || []).filter(function (item) {
-    return item.source === 'jira';
-  });
-  for (let i = 0; i < jiraTasks.length; i++) {
-    const opt = document.createElement('option');
-    opt.value = extractJiraKey(jiraTasks[i].title) || '';
-    opt.textContent = jiraTasks[i].title;
-    jiraSelect.appendChild(opt);
-  }
-
-  const orLabel = document.createElement('div');
-  orLabel.className = 'time-log-or-label';
-  orLabel.textContent = t('sidebar.or_manual_code');
-
-  const manualKeyInput = document.createElement('input');
-  manualKeyInput.type = 'text';
-  manualKeyInput.className = 'time-log-manual-key';
-  manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
-  manualKeyInput.setAttribute('aria-label', t('sidebar.or_manual_code'));
-
-  function currentKey() {
-    const manual = manualKeyInput.value.trim().toUpperCase();
-    return manual || jiraSelect.value || null;
-  }
-
-  jiraSelect.addEventListener('change', function () {
-    if (jiraSelect.value) {
-      manualKeyInput.value = '';
-    }
-    onKeyChange(currentKey());
-  });
-  manualKeyInput.addEventListener('input', function () {
-    if (manualKeyInput.value.trim()) {
-      jiraSelect.value = '';
-    }
-    onKeyChange(currentKey());
-  });
-  reveal.addEventListener('click', function () {
-    reveal.hidden = true;
-    fields.hidden = false;
-    jiraSelect.focus();
-  });
-
-  fields.appendChild(jiraSelect);
-  fields.appendChild(orLabel);
-  fields.appendChild(manualKeyInput);
-  wrap.appendChild(reveal);
-  wrap.appendChild(fields);
-  return { element: wrap, getKey: currentKey };
-}
-
-function createLabelledField(labelText, control, id) {
-  const field = document.createElement('div');
-  field.className = 'time-log-field';
-  const label = document.createElement('label');
-  label.className = 'time-log-label';
-  label.htmlFor = id;
-  label.textContent = labelText;
-  control.id = id;
-  field.appendChild(label);
-  field.appendChild(control);
-  return field;
-}
-
-function createFormError() {
-  const error = document.createElement('p');
-  error.className = 'time-log-error';
-  error.setAttribute('role', 'alert');
-  error.hidden = true;
-  return {
-    element: error,
-    show: function (message) {
-      error.textContent = message;
-      error.hidden = false;
-    },
-    clear: function () {
-      error.hidden = true;
-    },
-  };
-}
-
-function createTimeLogForm(task) {
-  const form = document.createElement('div');
-  form.className = 'time-log-form';
-  const idBase = 'tl-' + String(task.id).replace(/[^a-zA-Z0-9_-]/g, '_');
-
-  const header = document.createElement('div');
-  header.className = 'time-log-header';
-  header.textContent = t('sidebar.log_time_title');
-  form.appendChild(header);
-
-  const jiraKey = extractJiraKey(task.title);
-  const summaryEl = document.createElement('div');
-  summaryEl.className = 'time-log-summary';
-  summaryEl.textContent = buildEventSummary(jiraKey, task.title);
-  form.appendChild(summaryEl);
-
-  if (task.source === 'local' && !jiraKey) {
-    const picker = createJiraKeyPicker(task, function (key) {
-      summaryEl.textContent = key ? '[' + key + '] - ' + task.title : task.title;
-    });
-    form.appendChild(picker.element);
-  }
-
-  const logStart = defaultLogStart(new Date());
-
-  const dateInput = document.createElement('input');
-  dateInput.type = 'date';
-  dateInput.className = 'time-log-date';
-  dateInput.value = logStart.slice(0, 10);
-
-  const timeInput = document.createElement('input');
-  timeInput.type = 'time';
-  timeInput.className = 'time-log-time';
-  timeInput.value = logStart.slice(11);
-
-  const row1 = document.createElement('div');
-  row1.className = 'time-log-row';
-  row1.appendChild(createLabelledField(t('sidebar.label_day'), dateInput, idBase + '-date'));
-  row1.appendChild(createLabelledField(t('sidebar.label_start'), timeInput, idBase + '-time'));
-  form.appendChild(row1);
-
-  const durationInput = document.createElement('input');
-  durationInput.type = 'number';
-  durationInput.className = 'time-log-duration';
-  durationInput.min = '15';
-  durationInput.max = '480';
-  durationInput.step = '15';
-  durationInput.value = '60';
-
-  const presets = document.createElement('div');
-  presets.className = 'time-log-presets';
-  function syncPresets() {
-    presets.querySelectorAll('button').forEach(function (b) {
-      const active = b.dataset.minutes === durationInput.value;
-      b.classList.toggle('active', active);
-      b.setAttribute('aria-pressed', String(active));
-    });
-  }
-  for (const minutes of DURATION_PRESETS_MIN) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.dataset.minutes = String(minutes);
-    chip.textContent = minutes < 60 ? minutes + ' min' : formatCountdown(minutes / 60);
-    chip.addEventListener('click', function () {
-      durationInput.value = String(minutes);
-      syncPresets();
-    });
-    presets.appendChild(chip);
-  }
-  durationInput.addEventListener('input', syncPresets);
-  syncPresets();
-
-  const durationField = createLabelledField(
-    t('sidebar.label_duration'),
-    durationInput,
-    idBase + '-duration',
-  );
-  durationField.appendChild(presets);
-  form.appendChild(durationField);
-
-  const calendarSelect = document.createElement('select');
-  calendarSelect.className = 'time-log-calendar-select';
-  const loadingOpt = document.createElement('option');
-  loadingOpt.value = '';
-  loadingOpt.textContent = t('sidebar.select_calendar');
-  calendarSelect.appendChild(loadingOpt);
-  loadCalendarOptions(calendarSelect);
-  form.appendChild(
-    createLabelledField(t('sidebar.label_calendar'), calendarSelect, idBase + '-calendar'),
-  );
-
-  const error = createFormError();
-
-  const sendBtn = document.createElement('button');
-  sendBtn.type = 'button';
-  sendBtn.className = 'time-log-send';
-  sendBtn.textContent = t('sidebar.log_time');
-
-  const cancelBtn = createIconButton({
-    icon: 'close',
-    label: t('common.cancel'),
-    onClick: function () {
-      timeLogTaskId = null;
-      renderTaskList(lastTasks, lastPalette);
-    },
-  });
-
-  sendBtn.addEventListener('click', function () {
-    error.clear();
-    const values = validateTimeLog({
-      duration: durationInput.value,
-      calendarId: calendarSelect.value,
-      date: dateInput.value,
-      time: timeInput.value,
-    });
-    if (values.error) {
-      error.show(t(values.error));
-      const fields = { duration: durationInput, calendar: calendarSelect, date: dateInput };
-      fields[values.field].focus();
-      return;
-    }
-    const { duration, calendarId: calId, startTime } = values;
-
-    sendBtn.disabled = true;
-    sendBtn.textContent = t('sidebar.logging');
-
-    window.deadlineAura
-      .logTimeToCalendar({
-        summary: summaryEl.textContent,
-        startTime: startTime,
-        durationMinutes: duration,
-        calendarId: calId,
-      })
-      .then(function (result) {
-        if (result.ok) {
-          window.deadlineAura.setDefaultLogCalendar(calId);
-          timeLogTaskId = null;
-          temporaryLoggedTaskId = task.id;
-          renderTaskList(lastTasks, lastPalette);
-          setTimeout(function () {
-            temporaryLoggedTaskId = null;
-            renderTaskList(lastTasks, lastPalette);
-          }, LOGGED_BADGE_MS);
-        } else {
-          sendBtn.disabled = false;
-          sendBtn.textContent = t('sidebar.log_time');
-          error.show(t('sidebar.log_failed', { error: result.error || '?' }));
-        }
-      });
-  });
-
-  const row2 = document.createElement('div');
-  row2.className = 'time-log-row time-log-actions';
-  row2.appendChild(sendBtn);
-  row2.appendChild(cancelBtn);
-  form.appendChild(row2);
-  form.appendChild(error.element);
-
-  return form;
-}
-
-function loadCalendarOptions(selectEl) {
-  if (cachedCalendars) {
-    populateCalendarSelect(selectEl, cachedCalendars);
-    return;
-  }
-  window.deadlineAura.listCalendars().then(function (result) {
-    if (result.ok && result.calendars) {
-      cachedCalendars = result.calendars;
-      populateCalendarSelect(selectEl, result.calendars);
-    }
-  });
-}
-
-function populateCalendarSelect(selectEl, calendars) {
-  selectEl.innerHTML = '';
-  const placeholder = document.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = t('sidebar.select_calendar');
-  selectEl.appendChild(placeholder);
-
-  for (let i = 0; i < calendars.length; i++) {
-    const opt = document.createElement('option');
-    opt.value = calendars[i].id;
-    opt.textContent = calendars[i].summary;
-    selectEl.appendChild(opt);
-  }
-
-  window.deadlineAura.getDefaultLogCalendar().then(function (result) {
-    if (result.ok && result.calendarId) {
-      selectEl.value = result.calendarId;
-    }
-  });
-}
-
 function createTaskCard(task) {
-  if (task.source === 'local' && editingTaskId === task.id) {
+  if (task.source === 'local' && sidebarState.editingTaskId === task.id) {
     return createEditForm(task);
   }
 
@@ -778,7 +401,7 @@ function createTaskCard(task) {
     meta.appendChild(badge);
   }
 
-  if (temporaryLoggedTaskId === task.id) {
+  if (sidebarState.temporaryLoggedTaskId === task.id) {
     const logged = document.createElement('span');
     logged.className = 'task-logged';
     logged.textContent = t('sidebar.time_logged');
@@ -798,7 +421,7 @@ function createTaskCard(task) {
   card.appendChild(meta);
 
   // Append time log form if this task is being logged
-  if (timeLogTaskId === task.id) {
+  if (sidebarState.timeLogTaskId === task.id) {
     const wrapper = document.createElement('div');
     wrapper.appendChild(card);
     wrapper.appendChild(createTimeLogForm(task));
@@ -806,7 +429,7 @@ function createTaskCard(task) {
   }
 
   // Append timer calendar picker if needed
-  if (timerPickerTaskId === task.id) {
+  if (sidebarState.timerPickerTaskId === task.id) {
     const wrapper = document.createElement('div');
     wrapper.appendChild(card);
     wrapper.appendChild(createTimerCalendarPicker(task));
@@ -832,7 +455,7 @@ function appendPrimaryActions(container, task) {
   }
 
   if (task.source === 'jira') {
-    const isFav = favoriteTaskIds.has(task.id);
+    const isFav = sidebarState.favoriteTaskIds.has(task.id);
     container.appendChild(
       createIconButton({
         icon: 'star',
@@ -850,17 +473,17 @@ function appendPrimaryActions(container, task) {
   }
 
   // A running timer always keeps its stop button, even if Google stopped being available.
-  const isTimerActive = activeTimer && activeTimer.taskId === task.id;
+  const isTimerActive = sidebarState.activeTimer && sidebarState.activeTimer.taskId === task.id;
   if (
     (task.source === 'jira' || task.source === 'local') &&
-    (googleCalendarReady || isTimerActive)
+    (sidebarState.googleCalendarReady || isTimerActive)
   ) {
     container.appendChild(createTimerButton(task));
   }
 }
 
 function createTimerButton(task) {
-  const isTimerActive = activeTimer && activeTimer.taskId === task.id;
+  const isTimerActive = sidebarState.activeTimer && sidebarState.activeTimer.taskId === task.id;
   if (isTimerActive) {
     const stopBtn = document.createElement('button');
     stopBtn.type = 'button';
@@ -870,7 +493,7 @@ function createTimerButton(task) {
     const elapsed = document.createElement('span');
     elapsed.className = 'timer-elapsed';
     elapsed.dataset.taskId = task.id;
-    elapsed.textContent = formatElapsed(activeTimer.startTime);
+    elapsed.textContent = formatElapsed(sidebarState.activeTimer.startTime);
     stopBtn.appendChild(createIcon('stop'));
     stopBtn.appendChild(elapsed);
     stopBtn.addEventListener('click', function (e) {
@@ -879,7 +502,8 @@ function createTimerButton(task) {
     });
     return stopBtn;
   }
-  const isOtherTimerActive = activeTimer && activeTimer.taskId !== task.id;
+  const isOtherTimerActive =
+    sidebarState.activeTimer && sidebarState.activeTimer.taskId !== task.id;
   return createIconButton({
     icon: 'play',
     label: t('sidebar.timer_start'),
@@ -901,13 +525,13 @@ function buildTaskMenuItems(task) {
       label: t('common.edit'),
       icon: 'edit',
       onClick: function () {
-        editingTaskId = task.id;
-        renderTaskList(lastTasks, lastPalette);
+        sidebarState.editingTaskId = task.id;
+        rerender();
       },
     });
   }
   if (task.source === 'jira' || task.source === 'local') {
-    const isPinned = pinnedTaskIds.has(task.id);
+    const isPinned = sidebarState.pinnedTaskIds.has(task.id);
     items.push({
       label: isPinned ? t('sidebar.unpin_from_desktop') : t('sidebar.pin_to_desktop'),
       icon: isPinned ? 'unpin' : 'pin',
@@ -919,13 +543,13 @@ function buildTaskMenuItems(task) {
         }
       },
     });
-    if (googleCalendarReady) {
+    if (sidebarState.googleCalendarReady) {
       items.push({
         label: t('sidebar.log_time'),
         icon: 'clock',
         onClick: function () {
-          timeLogTaskId = timeLogTaskId === task.id ? null : task.id;
-          renderTaskList(lastTasks, lastPalette);
+          sidebarState.timeLogTaskId = sidebarState.timeLogTaskId === task.id ? null : task.id;
+          rerender();
         },
       });
     } else {
@@ -954,27 +578,29 @@ function buildTaskMenuItems(task) {
 
 // --- Delete with undo: the task disappears at once, the IPC delete waits for the undo window ---
 const UNDO_DELETE_MS = 5000;
-let pendingDelete = null; // { task, timeoutId }
 
 function requestLocalDelete(task) {
   commitPendingDelete();
-  pendingDelete = { task: task, timeoutId: setTimeout(commitPendingDelete, UNDO_DELETE_MS) };
-  renderTaskList(lastTasks, lastPalette);
+  sidebarState.pendingDelete = {
+    task: task,
+    timeoutId: setTimeout(commitPendingDelete, UNDO_DELETE_MS),
+  };
+  rerender();
 }
 
 function commitPendingDelete() {
-  if (!pendingDelete) {
+  if (!sidebarState.pendingDelete) {
     return;
   }
-  clearTimeout(pendingDelete.timeoutId);
-  const taskId = pendingDelete.task.id;
-  pendingDelete = null;
+  clearTimeout(sidebarState.pendingDelete.timeoutId);
+  const taskId = sidebarState.pendingDelete.task.id;
+  sidebarState.pendingDelete = null;
   window.deadlineAura.deleteLocalTask(taskId);
   // Drop it locally too, so it does not flash back before the next update arrives.
-  lastTasks = (lastTasks || []).filter(function (item) {
+  sidebarState.lastTasks = (sidebarState.lastTasks || []).filter(function (item) {
     return item.id !== taskId;
   });
-  renderTaskList(lastTasks, lastPalette);
+  rerender();
 }
 
 // Closing or reloading the sidebar inside the undo window must still delete the task.
@@ -982,12 +608,12 @@ window.addEventListener('pagehide', commitPendingDelete);
 window.addEventListener('beforeunload', commitPendingDelete);
 
 function undoPendingDelete() {
-  if (!pendingDelete) {
+  if (!sidebarState.pendingDelete) {
     return;
   }
-  clearTimeout(pendingDelete.timeoutId);
-  pendingDelete = null;
-  renderTaskList(lastTasks, lastPalette);
+  clearTimeout(sidebarState.pendingDelete.timeoutId);
+  sidebarState.pendingDelete = null;
+  rerender();
 }
 
 function handlePlayClick(task) {
@@ -995,8 +621,8 @@ function handlePlayClick(task) {
     if (result.ok && result.calendarId) {
       startTimer(task, result.calendarId);
     } else {
-      timerPickerTaskId = timerPickerTaskId === task.id ? null : task.id;
-      renderTaskList(lastTasks, lastPalette);
+      sidebarState.timerPickerTaskId = sidebarState.timerPickerTaskId === task.id ? null : task.id;
+      rerender();
     }
   });
 }
@@ -1054,8 +680,8 @@ function createTimerCalendarPicker(task) {
       icon: 'close',
       label: t('common.cancel'),
       onClick: function () {
-        timerPickerTaskId = null;
-        renderTaskList(lastTasks, lastPalette);
+        sidebarState.timerPickerTaskId = null;
+        rerender();
       },
     }),
   );
@@ -1092,7 +718,7 @@ function renderSection(container, title, tasks, _palette, sectionId) {
       : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset['expanded_' + sectionId] = isExpanded ? '0' : '1';
-      renderTaskList(lastTasks, lastPalette);
+      rerender();
     });
     container.appendChild(expandBtn);
   }
@@ -1116,10 +742,10 @@ function renderJiraSection(container, tasks, _palette) {
   searchInput.type = 'text';
   searchInput.className = 'jira-search';
   searchInput.placeholder = t('sidebar.filter_placeholder');
-  searchInput.value = jiraFilter;
+  searchInput.value = sidebarState.jiraFilter;
   searchInput.addEventListener('input', function () {
-    jiraFilter = searchInput.value;
-    renderTaskList(lastTasks, lastPalette);
+    sidebarState.jiraFilter = searchInput.value;
+    rerender();
   });
   searchWrap.appendChild(searchInput);
   container.appendChild(searchWrap);
@@ -1127,7 +753,9 @@ function renderJiraSection(container, tasks, _palette) {
   if (tasks.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.textContent = jiraFilter ? t('sidebar.no_results') : t('sidebar.no_jira_tasks');
+    empty.textContent = sidebarState.jiraFilter
+      ? t('sidebar.no_results')
+      : t('sidebar.no_jira_tasks');
     container.appendChild(empty);
     return;
   }
@@ -1147,18 +775,15 @@ function renderJiraSection(container, tasks, _palette) {
       : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset.expanded_jira = isExpanded ? '0' : '1';
-      renderTaskList(lastTasks, lastPalette);
+      rerender();
     });
     container.appendChild(expandBtn);
   }
 }
 
-let addFormVisible = false;
-let editingTaskId = null;
-
 function openQuickAdd() {
-  addFormVisible = true;
-  renderTaskList(lastTasks, lastPalette);
+  sidebarState.addFormVisible = true;
+  rerender();
   const input = document.getElementById('quickAddTitle');
   if (input) {
     input.focus();
@@ -1178,20 +803,20 @@ function renderLocalSection(container, tasks, _palette, startCardShown) {
 
   const addToggle = document.createElement('button');
   addToggle.className = 'local-add-toggle';
-  addToggle.textContent = addFormVisible ? '\u2212' : '+';
+  addToggle.textContent = sidebarState.addFormVisible ? '\u2212' : '+';
   addToggle.title = t('sidebar.new_task');
   addToggle.addEventListener('click', function () {
-    addFormVisible = !addFormVisible;
-    renderTaskList(lastTasks, lastPalette);
+    sidebarState.addFormVisible = !sidebarState.addFormVisible;
+    rerender();
   });
   label.appendChild(addToggle);
   container.appendChild(label);
 
-  if (addFormVisible) {
+  if (sidebarState.addFormVisible) {
     container.appendChild(createQuickAddForm());
   }
 
-  if (tasks.length === 0 && !addFormVisible) {
+  if (tasks.length === 0 && !sidebarState.addFormVisible) {
     if (!startCardShown) {
       const empty = document.createElement('div');
       empty.className = 'empty-state';
@@ -1216,84 +841,10 @@ function renderLocalSection(container, tasks, _palette, startCardShown) {
       : t('sidebar.show_all', { n: tasks.length - COLLAPSED_LIMIT });
     expandBtn.addEventListener('click', function () {
       container.dataset.expanded_local = isExpanded ? '0' : '1';
-      renderTaskList(lastTasks, lastPalette);
+      rerender();
     });
     container.appendChild(expandBtn);
   }
-}
-
-function createQuickAddForm() {
-  const form = document.createElement('div');
-  form.className = 'quick-add-form';
-
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.className = 'quick-add-input';
-  titleInput.placeholder = t('sidebar.task_title_placeholder');
-  titleInput.id = 'quickAddTitle';
-
-  const row = document.createElement('div');
-  row.className = 'quick-add-row';
-
-  const dateInput = document.createElement('input');
-  dateInput.type = 'datetime-local';
-  dateInput.className = 'quick-add-date';
-  dateInput.id = 'quickAddDate';
-
-  const prioritySelect = document.createElement('select');
-  prioritySelect.className = 'quick-add-priority';
-  prioritySelect.id = 'quickAddPriority';
-  const priorities = [
-    { value: '1', label: t('priorities.p1_full') },
-    { value: '2', label: t('priorities.p2_full') },
-    { value: '3', label: t('priorities.p3_full') },
-    { value: '4', label: t('priorities.p4_full') },
-  ];
-  for (let i = 0; i < priorities.length; i++) {
-    const opt = document.createElement('option');
-    opt.value = priorities[i].value;
-    opt.textContent = priorities[i].label;
-    if (priorities[i].value === '3') {
-      opt.selected = true;
-    }
-    prioritySelect.appendChild(opt);
-  }
-
-  const saveBtn = document.createElement('button');
-  saveBtn.className = 'quick-add-save';
-  saveBtn.textContent = t('common.add');
-  saveBtn.addEventListener('click', function () {
-    const values = readTaskFormValues({
-      title: titleInput.value,
-      date: dateInput.value,
-      priority: prioritySelect.value,
-    });
-    if (values.error) {
-      titleInput.focus();
-      return;
-    }
-    window.deadlineAura.createLocalTask(values);
-    addFormVisible = false;
-  });
-
-  titleInput.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      saveBtn.click();
-    }
-    if (e.key === 'Escape') {
-      addFormVisible = false;
-      renderTaskList(lastTasks, lastPalette);
-    }
-  });
-
-  row.appendChild(dateInput);
-  row.appendChild(prioritySelect);
-  row.appendChild(saveBtn);
-
-  form.appendChild(titleInput);
-  form.appendChild(row);
-
-  return form;
 }
 
 updateClock();
@@ -1381,7 +932,7 @@ document.getElementById('btnClose').addEventListener('click', function () {
       const action = item.dataset.action;
       const res = await window.deadlineAura.setFlybyState(action);
       if (res && res.ok && res.state) {
-        _flybyState = res.state;
+        sidebarState._flybyState = res.state;
         applyFlybyIcon();
       } else {
         console.error('flyby:set-state failed for action', action, res && res.error);
@@ -1405,7 +956,7 @@ document.getElementById('btnClose').addEventListener('click', function () {
 
   window.deadlineAura.getFlybyState().then(function (state) {
     if (state) {
-      _flybyState = state;
+      sidebarState._flybyState = state;
       applyFlybyIcon();
     }
   });
@@ -1517,7 +1068,7 @@ window.deadlineAura.onConfigChanged((cfg) => {
   setShiftConfig(cfg.work_shift || null);
   updateShiftCountdown();
   if (cfg.meeting_flyby) {
-    _flybyState = {
+    sidebarState._flybyState = {
       enabled: cfg.meeting_flyby.enabled !== false,
       snoozed_until: cfg.meeting_flyby.snoozed_until ?? null,
     };
@@ -1526,24 +1077,24 @@ window.deadlineAura.onConfigChanged((cfg) => {
 });
 
 window.deadlineAura.onUpdate(function (data) {
-  pinnedTaskIds = new Set(data.pinnedTaskIds || []);
-  favoriteTaskIds = new Set(data.favoriteTaskIds || []);
+  sidebarState.pinnedTaskIds = new Set(data.pinnedTaskIds || []);
+  sidebarState.favoriteTaskIds = new Set(data.favoriteTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
-  googleCalendarReady = data.googleCalendarReady !== false;
+  sidebarState.googleCalendarReady = data.googleCalendarReady !== false;
   renderClinicalNote(data.clinicalNote);
   renderStressForecast(data.stressForecast);
   updateAiNotesToggle(Boolean(data.clinicalNote), (data.stressForecast || []).length > 0);
   renderTaskList(data.engineResult.tasks, data.palette);
   renderSyncStatus(data.syncStatus || null);
-  if (!firstRunHintDismissed) {
+  if (!sidebarState.firstRunHintDismissed) {
     document.getElementById('firstRunHint').hidden = !data.showFirstRunHint;
   }
 });
 
 // Set once the user closes the hint, so a late update cannot bring it back.
-let firstRunHintDismissed = false;
+
 document.getElementById('firstRunOk').addEventListener('click', function () {
-  firstRunHintDismissed = true;
+  sidebarState.firstRunHintDismissed = true;
   document.getElementById('firstRunHint').hidden = true;
   window.deadlineAura.dismissFirstRunHint();
 });

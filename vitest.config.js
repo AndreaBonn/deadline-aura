@@ -20,6 +20,8 @@ module.exports = defineConfig({
         'renderer/i18n-renderer.js',
         'renderer/shift-countdown.js',
         'renderer/settings-helpers.js',
+        'renderer/sidebar-task-forms.js',
+        'renderer/sidebar-time-log.js',
         'renderer/sidebar-form-values.js',
         'renderer/sidebar-ai-panel.js',
         'renderer/sidebar-timer.js',

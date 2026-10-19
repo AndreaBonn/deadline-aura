@@ -5,6 +5,7 @@ const {
   toDateTimeLocalValue,
   defaultLogStart,
   validateTimeLog,
+  priorityOptions,
 } = require('../../renderer/sidebar-form-values');
 
 describe('task form values', () => {
@@ -80,4 +81,20 @@ describe('time log validation', () => {
       });
     },
   );
+});
+
+describe('priority options', () => {
+  it('preselects P3 when adding a task', () => {
+    const selected = priorityOptions(null).filter((option) => option.selected);
+    expect(selected.map((option) => option.value)).toEqual(['3']);
+  });
+
+  it.each([1, 2, 4])("preselects the task's own priority P%i when editing", (priority) => {
+    const selected = priorityOptions({ priority }).filter((option) => option.selected);
+    expect(selected.map((option) => option.value)).toEqual([String(priority)]);
+  });
+
+  it('lists P1 to P4 in order', () => {
+    expect(priorityOptions(null).map((option) => option.value)).toEqual(['1', '2', '3', '4']);
+  });
 });

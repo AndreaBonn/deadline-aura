@@ -1,6 +1,7 @@
 'use strict';
 
 const LOG_QUARTER_MINUTES = 15;
+const DEFAULT_NEW_TASK_PRIORITY = 3;
 
 function readTaskFormValues({ title, date, priority }) {
   const trimmedTitle = title.trim();
@@ -54,6 +55,23 @@ function validateTimeLog({ duration, calendarId, date, time }) {
   return { duration: minutes, calendarId, startTime: start.toISOString() };
 }
 
+/**
+ * Priority choices for the task forms, with the one to preselect.
+ *
+ * @param {{priority: number}|null} task - Task being edited, or null when adding.
+ * @returns {{value: string, selected: boolean}[]} P1 to P4; the task's priority, or P3 for a new task.
+ */
+function priorityOptions(task) {
+  const preselected = String(task ? task.priority : DEFAULT_NEW_TASK_PRIORITY);
+  return ['1', '2', '3', '4'].map((value) => ({ value, selected: value === preselected }));
+}
+
 if (typeof module !== 'undefined') {
-  module.exports = { readTaskFormValues, toDateTimeLocalValue, defaultLogStart, validateTimeLog };
+  module.exports = {
+    readTaskFormValues,
+    toDateTimeLocalValue,
+    defaultLogStart,
+    validateTimeLog,
+    priorityOptions,
+  };
 }
