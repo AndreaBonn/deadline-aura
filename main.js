@@ -53,6 +53,7 @@ const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
 const { summarizeSync } = require('./core/sync-status');
+const { engineOptionsFromConfig, aiNotesFromCache } = require('./core/update-payload');
 const { describeSourceStatus, collectSourceFacts } = require('./core/source-status');
 const {
   onboardingMarkerPath,
@@ -530,11 +531,7 @@ function checkDesktopState() {
 
 function initSidebar() {
   // Compute initial color before creating strips so they start with the correct palette
-  const initialResult = deadlineEngine.run({
-    lookaheadHours: config.sync.lookahead_hours,
-    k: config.engine.k_constant,
-    priorityWeights: config.engine.priority_weights,
-  });
+  const initialResult = deadlineEngine.run(engineOptionsFromConfig(config));
   const initialPalette = colorMapper.mapScoreToColor(initialResult.global_score);
   currentPaletteHex = initialPalette.accent_hex;
 
@@ -577,11 +574,7 @@ async function runUpdateCycle({ force = false } = {}) {
   }
   isUpdateCycleRunning = true;
   try {
-    const engineResult = deadlineEngine.run({
-      lookaheadHours: config.sync.lookahead_hours,
-      k: config.engine.k_constant,
-      priorityWeights: config.engine.priority_weights,
-    });
+    const engineResult = deadlineEngine.run(engineOptionsFromConfig(config));
 
     const palette = colorMapper.mapScoreToColor(engineResult.global_score);
 
@@ -612,8 +605,7 @@ async function runUpdateCycle({ force = false } = {}) {
     const favoriteIds = favoriteQueries.getAllFavoriteIds();
 
     const aiResponse = db.getLatestAiCacheResponse();
-    const clinicalNote = aiResponse?.note || aiResponse?.clinical_note || null;
-    const stressForecast = aiResponse?.daily_breakdown || [];
+    const { clinicalNote, stressForecast } = aiNotesFromCache(aiResponse);
 
     if (sidebarWindow && !sidebarWindow.isDestroyed() && sidebarReady) {
       sidebarWindow.webContents.send('update', {
@@ -836,11 +828,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('score:get-breakdown', () => {
     try {
-      const result = deadlineEngine.run({
-        lookaheadHours: config.sync.lookahead_hours,
-        k: config.engine.k_constant,
-        priorityWeights: config.engine.priority_weights,
-      });
+      const result = deadlineEngine.run(engineOptionsFromConfig(config));
       const aiResponse = db.getLatestAiCacheResponse();
       return {
         breakdown: result.breakdown,
