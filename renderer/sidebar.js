@@ -2,8 +2,8 @@
 
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
-   priorityKey, formatScore100, withoutFavorites, flybyStateKey, formatSyncStatus,
-   urgencyToTextColor, buildScoreBreakdownHtml,
+   priorityKey, formatScore100, flybyStateKey, formatSyncStatus,
+   urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
 const COLLAPSED_LIMIT = 5;
@@ -250,16 +250,6 @@ function renderUrgencyBar(globalScore, palette) {
   scoreEl.title = globalScore.toFixed(2);
 }
 
-function filterJiraTasks(tasks) {
-  if (!jiraFilter) {
-    return tasks;
-  }
-  const query = jiraFilter.toLowerCase();
-  return tasks.filter(function (task) {
-    return task.title.toLowerCase().includes(query);
-  });
-}
-
 function renderActiveTimerSection(container, tasks, palette) {
   if (!activeTimer) {
     return;
@@ -302,43 +292,19 @@ function renderTaskList(tasks, palette) {
     );
   }
 
-  // A task waiting for its undo window is already gone from the user's point of view.
-  const visibleTasks = (tasks || []).filter(function (task) {
-    return !pendingDelete || task.id !== pendingDelete.task.id;
-  });
-  const isEmpty = visibleTasks.length === 0;
-
-  const gcalTasks = visibleTasks
-    .filter(function (task) {
-      return task.source === 'gcal';
-    })
-    .sort(function (a, b) {
-      return (a.due_at || 0) - (b.due_at || 0);
-    });
-  const outlookTasks = visibleTasks
-    .filter(function (task) {
-      return task.source === 'outlook';
-    })
-    .sort(function (a, b) {
-      return (a.due_at || 0) - (b.due_at || 0);
-    });
-  const jiraTasks = filterJiraTasks(
-    withoutFavorites(
-      visibleTasks.filter(function (task) {
-        return task.source === 'jira';
-      }),
-      favoriteTaskIds,
-    ),
-  );
-  const localTasks = visibleTasks.filter(function (task) {
-    return task.source === 'local';
-  });
-  const gtasksTasks = visibleTasks.filter(function (task) {
-    return task.source === 'gtasks';
-  });
-
-  const favoriteTasks = visibleTasks.filter(function (task) {
-    return task.source === 'jira' && favoriteTaskIds.has(task.id);
+  const {
+    visibleTasks,
+    isEmpty,
+    gcal: gcalTasks,
+    outlook: outlookTasks,
+    jira: jiraTasks,
+    local: localTasks,
+    gtasks: gtasksTasks,
+    favorites: favoriteTasks,
+  } = groupTasksForSections(tasks, {
+    pendingDeleteId: pendingDelete ? pendingDelete.task.id : null,
+    favoriteIds: favoriteTaskIds,
+    jiraFilter,
   });
 
   renderActiveTimerSection(container, visibleTasks, palette);
