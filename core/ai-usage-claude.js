@@ -246,5 +246,4 @@ module.exports = {
   readSnapshot,
   readClaudeUsage,
   DEFAULT_ACCOUNT,
-  ACCOUNT_ID_PATTERN,
 };

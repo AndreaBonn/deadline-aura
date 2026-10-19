@@ -280,8 +280,5 @@ module.exports = {
   buildScoringPrompt,
   parseAiResponse,
   PROMPT_VERSION,
-  VALID_CATEGORIES,
   VALID_COGNITIVE_TYPES,
-  VALID_LEVELS,
-  VALID_ADEQUACY,
 };

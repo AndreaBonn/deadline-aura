@@ -53,11 +53,8 @@ function computeBandLayout(rowCount, region) {
 
 module.exports = {
   computeBandLayout,
-  BAND_MARGIN_X,
   BAND_PADDING_Y,
-  MIN_COLUMN_WIDTH,
   CARD_FILE_HEIGHT,
-  CARD_FILE_GAP,
   CARD_LABEL_LINE_HEIGHT,
   CARD_VALUE_LINE_HEIGHT,
 };

@@ -127,4 +127,4 @@ async function scoreEvents(events, config) {
   return null;
 }
 
-module.exports = { scoreEvents, loadProviders, resolveKeyString };
+module.exports = { scoreEvents, loadProviders };

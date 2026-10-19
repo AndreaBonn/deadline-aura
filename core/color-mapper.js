@@ -105,4 +105,4 @@ function mapScoreToColor(score) {
   };
 }
 
-module.exports = { mapScoreToColor, COLOR_BANDS, lerp, hslToHex };
+module.exports = { mapScoreToColor, hslToHex };
