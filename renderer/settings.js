@@ -92,8 +92,24 @@ document.getElementById('settingsNav').addEventListener('click', (e) => {
   selectTab(btn.dataset.tab);
 });
 
+// A rejected IPC call is not a validation answer: it carries no issues to point at.
+async function requestSave() {
+  try {
+    return await settingsApi.saveConfig(config);
+  } catch (err) {
+    console.error('settings save failed:', err.message);
+    return { ok: false, rejected: true };
+  }
+}
+
+// The error stays until the next save: the user needs time to find the field.
+function showSaveError(message) {
+  feedback.classList.add('save-feedback--error');
+  feedback.textContent = message;
+}
+
 async function saveSettings() {
-  const result = await settingsApi.saveConfig(config);
+  const result = await requestSave();
   if (result.ok) {
     savedConfig = JSON.parse(JSON.stringify(config));
     userTouched = false;
@@ -106,10 +122,12 @@ async function saveSettings() {
     }, FEEDBACK_MS);
     return true;
   }
-  // The error stays until the next save: the user needs time to find the field.
-  feedback.classList.add('save-feedback--error');
-  feedback.textContent = describeSaveError(result, t, (tab) =>
-    document.querySelector(`.nav-item[data-tab="${tab}"]`).textContent.trim(),
+  showSaveError(
+    result.rejected
+      ? t('settings.action_failed')
+      : describeSaveError(result, t, (tab) =>
+          document.querySelector(`.nav-item[data-tab="${tab}"]`).textContent.trim(),
+        ),
   );
   const issue = (result.issues || [])[0];
   const tab = issue && tabForIssuePath(issue.path);
@@ -204,9 +222,14 @@ function renderTab() {
 
 // Init
 (async () => {
-  await initI18n(settingsApi);
-  config = await settingsApi.getConfig();
-  savedConfig = JSON.parse(JSON.stringify(config));
-  defaults = await settingsApi.getDefaults();
-  selectTab(activeTab);
+  try {
+    await initI18n(settingsApi);
+    config = await settingsApi.getConfig();
+    savedConfig = JSON.parse(JSON.stringify(config));
+    defaults = await settingsApi.getDefaults();
+    selectTab(activeTab);
+  } catch (err) {
+    console.error('settings init failed:', err.message);
+    showSaveError(t('settings.action_failed'));
+  }
 })();
