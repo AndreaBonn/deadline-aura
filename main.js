@@ -14,7 +14,12 @@
 }
 
 const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
-const { execFile } = require('child_process');
+const { execFile, execFileSync, spawn } = require('child_process');
+const { openExternalUrl } = require('./core/open-external');
+const externalBrowserDependencies = {
+  which: (bin) => execFileSync('which', [bin], { stdio: 'ignore' }),
+  spawnDetached: spawn,
+};
 const path = require('path');
 const os = require('os');
 const {
@@ -749,22 +754,7 @@ app.whenReady().then(() => {
     if (typeof url === 'string' && isSafeExternalUrl(url)) {
       const googleAccount = config.sources?.google_calendar?.google_account;
       const finalUrl = buildMeetUrl(url, googleAccount);
-      const { spawn, execFileSync } = require('child_process');
-      const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
-      let opened = false;
-      for (const bin of browsers) {
-        try {
-          execFileSync('which', [bin], { stdio: 'ignore' });
-          spawn(bin, [finalUrl], { detached: true, stdio: 'ignore' }).unref();
-          opened = true;
-          break;
-        } catch {
-          /* not found, try next */
-        }
-      }
-      if (!opened) {
-        spawn('xdg-open', [finalUrl], { detached: true, stdio: 'ignore' }).unref();
-      }
+      openExternalUrl(finalUrl, externalBrowserDependencies);
     }
   });
 
@@ -835,24 +825,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('shell:open-link', (_event, url) => {
-    if (typeof url === 'string' && isSafeExternalUrl(url)) {
-      const { spawn, execFileSync } = require('child_process');
-      const browsers = ['firefox', 'google-chrome', 'chromium-browser', 'chromium'];
-      let opened = false;
-      for (const bin of browsers) {
-        try {
-          execFileSync('which', [bin], { stdio: 'ignore' });
-          spawn(bin, [url], { detached: true, stdio: 'ignore' }).unref();
-          opened = true;
-          break;
-        } catch {
-          /* not found, try next */
-        }
-      }
-      if (!opened) {
-        spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-      }
-    }
+    openExternalUrl(url, externalBrowserDependencies);
   });
 
   ipcMain.on('settings:open', () => {
