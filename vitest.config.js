@@ -19,6 +19,7 @@ module.exports = defineConfig({
         'renderer/settings-ai-capture.js',
         'renderer/i18n-renderer.js',
         'renderer/shift-countdown.js',
+        'renderer/settings-helpers.js',
       ],
       reporter: ['text', 'json-summary'],
       thresholds: {

@@ -1,7 +1,10 @@
 'use strict';
 
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
-   updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary */
+   updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
+   priorityKey, formatScore100, withoutFavorites, flybyStateKey, formatSyncStatus, escapeHtml,
+   urgencyToTextColor,
+   createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
 const COLLAPSED_LIMIT = 5;
 const COLOR_ONGOING = '#4fc3f7';
@@ -15,6 +18,8 @@ let favoriteTaskIds = new Set();
 let timeLogTaskId = null;
 let temporaryLoggedTaskId = null;
 let cachedCalendars = null;
+// Time logging and the live timer write to Google Calendar: without it they cannot work.
+let googleCalendarReady = true;
 
 // --- Live timer state ---
 const TIMER_STORAGE_KEY = 'deadlineaura_active_timer';
@@ -195,10 +200,27 @@ function applyFlybyIcon() {
   if (!toggle) {
     return;
   }
-  const suppressed = isFlybySuppressed(_flybyState, Date.now());
+  const now = Date.now();
+  const suppressed = isFlybySuppressed(_flybyState, now);
   toggle.classList.toggle('is-snoozed', suppressed);
+  // "Reactivate" only makes sense when something is suspended.
+  const reactivate = document.querySelector('.flyby-menu-item--reactivate');
+  if (reactivate) {
+    reactivate.hidden = !suppressed;
+  }
   if (_i18nReady) {
     toggle.setAttribute('aria-label', t(suppressed ? 'flyby_menu.suspended' : 'flyby_menu.active'));
+    const stateEl = document.getElementById('flybyMenuState');
+    if (stateEl) {
+      const until = _flybyState.snoozed_until
+        ? new Date(_flybyState.snoozed_until).toLocaleString([], {
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '';
+      stateEl.textContent = t(flybyStateKey(_flybyState, now), { time: until });
+    }
   }
 }
 
@@ -222,7 +244,10 @@ function renderUrgencyBar(globalScore, palette) {
   bar.style.backgroundColor = palette.accent_hex;
 
   document.getElementById('urgencyLabel').textContent = palette.label;
-  document.getElementById('urgencyScore').textContent = globalScore.toFixed(2);
+  const scoreEl = document.getElementById('urgencyScore');
+  scoreEl.textContent = formatScore100(globalScore);
+  // The exact value stays available to whoever tunes the thresholds.
+  scoreEl.title = globalScore.toFixed(2);
 }
 
 function filterJiraTasks(tasks) {
@@ -267,19 +292,30 @@ function renderTaskList(tasks, palette) {
   lastTasks = tasks;
   lastPalette = palette;
 
-  if (!tasks || tasks.length === 0) {
-    container.innerHTML = '<div class="empty-state">' + t('sidebar.no_tasks') + '</div>';
-    return;
+  if (pendingDelete) {
+    container.appendChild(
+      createUndoToast(
+        t('sidebar.deleted_toast', { title: pendingDelete.task.title }),
+        t('sidebar.undo'),
+        undoPendingDelete,
+      ),
+    );
   }
 
-  const gcalTasks = tasks
+  // A task waiting for its undo window is already gone from the user's point of view.
+  const visibleTasks = (tasks || []).filter(function (task) {
+    return !pendingDelete || task.id !== pendingDelete.task.id;
+  });
+  const isEmpty = visibleTasks.length === 0;
+
+  const gcalTasks = visibleTasks
     .filter(function (task) {
       return task.source === 'gcal';
     })
     .sort(function (a, b) {
       return (a.due_at || 0) - (b.due_at || 0);
     });
-  const outlookTasks = tasks
+  const outlookTasks = visibleTasks
     .filter(function (task) {
       return task.source === 'outlook';
     })
@@ -287,23 +323,36 @@ function renderTaskList(tasks, palette) {
       return (a.due_at || 0) - (b.due_at || 0);
     });
   const jiraTasks = filterJiraTasks(
-    tasks.filter(function (task) {
-      return task.source === 'jira';
-    }),
+    withoutFavorites(
+      visibleTasks.filter(function (task) {
+        return task.source === 'jira';
+      }),
+      favoriteTaskIds,
+    ),
   );
-  const localTasks = tasks.filter(function (task) {
+  const localTasks = visibleTasks.filter(function (task) {
     return task.source === 'local';
   });
-  const gtasksTasks = tasks.filter(function (task) {
+  const gtasksTasks = visibleTasks.filter(function (task) {
     return task.source === 'gtasks';
   });
 
-  const favoriteTasks = tasks.filter(function (task) {
+  const favoriteTasks = visibleTasks.filter(function (task) {
     return task.source === 'jira' && favoriteTaskIds.has(task.id);
   });
 
-  renderActiveTimerSection(container, tasks, palette);
-  renderLocalSection(container, localTasks, palette);
+  renderActiveTimerSection(container, visibleTasks, palette);
+  if (isEmpty && !addFormVisible) {
+    container.appendChild(
+      createStartCard({
+        onNewTask: openQuickAdd,
+        onOpenSettings: function () {
+          window.deadlineAura.openConfig();
+        },
+      }),
+    );
+  }
+  renderLocalSection(container, localTasks, palette, isEmpty);
   if (gtasksTasks.length > 0) {
     renderSection(container, t('sidebar.google_tasks'), gtasksTasks, palette, 'gtasks');
   }
@@ -433,9 +482,114 @@ function padTwo(n) {
   return String(n).padStart(2, '0');
 }
 
+const DURATION_PRESETS_MIN = [15, 30, 60, 90];
+const LOGGED_BADGE_MS = 3000;
+
+// Optional link to a Jira issue for a personal task: collapsed until the user asks for it.
+function createJiraKeyPicker(task, onKeyChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'jira-key-picker';
+
+  const reveal = document.createElement('button');
+  reveal.type = 'button';
+  reveal.className = 'time-log-link';
+  reveal.textContent = t('sidebar.link_jira_optional');
+
+  const fields = document.createElement('div');
+  fields.hidden = true;
+
+  const jiraSelect = document.createElement('select');
+  jiraSelect.className = 'time-log-jira-select';
+  jiraSelect.setAttribute('aria-label', t('sidebar.select_jira_task'));
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = t('sidebar.select_jira_task');
+  jiraSelect.appendChild(placeholder);
+  const jiraTasks = (lastTasks || []).filter(function (item) {
+    return item.source === 'jira';
+  });
+  for (let i = 0; i < jiraTasks.length; i++) {
+    const opt = document.createElement('option');
+    opt.value = extractJiraKey(jiraTasks[i].title) || '';
+    opt.textContent = jiraTasks[i].title;
+    jiraSelect.appendChild(opt);
+  }
+
+  const orLabel = document.createElement('div');
+  orLabel.className = 'time-log-or-label';
+  orLabel.textContent = t('sidebar.or_manual_code');
+
+  const manualKeyInput = document.createElement('input');
+  manualKeyInput.type = 'text';
+  manualKeyInput.className = 'time-log-manual-key';
+  manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
+  manualKeyInput.setAttribute('aria-label', t('sidebar.or_manual_code'));
+
+  function currentKey() {
+    const manual = manualKeyInput.value.trim().toUpperCase();
+    return manual || jiraSelect.value || null;
+  }
+
+  jiraSelect.addEventListener('change', function () {
+    if (jiraSelect.value) {
+      manualKeyInput.value = '';
+    }
+    onKeyChange(currentKey());
+  });
+  manualKeyInput.addEventListener('input', function () {
+    if (manualKeyInput.value.trim()) {
+      jiraSelect.value = '';
+    }
+    onKeyChange(currentKey());
+  });
+  reveal.addEventListener('click', function () {
+    reveal.hidden = true;
+    fields.hidden = false;
+    jiraSelect.focus();
+  });
+
+  fields.appendChild(jiraSelect);
+  fields.appendChild(orLabel);
+  fields.appendChild(manualKeyInput);
+  wrap.appendChild(reveal);
+  wrap.appendChild(fields);
+  return { element: wrap, getKey: currentKey };
+}
+
+function createLabelledField(labelText, control, id) {
+  const field = document.createElement('div');
+  field.className = 'time-log-field';
+  const label = document.createElement('label');
+  label.className = 'time-log-label';
+  label.htmlFor = id;
+  label.textContent = labelText;
+  control.id = id;
+  field.appendChild(label);
+  field.appendChild(control);
+  return field;
+}
+
+function createFormError() {
+  const error = document.createElement('p');
+  error.className = 'time-log-error';
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  return {
+    element: error,
+    show: function (message) {
+      error.textContent = message;
+      error.hidden = false;
+    },
+    clear: function () {
+      error.hidden = true;
+    },
+  };
+}
+
 function createTimeLogForm(task) {
   const form = document.createElement('div');
   form.className = 'time-log-form';
+  const idBase = 'tl-' + String(task.id).replace(/[^a-zA-Z0-9_-]/g, '_');
 
   const header = document.createElement('div');
   header.className = 'time-log-header';
@@ -443,75 +597,21 @@ function createTimeLogForm(task) {
   form.appendChild(header);
 
   const jiraKey = extractJiraKey(task.title);
-  const needsJiraSelect = task.source === 'local' && !jiraKey;
-
-  const summary = buildEventSummary(jiraKey, task.title);
   const summaryEl = document.createElement('div');
   summaryEl.className = 'time-log-summary';
-  summaryEl.textContent = summary;
+  summaryEl.textContent = buildEventSummary(jiraKey, task.title);
   form.appendChild(summaryEl);
 
-  let jiraSelect = null;
-  let manualKeyInput = null;
-  if (needsJiraSelect) {
-    jiraSelect = document.createElement('select');
-    jiraSelect.className = 'time-log-jira-select';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = t('sidebar.select_jira_task');
-    jiraSelect.appendChild(placeholder);
-
-    const jiraTasks = (lastTasks || []).filter(function (item) {
-      return item.source === 'jira';
+  if (task.source === 'local' && !jiraKey) {
+    const picker = createJiraKeyPicker(task, function (key) {
+      summaryEl.textContent = key ? '[' + key + '] - ' + task.title : task.title;
     });
-    for (let i = 0; i < jiraTasks.length; i++) {
-      const opt = document.createElement('option');
-      const key = extractJiraKey(jiraTasks[i].title);
-      opt.value = key || jiraTasks[i].title;
-      opt.textContent = jiraTasks[i].title;
-      jiraSelect.appendChild(opt);
-    }
-
-    jiraSelect.addEventListener('change', function () {
-      const selectedKey = jiraSelect.value;
-      if (selectedKey) {
-        manualKeyInput.value = '';
-        summaryEl.textContent = '[' + selectedKey + '] - ' + task.title;
-      } else {
-        summaryEl.textContent = task.title;
-      }
-    });
-
-    form.appendChild(jiraSelect);
-
-    const orLabel = document.createElement('div');
-    orLabel.className = 'time-log-or-label';
-    orLabel.textContent = t('sidebar.or_manual_code');
-    form.appendChild(orLabel);
-
-    manualKeyInput = document.createElement('input');
-    manualKeyInput.type = 'text';
-    manualKeyInput.className = 'time-log-manual-key';
-    manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
-    manualKeyInput.addEventListener('input', function () {
-      const val = manualKeyInput.value.trim().toUpperCase();
-      if (val) {
-        jiraSelect.value = '';
-        summaryEl.textContent = '[' + val + '] - ' + task.title;
-      } else if (!jiraSelect.value) {
-        summaryEl.textContent = task.title;
-      }
-    });
-    form.appendChild(manualKeyInput);
+    form.appendChild(picker.element);
   }
 
   const now = new Date();
   const roundedMinutes = Math.floor(now.getMinutes() / 15) * 15;
   now.setMinutes(roundedMinutes, 0, 0);
-
-  const row1 = document.createElement('div');
-  row1.className = 'time-log-row';
 
   const dateInput = document.createElement('input');
   dateInput.type = 'date';
@@ -524,6 +624,12 @@ function createTimeLogForm(task) {
   timeInput.className = 'time-log-time';
   timeInput.value = padTwo(now.getHours()) + ':' + padTwo(now.getMinutes());
 
+  const row1 = document.createElement('div');
+  row1.className = 'time-log-row';
+  row1.appendChild(createLabelledField(t('sidebar.label_day'), dateInput, idBase + '-date'));
+  row1.appendChild(createLabelledField(t('sidebar.label_start'), timeInput, idBase + '-time'));
+  form.appendChild(row1);
+
   const durationInput = document.createElement('input');
   durationInput.type = 'number';
   durationInput.className = 'time-log-duration';
@@ -531,15 +637,37 @@ function createTimeLogForm(task) {
   durationInput.max = '480';
   durationInput.step = '15';
   durationInput.value = '60';
-  durationInput.title = t('sidebar.duration_minutes');
 
-  row1.appendChild(dateInput);
-  row1.appendChild(timeInput);
-  row1.appendChild(durationInput);
-  form.appendChild(row1);
+  const presets = document.createElement('div');
+  presets.className = 'time-log-presets';
+  function syncPresets() {
+    presets.querySelectorAll('button').forEach(function (b) {
+      const active = b.dataset.minutes === durationInput.value;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-pressed', String(active));
+    });
+  }
+  for (const minutes of DURATION_PRESETS_MIN) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.dataset.minutes = String(minutes);
+    chip.textContent = minutes < 60 ? minutes + ' min' : formatCountdown(minutes / 60);
+    chip.addEventListener('click', function () {
+      durationInput.value = String(minutes);
+      syncPresets();
+    });
+    presets.appendChild(chip);
+  }
+  durationInput.addEventListener('input', syncPresets);
+  syncPresets();
 
-  const row2 = document.createElement('div');
-  row2.className = 'time-log-row';
+  const durationField = createLabelledField(
+    t('sidebar.label_duration'),
+    durationInput,
+    idBase + '-duration',
+  );
+  durationField.appendChild(presets);
+  form.appendChild(durationField);
 
   const calendarSelect = document.createElement('select');
   calendarSelect.className = 'time-log-calendar-select';
@@ -547,47 +675,55 @@ function createTimeLogForm(task) {
   loadingOpt.value = '';
   loadingOpt.textContent = t('sidebar.select_calendar');
   calendarSelect.appendChild(loadingOpt);
-
   loadCalendarOptions(calendarSelect);
+  form.appendChild(
+    createLabelledField(t('sidebar.label_calendar'), calendarSelect, idBase + '-calendar'),
+  );
+
+  const error = createFormError();
 
   const sendBtn = document.createElement('button');
+  sendBtn.type = 'button';
   sendBtn.className = 'time-log-send';
   sendBtn.textContent = t('sidebar.log_time');
 
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'local-action-btn';
-  cancelBtn.textContent = '\u2715';
-  cancelBtn.title = t('common.cancel');
-  cancelBtn.addEventListener('click', function () {
-    timeLogTaskId = null;
-    renderTaskList(lastTasks, lastPalette);
+  const cancelBtn = createIconButton({
+    icon: 'close',
+    label: t('common.cancel'),
+    onClick: function () {
+      timeLogTaskId = null;
+      renderTaskList(lastTasks, lastPalette);
+    },
   });
 
   sendBtn.addEventListener('click', function () {
-    const finalSummary = summaryEl.textContent;
-    const manualVal = manualKeyInput ? manualKeyInput.value.trim() : '';
-    if (needsJiraSelect && !jiraSelect.value && !manualVal) {
-      manualKeyInput.focus();
-      return;
-    }
-    const startTime = new Date(dateInput.value + 'T' + timeInput.value + ':00').toISOString();
+    error.clear();
     const duration = parseInt(durationInput.value, 10);
     if (!duration || duration < 1) {
+      error.show(t('sidebar.error_duration'));
       durationInput.focus();
       return;
     }
     const calId = calendarSelect.value;
     if (!calId) {
+      error.show(t('sidebar.error_calendar'));
       calendarSelect.focus();
       return;
     }
+    const start = new Date(dateInput.value + 'T' + timeInput.value + ':00');
+    if (Number.isNaN(start.getTime())) {
+      error.show(t('sidebar.error_start'));
+      dateInput.focus();
+      return;
+    }
+    const startTime = start.toISOString();
 
     sendBtn.disabled = true;
     sendBtn.textContent = t('sidebar.logging');
 
     window.deadlineAura
       .logTimeToCalendar({
-        summary: finalSummary,
+        summary: summaryEl.textContent,
         startTime: startTime,
         durationMinutes: duration,
         calendarId: calId,
@@ -601,18 +737,21 @@ function createTimeLogForm(task) {
           setTimeout(function () {
             temporaryLoggedTaskId = null;
             renderTaskList(lastTasks, lastPalette);
-          }, 3000);
+          }, LOGGED_BADGE_MS);
         } else {
           sendBtn.disabled = false;
-          sendBtn.textContent = result.error || 'Error';
+          sendBtn.textContent = t('sidebar.log_time');
+          error.show(t('sidebar.log_failed', { error: result.error || '?' }));
         }
       });
   });
 
-  row2.appendChild(calendarSelect);
+  const row2 = document.createElement('div');
+  row2.className = 'time-log-row time-log-actions';
   row2.appendChild(sendBtn);
   row2.appendChild(cancelBtn);
   form.appendChild(row2);
+  form.appendChild(error.element);
 
   return form;
 }
@@ -661,11 +800,7 @@ function createTaskCard(task) {
   if (task.web_url) {
     card.classList.add('clickable');
     card.addEventListener('click', function (e) {
-      if (
-        e.target.closest('.pin-btn') ||
-        e.target.closest('.time-log-btn') ||
-        e.target.closest('.favorite-btn')
-      ) {
+      if (e.target.closest('.task-actions')) {
         return;
       }
       window.deadlineAura.openLink(task.web_url);
@@ -700,7 +835,7 @@ function createTaskCard(task) {
     countdownEl.style.color = COLOR_ENDED;
     countdownEl.classList.add('event-ended');
   } else {
-    countdownEl.style.color = color;
+    countdownEl.style.color = urgencyToTextColor(task.urgency_score);
   }
   countdownEl.textContent = countdown + ' ';
   countdownEl.appendChild(dot);
@@ -710,7 +845,14 @@ function createTaskCard(task) {
 
   const meta = document.createElement('div');
   meta.className = 'task-meta';
-  meta.textContent = String(task.source) + (task.priority ? ' · P' + Number(task.priority) : '');
+
+  const prioKey = priorityKey(Number(task.priority));
+  if (prioKey) {
+    const prio = document.createElement('span');
+    prio.className = 'task-priority prio-' + Number(task.priority);
+    prio.textContent = t(prioKey);
+    meta.appendChild(prio);
+  }
 
   if (task.ai_category) {
     const badge = document.createElement('span');
@@ -719,136 +861,21 @@ function createTaskCard(task) {
     meta.appendChild(badge);
   }
 
-  // Action buttons for local tasks
-  if (task.source === 'local') {
-    const actionsWrap = document.createElement('span');
-    actionsWrap.className = 'local-actions';
-
-    const doneBtn = document.createElement('button');
-    doneBtn.className = 'local-action-btn done-btn';
-    doneBtn.textContent = '\u2713';
-    doneBtn.title = t('sidebar.complete');
-    doneBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      window.deadlineAura.completeLocalTask(task.id);
-    });
-    actionsWrap.appendChild(doneBtn);
-
-    const editBtn = document.createElement('button');
-    editBtn.className = 'local-action-btn edit-btn';
-    editBtn.textContent = '✏';
-    editBtn.title = t('common.edit');
-    editBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      editingTaskId = task.id;
-      renderTaskList(lastTasks, lastPalette);
-    });
-    actionsWrap.appendChild(editBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'local-action-btn del-btn';
-    delBtn.textContent = '\u2715';
-    delBtn.title = t('common.delete');
-    delBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      window.deadlineAura.deleteLocalTask(task.id);
-    });
-    actionsWrap.appendChild(delBtn);
-
-    meta.appendChild(actionsWrap);
+  if (temporaryLoggedTaskId === task.id) {
+    const logged = document.createElement('span');
+    logged.className = 'task-logged';
+    logged.textContent = t('sidebar.time_logged');
+    meta.appendChild(logged);
   }
 
-  // Favorite button — solo per task Jira
-  if (task.source === 'jira') {
-    const favBtn = document.createElement('button');
-    const isFav = favoriteTaskIds.has(task.id);
-    favBtn.className = 'favorite-btn' + (isFav ? ' favorited' : '');
-    favBtn.textContent = '\u2605';
-    favBtn.title = isFav ? t('sidebar.remove_from_favorites') : t('sidebar.add_to_favorites');
-    favBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (isFav) {
-        window.deadlineAura.unfavoriteTask(task.id);
-      } else {
-        window.deadlineAura.favoriteTask(task.id);
-      }
-    });
-    meta.appendChild(favBtn);
+  const actions = document.createElement('span');
+  actions.className = 'task-actions';
+  appendPrimaryActions(actions, task);
+  const menuItems = buildTaskMenuItems(task);
+  if (menuItems.length > 0) {
+    actions.appendChild(createActionMenu(t('sidebar.more_actions'), menuItems));
   }
-
-  // Pin/unpin button — per task Jira e local
-  if (task.source === 'jira' || task.source === 'local') {
-    const pinBtn = document.createElement('button');
-    const isPinned = pinnedTaskIds.has(task.id);
-    pinBtn.className = 'pin-btn' + (isPinned ? ' pinned' : '');
-    pinBtn.textContent = isPinned ? '✕' : '📌';
-    pinBtn.title = isPinned ? t('sidebar.unpin_from_desktop') : t('sidebar.pin_to_desktop');
-    pinBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      if (isPinned) {
-        window.deadlineAura.unpinTask(task.id);
-      } else {
-        window.deadlineAura.pinTask(task.id);
-      }
-    });
-    meta.appendChild(pinBtn);
-  }
-
-  // Time log button — per task Jira e local
-  if (task.source === 'jira' || task.source === 'local') {
-    const isLogged = temporaryLoggedTaskId === task.id;
-    const timeBtn = document.createElement('button');
-    timeBtn.className = 'time-log-btn' + (isLogged ? ' logged' : '');
-    timeBtn.textContent = isLogged ? '\u2713' : '\u23F1';
-    timeBtn.title = isLogged ? t('sidebar.time_logged') : t('sidebar.log_time');
-    if (!isLogged) {
-      timeBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        timeLogTaskId = timeLogTaskId === task.id ? null : task.id;
-        renderTaskList(lastTasks, lastPalette);
-      });
-    }
-    meta.appendChild(timeBtn);
-  }
-
-  // Live timer play/stop button — per task Jira e local
-  if (task.source === 'jira' || task.source === 'local') {
-    const isTimerActive = activeTimer && activeTimer.taskId === task.id;
-    const isOtherTimerActive = activeTimer && activeTimer.taskId !== task.id;
-
-    if (isTimerActive) {
-      const stopBtn = document.createElement('button');
-      stopBtn.className = 'timer-stop-btn';
-      const elapsed = document.createElement('span');
-      elapsed.className = 'timer-elapsed';
-      elapsed.dataset.taskId = task.id;
-      elapsed.textContent = formatElapsed(activeTimer.startTime);
-      stopBtn.appendChild(document.createTextNode('\u25A0 '));
-      stopBtn.appendChild(elapsed);
-      stopBtn.title = t('sidebar.timer_stop');
-      stopBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        stopTimer();
-      });
-      meta.appendChild(stopBtn);
-    } else {
-      const playBtn = document.createElement('button');
-      playBtn.className = 'timer-play-btn';
-      if (isOtherTimerActive) {
-        playBtn.classList.add('disabled');
-      }
-      playBtn.textContent = '\u25B6';
-      playBtn.title = t('sidebar.timer_start');
-      playBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        if (isOtherTimerActive) {
-          stopTimer();
-        }
-        handlePlayClick(task);
-      });
-      meta.appendChild(playBtn);
-    }
-  }
+  meta.appendChild(actions);
 
   card.appendChild(header);
   card.appendChild(meta);
@@ -872,21 +899,186 @@ function createTaskCard(task) {
   return card;
 }
 
-function handlePlayClick(task) {
-  const jiraKey = extractJiraKey(task.title);
-  const needsJiraSelect = task.source === 'local' && !jiraKey;
-
-  if (needsJiraSelect) {
-    timerPickerTaskId = timerPickerTaskId === task.id ? null : task.id;
-    renderTaskList(lastTasks, lastPalette);
-    return;
+// Buttons always visible on a card: complete, favorite and the live timer.
+function appendPrimaryActions(container, task) {
+  if (task.source === 'local') {
+    container.appendChild(
+      createIconButton({
+        icon: 'check',
+        label: t('sidebar.complete'),
+        className: 'done-btn',
+        onClick: function () {
+          window.deadlineAura.completeLocalTask(task.id);
+        },
+      }),
+    );
   }
 
+  if (task.source === 'jira') {
+    const isFav = favoriteTaskIds.has(task.id);
+    container.appendChild(
+      createIconButton({
+        icon: 'star',
+        label: isFav ? t('sidebar.remove_from_favorites') : t('sidebar.add_to_favorites'),
+        className: 'favorite-btn' + (isFav ? ' favorited' : ''),
+        onClick: function () {
+          if (isFav) {
+            window.deadlineAura.unfavoriteTask(task.id);
+          } else {
+            window.deadlineAura.favoriteTask(task.id);
+          }
+        },
+      }),
+    );
+  }
+
+  // A running timer always keeps its stop button, even if Google stopped being available.
+  const isTimerActive = activeTimer && activeTimer.taskId === task.id;
+  if (
+    (task.source === 'jira' || task.source === 'local') &&
+    (googleCalendarReady || isTimerActive)
+  ) {
+    container.appendChild(createTimerButton(task));
+  }
+}
+
+function createTimerButton(task) {
+  const isTimerActive = activeTimer && activeTimer.taskId === task.id;
+  if (isTimerActive) {
+    const stopBtn = document.createElement('button');
+    stopBtn.type = 'button';
+    stopBtn.className = 'timer-stop-btn';
+    stopBtn.title = t('sidebar.timer_stop');
+    stopBtn.setAttribute('aria-label', t('sidebar.timer_stop'));
+    const elapsed = document.createElement('span');
+    elapsed.className = 'timer-elapsed';
+    elapsed.dataset.taskId = task.id;
+    elapsed.textContent = formatElapsed(activeTimer.startTime);
+    stopBtn.appendChild(createIcon('stop'));
+    stopBtn.appendChild(elapsed);
+    stopBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      stopTimer();
+    });
+    return stopBtn;
+  }
+  const isOtherTimerActive = activeTimer && activeTimer.taskId !== task.id;
+  return createIconButton({
+    icon: 'play',
+    label: t('sidebar.timer_start'),
+    className: 'timer-play-btn' + (isOtherTimerActive ? ' disabled' : ''),
+    onClick: function () {
+      if (isOtherTimerActive) {
+        stopTimer();
+      }
+      handlePlayClick(task);
+    },
+  });
+}
+
+// Secondary actions, grouped behind the "more" button with their names written out.
+function buildTaskMenuItems(task) {
+  const items = [];
+  if (task.source === 'local') {
+    items.push({
+      label: t('common.edit'),
+      icon: 'edit',
+      onClick: function () {
+        editingTaskId = task.id;
+        renderTaskList(lastTasks, lastPalette);
+      },
+    });
+  }
+  if (task.source === 'jira' || task.source === 'local') {
+    const isPinned = pinnedTaskIds.has(task.id);
+    items.push({
+      label: isPinned ? t('sidebar.unpin_from_desktop') : t('sidebar.pin_to_desktop'),
+      icon: isPinned ? 'unpin' : 'pin',
+      onClick: function () {
+        if (isPinned) {
+          window.deadlineAura.unpinTask(task.id);
+        } else {
+          window.deadlineAura.pinTask(task.id);
+        }
+      },
+    });
+    if (googleCalendarReady) {
+      items.push({
+        label: t('sidebar.log_time'),
+        icon: 'clock',
+        onClick: function () {
+          timeLogTaskId = timeLogTaskId === task.id ? null : task.id;
+          renderTaskList(lastTasks, lastPalette);
+        },
+      });
+    } else {
+      // Time logging writes to Google Calendar: point to the setup instead of a dead form.
+      items.push({
+        label: t('sidebar.google_connect'),
+        icon: 'clock',
+        onClick: function () {
+          window.deadlineAura.openConfig();
+        },
+      });
+    }
+  }
+  if (task.source === 'local') {
+    items.push({
+      label: t('common.delete'),
+      icon: 'trash',
+      danger: true,
+      onClick: function () {
+        requestLocalDelete(task);
+      },
+    });
+  }
+  return items;
+}
+
+// --- Delete with undo: the task disappears at once, the IPC delete waits for the undo window ---
+const UNDO_DELETE_MS = 5000;
+let pendingDelete = null; // { task, timeoutId }
+
+function requestLocalDelete(task) {
+  commitPendingDelete();
+  pendingDelete = { task: task, timeoutId: setTimeout(commitPendingDelete, UNDO_DELETE_MS) };
+  renderTaskList(lastTasks, lastPalette);
+}
+
+function commitPendingDelete() {
+  if (!pendingDelete) {
+    return;
+  }
+  clearTimeout(pendingDelete.timeoutId);
+  const taskId = pendingDelete.task.id;
+  pendingDelete = null;
+  window.deadlineAura.deleteLocalTask(taskId);
+  // Drop it locally too, so it does not flash back before the next update arrives.
+  lastTasks = (lastTasks || []).filter(function (item) {
+    return item.id !== taskId;
+  });
+  renderTaskList(lastTasks, lastPalette);
+}
+
+// Closing or reloading the sidebar inside the undo window must still delete the task.
+window.addEventListener('pagehide', commitPendingDelete);
+window.addEventListener('beforeunload', commitPendingDelete);
+
+function undoPendingDelete() {
+  if (!pendingDelete) {
+    return;
+  }
+  clearTimeout(pendingDelete.timeoutId);
+  pendingDelete = null;
+  renderTaskList(lastTasks, lastPalette);
+}
+
+function handlePlayClick(task) {
   window.deadlineAura.getDefaultLogCalendar().then(function (result) {
     if (result.ok && result.calendarId) {
       startTimer(task, result.calendarId);
     } else {
-      timerPickerTaskId = task.id;
+      timerPickerTaskId = timerPickerTaskId === task.id ? null : task.id;
       renderTaskList(lastTasks, lastPalette);
     }
   });
@@ -895,95 +1087,64 @@ function handlePlayClick(task) {
 function createTimerCalendarPicker(task) {
   const form = document.createElement('div');
   form.className = 'timer-picker-form';
+  const idBase = 'tp-' + String(task.id).replace(/[^a-zA-Z0-9_-]/g, '_');
 
   const header = document.createElement('div');
   header.className = 'time-log-header';
   header.textContent = t('sidebar.timer_select_calendar');
   form.appendChild(header);
 
-  const jiraKey = extractJiraKey(task.title);
-  const needsJiraSelect = task.source === 'local' && !jiraKey;
-
-  let jiraSelect = null;
-  let manualKeyInput = null;
-
-  if (needsJiraSelect) {
-    jiraSelect = document.createElement('select');
-    jiraSelect.className = 'time-log-jira-select';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = t('sidebar.select_jira_task');
-    jiraSelect.appendChild(placeholder);
-
-    const jiraTasks = (lastTasks || []).filter(function (item) {
-      return item.source === 'jira';
-    });
-    for (let i = 0; i < jiraTasks.length; i++) {
-      const opt = document.createElement('option');
-      const key = extractJiraKey(jiraTasks[i].title);
-      opt.value = key || '';
-      opt.textContent = jiraTasks[i].title;
-      jiraSelect.appendChild(opt);
-    }
-    form.appendChild(jiraSelect);
-
-    manualKeyInput = document.createElement('input');
-    manualKeyInput.type = 'text';
-    manualKeyInput.className = 'time-log-manual-key';
-    manualKeyInput.placeholder = t('sidebar.manual_code_placeholder');
-    form.appendChild(manualKeyInput);
+  let picker = null;
+  if (task.source === 'local' && !extractJiraKey(task.title)) {
+    picker = createJiraKeyPicker(task, function () {});
+    form.appendChild(picker.element);
   }
-
-  const row = document.createElement('div');
-  row.className = 'time-log-row';
 
   const calendarSelect = document.createElement('select');
   calendarSelect.className = 'time-log-calendar-select';
   loadCalendarOptions(calendarSelect);
-  row.appendChild(calendarSelect);
+  form.appendChild(
+    createLabelledField(t('sidebar.label_calendar'), calendarSelect, idBase + '-calendar'),
+  );
+
+  const error = createFormError();
+
+  const row = document.createElement('div');
+  row.className = 'time-log-row time-log-actions';
 
   const startBtn = document.createElement('button');
+  startBtn.type = 'button';
   startBtn.className = 'timer-start-btn';
-  startBtn.textContent = '\u25B6 ' + t('sidebar.timer_start');
+  startBtn.textContent = t('sidebar.timer_start');
   startBtn.addEventListener('click', function () {
+    error.clear();
     const calId = calendarSelect.value;
     if (!calId) {
+      error.show(t('sidebar.error_calendar'));
       calendarSelect.focus();
       return;
     }
-
-    if (needsJiraSelect) {
-      const manualVal = manualKeyInput ? manualKeyInput.value.trim() : '';
-      const selectedKey = jiraSelect ? jiraSelect.value : '';
-      if (!selectedKey && !manualVal) {
-        if (manualKeyInput) {
-          manualKeyInput.focus();
-        }
-        return;
-      }
-      const resolvedKey = manualVal || selectedKey;
-      const modifiedTask = Object.assign({}, task, {
-        title: '[' + resolvedKey + '] - ' + task.title,
-      });
-      startTimer(modifiedTask, calId);
-    } else {
-      startTimer(task, calId);
-    }
+    const key = picker ? picker.getKey() : null;
+    const timedTask = key
+      ? Object.assign({}, task, { title: '[' + key + '] - ' + task.title })
+      : task;
+    startTimer(timedTask, calId);
   });
   row.appendChild(startBtn);
 
-  const cancelBtn = document.createElement('button');
-  cancelBtn.className = 'local-action-btn';
-  cancelBtn.textContent = '\u2715';
-  cancelBtn.title = t('common.cancel');
-  cancelBtn.addEventListener('click', function () {
-    timerPickerTaskId = null;
-    renderTaskList(lastTasks, lastPalette);
-  });
-  row.appendChild(cancelBtn);
+  row.appendChild(
+    createIconButton({
+      icon: 'close',
+      label: t('common.cancel'),
+      onClick: function () {
+        timerPickerTaskId = null;
+        renderTaskList(lastTasks, lastPalette);
+      },
+    }),
+  );
 
   form.appendChild(row);
+  form.appendChild(error.element);
   return form;
 }
 
@@ -1078,7 +1239,16 @@ function renderJiraSection(container, tasks, _palette) {
 let addFormVisible = false;
 let editingTaskId = null;
 
-function renderLocalSection(container, tasks, _palette) {
+function openQuickAdd() {
+  addFormVisible = true;
+  renderTaskList(lastTasks, lastPalette);
+  const input = document.getElementById('quickAddTitle');
+  if (input) {
+    input.focus();
+  }
+}
+
+function renderLocalSection(container, tasks, _palette, startCardShown) {
   const label = document.createElement('div');
   label.className = 'section-label';
   label.textContent = t('sidebar.local');
@@ -1105,10 +1275,12 @@ function renderLocalSection(container, tasks, _palette) {
   }
 
   if (tasks.length === 0 && !addFormVisible) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.textContent = t('sidebar.no_local_tasks');
-    container.appendChild(empty);
+    if (!startCardShown) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = t('sidebar.no_local_tasks');
+      container.appendChild(empty);
+    }
     return;
   }
 
@@ -1221,27 +1393,26 @@ document.getElementById('btnLayout').addEventListener('click', function () {
   window.deadlineAura.openOverlay();
 });
 
-// Toggle AI notes panel on urgency bar click
+// Toggle the AI note and 5-day forecast with an explicit button.
 (function initAiNotesToggle() {
-  const urgencySection = document.querySelector('.urgency-section');
+  const btn = document.getElementById('aiNotesToggle');
   const aiPanel = document.getElementById('aiNotesPanel');
-  if (!urgencySection || !aiPanel) {
+  if (!btn || !aiPanel) {
     return;
   }
-
-  const indicator = document.createElement('span');
-  indicator.className = 'toggle-indicator';
-  indicator.textContent = '▼';
-  const urgencyLabel = document.getElementById('urgencyLabel');
-  if (urgencyLabel) {
-    urgencyLabel.appendChild(indicator);
-  }
-
-  urgencySection.addEventListener('click', function () {
+  btn.addEventListener('click', function () {
     const isExpanded = aiPanel.classList.toggle('expanded');
-    urgencySection.classList.toggle('expanded', isExpanded);
+    btn.setAttribute('aria-expanded', String(isExpanded));
   });
 })();
+
+// The toggle is shown only when there is a note or a forecast to open.
+function updateAiNotesToggle(hasNote, hasForecast) {
+  const btn = document.getElementById('aiNotesToggle');
+  if (btn) {
+    btn.hidden = !hasNote && !hasForecast;
+  }
+}
 
 (function bindScoreBreakdownButton() {
   const btn = document.getElementById('scoreHelpBtn');
@@ -1350,7 +1521,8 @@ function formatHoursRemaining(hours) {
     return t('postit.expired');
   }
   if (hours < 1) {
-    return `${Math.round(hours * 60)}m`;
+    const minutes = Math.round(hours * 60);
+    return minutes < 60 ? `${minutes}m` : '1h';
   }
   if (hours < 24) {
     return `${Math.floor(hours)}h`;
@@ -1445,6 +1617,9 @@ function buildTopDriversSection(breakdown) {
         d.ai_stress !== null ? `<span class="breakdown-driver-ai">AI ${d.ai_stress}/10</span>` : '';
       const eta = formatHoursRemaining(d.hours_remaining);
       const safeTitle = escapeHtml(d.title);
+      const openBtn = d.web_url
+        ? `<button type="button" class="breakdown-open" data-url="${escapeHtml(d.web_url)}">${t('score_breakdown.open')}</button>`
+        : '';
       return `
         <div class="breakdown-driver">
           <div class="breakdown-driver-main">
@@ -1455,12 +1630,28 @@ function buildTopDriversSection(breakdown) {
             <span>${sourceLabel}</span>
             <span>${eta}</span>
             ${aiTag}
+            ${openBtn}
           </div>
         </div>
       `;
     })
     .join('');
-  return buildBreakdownSection('score_breakdown.top_drivers_title', rows);
+  return buildBreakdownSection('score_breakdown.drivers_title', rows);
+}
+
+// Plain-language reading of the score; the formula stays one click away.
+function buildWhySection(breakdown) {
+  const ai = breakdown.ai;
+  const aiLine =
+    ai && ai.fresh
+      ? t('score_breakdown.ai_sentence', { n: ai.global_stress })
+      : t('score_breakdown.ai_off_sentence');
+  const reasonLine = t(`score_breakdown.reason_${breakdown.mechanical.reason_key}`);
+  return buildBreakdownSection(
+    'score_breakdown.why_title',
+    `<p class="breakdown-plain">${escapeHtml(aiLine)}</p>
+     <p class="breakdown-plain">${escapeHtml(reasonLine)}</p>`,
+  );
 }
 
 function buildBlendFooter(breakdown) {
@@ -1487,18 +1678,23 @@ function renderScoreBreakdown(payload) {
   }
   const { breakdown } = payload;
   panel.innerHTML = [
-    buildAiSection(breakdown),
-    buildMechanicalSection(breakdown),
     buildTopDriversSection(breakdown),
-    buildBlendFooter(breakdown),
+    buildWhySection(breakdown),
+    `<details class="breakdown-details">
+       <summary>${t('score_breakdown.how_title')}</summary>
+       ${buildAiSection(breakdown)}
+       ${buildMechanicalSection(breakdown)}
+       ${buildBlendFooter(breakdown)}
+     </details>`,
   ].join('');
 }
 
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text === null || text === undefined ? '' : String(text);
-  return div.innerHTML;
-}
+document.getElementById('scoreBreakdownPanel').addEventListener('click', function (e) {
+  const openBtn = e.target.closest('.breakdown-open');
+  if (openBtn) {
+    window.deadlineAura.openLink(openBtn.dataset.url);
+  }
+});
 
 async function toggleScoreBreakdown() {
   const panel = document.getElementById('scoreBreakdownPanel');
@@ -1599,8 +1795,35 @@ window.deadlineAura.onUpdate(function (data) {
   pinnedTaskIds = new Set(data.pinnedTaskIds || []);
   favoriteTaskIds = new Set(data.favoriteTaskIds || []);
   renderUrgencyBar(data.engineResult.global_score, data.palette);
+  googleCalendarReady = data.googleCalendarReady !== false;
   renderClinicalNote(data.clinicalNote);
   renderStressForecast(data.stressForecast);
+  updateAiNotesToggle(Boolean(data.clinicalNote), (data.stressForecast || []).length > 0);
   renderTaskList(data.engineResult.tasks, data.palette);
-  document.getElementById('syncStatus').textContent = t('sidebar.updated');
+  renderSyncStatus(data.syncStatus || null);
+  if (!firstRunHintDismissed) {
+    document.getElementById('firstRunHint').hidden = !data.showFirstRunHint;
+  }
+});
+
+// Set once the user closes the hint, so a late update cannot bring it back.
+let firstRunHintDismissed = false;
+document.getElementById('firstRunOk').addEventListener('click', function () {
+  firstRunHintDismissed = true;
+  document.getElementById('firstRunHint').hidden = true;
+  window.deadlineAura.dismissFirstRunHint();
+});
+
+function renderSyncStatus(status) {
+  const view = formatSyncStatus(status, t, function (ms) {
+    return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  });
+  document.getElementById('syncStatus').textContent = view.text;
+  const problem = document.getElementById('syncProblem');
+  problem.hidden = !view.problem;
+  document.getElementById('syncProblemText').textContent = view.problem || '';
+}
+
+document.getElementById('syncProblemOpen').addEventListener('click', function () {
+  window.deadlineAura.openConfig();
 });

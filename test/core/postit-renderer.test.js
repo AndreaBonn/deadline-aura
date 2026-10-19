@@ -44,12 +44,12 @@ describe('extractCode', () => {
   });
 
   describe('local tasks', () => {
-    it('returns TODO for local_ prefix', () => {
-      expect(extractCode('local_1234_abc12345', 'Pagare bolletta')).toBe('TODO');
+    it('labels a personal task in plain words for local_ prefix', () => {
+      expect(extractCode('local_1234_abc12345', 'Pagare bolletta')).toBe('Personale');
     });
 
-    it('returns TODO regardless of title', () => {
-      expect(extractCode('local_9999_ff00ff00', '')).toBe('TODO');
+    it('uses the same label regardless of title', () => {
+      expect(extractCode('local_9999_ff00ff00', '')).toBe('Personale');
     });
   });
 

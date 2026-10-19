@@ -19,7 +19,8 @@ function formatCountdown(dueAt) {
     return t('countdown.expired');
   }
   if (hoursRemaining < 1) {
-    return Math.round(hoursRemaining * 60) + 'm';
+    const minutes = Math.round(hoursRemaining * 60);
+    return minutes < 60 ? minutes + 'm' : '1h';
   }
   if (hoursRemaining < 24) {
     return Math.floor(hoursRemaining) + 'h';
@@ -57,6 +58,9 @@ function createPostitGhost(task) {
     escapeHtml(task.title) +
     '</div>' +
     '</div>' +
+    (task.is_stale
+      ? '<div class="postit-stale-note">' + escapeHtml(t('overlay.stale_note')) + '</div>'
+      : '') +
     '<div class="postit-accent ' +
     pClass +
     '"></div>';
@@ -70,7 +74,8 @@ function createPostitGhost(task) {
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text || '';
-  return div.innerHTML;
+  // textContent does not escape quotes, and these strings also land in attributes.
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function onRemovePostit(e) {

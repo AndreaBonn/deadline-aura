@@ -66,10 +66,21 @@ function render() {
       '<span class="meeting-countdown">' +
       escapeHtml(formatCountdown(meeting.start_at)) +
       '</span>' +
-      '<button class="meeting-dismiss" type="button" aria-label="Dismiss">×</button>';
+      (meeting.meet_url
+        ? '<button class="meeting-join" type="button">' +
+          escapeHtml(t('meeting_dock.join')) +
+          '</button>'
+        : '') +
+      '<button class="meeting-dismiss" type="button" aria-label="' +
+      escapeHtml(t('meeting_dock.dismiss')) +
+      '" title="' +
+      escapeHtml(t('meeting_dock.dismiss')) +
+      '">×</button>';
 
     box.addEventListener('click', function () {
-      window.meetingDockApi.openMeetLink(meeting.meet_url);
+      if (meeting.meet_url) {
+        window.meetingDockApi.openMeetLink(meeting.meet_url);
+      }
     });
 
     const dismissBtn = box.querySelector('.meeting-dismiss');
@@ -94,7 +105,8 @@ function render() {
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
-  return div.innerHTML;
+  // textContent does not escape quotes, and these strings also land in attributes.
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 window.meetingDockApi.onMeetings(function (meetings) {

@@ -18,11 +18,12 @@ const COUNTDOWN_FONT_SIZE = 10;
 
 const STALE_BORDER_COLOR = '#ef4444';
 
+// Header colors on which the white code text reaches WCAG AA (4.5:1).
 const PRIORITY_COLORS = {
-  1: '#ef4444',
-  2: '#f97316',
-  3: '#3b82f6',
-  4: '#6b7280',
+  1: '#b91c1c',
+  2: '#c2410c',
+  3: '#2563eb',
+  4: '#4b5563',
 };
 
 function getPostitColor(priority) {
@@ -38,7 +39,8 @@ function formatCountdown(dueAt) {
     return t('postit.expired');
   }
   if (hoursRemaining < 1) {
-    return `${Math.round(hoursRemaining * 60)}m`;
+    const minutes = Math.round(hoursRemaining * 60);
+    return minutes < 60 ? `${minutes}m` : '1h';
   }
   if (hoursRemaining < 24) {
     return `${Math.floor(hoursRemaining)}h`;
@@ -182,6 +184,7 @@ function withPostitCodes(tasks) {
 }
 
 module.exports = {
+  formatCountdown,
   renderPostit,
   renderPostits,
   extractCode,

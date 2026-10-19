@@ -52,12 +52,12 @@ body {
 }
 
 .save-btn {
-  background: #3b82f6;
+  background: #2563eb;
   color: #fff;
 }
 
 .save-btn:hover {
-  background: #2563eb;
+  background: #1d4ed8;
 }
 
 .cancel-btn {
@@ -121,7 +121,7 @@ body {
 }
 
 .postit-remove:hover {
-  background: #ef4444;
+  background: #dc2626;
   color: #fff;
 }
 
@@ -141,16 +141,16 @@ body {
 }
 
 .postit-header.p1 {
-  background: #ef4444;
+  background: #b91c1c;
 }
 .postit-header.p2 {
-  background: #f97316;
+  background: #c2410c;
 }
 .postit-header.p3 {
-  background: #3b82f6;
+  background: #2563eb;
 }
 .postit-header.p4 {
-  background: #6b7280;
+  background: #4b5563;
 }
 
 .postit-code {
@@ -162,7 +162,7 @@ body {
 
 .postit-countdown {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .postit-body {
@@ -189,16 +189,16 @@ body {
 }
 
 .postit-accent.p1 {
-  background: #ef4444;
+  background: #b91c1c;
 }
 .postit-accent.p2 {
-  background: #f97316;
+  background: #c2410c;
 }
 .postit-accent.p3 {
-  background: #3b82f6;
+  background: #2563eb;
 }
 .postit-accent.p4 {
-  background: #6b7280;
+  background: #4b5563;
 }
 
 /* Stale task - not found in latest Jira sync */
@@ -213,4 +213,11 @@ body {
 
 .postit-ghost.stale .postit-remove {
   display: flex;
+}
+
+.postit-stale-note {
+  padding: 0 10px 8px;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: #ffb3ad;
 }

@@ -45,6 +45,15 @@ describe('formatCountdown', () => {
     it('handles rounding at the boundary', () => {
       expect(formatCountdown(1)).toBe('1h');
     });
+
+    it('carries rounded minutes into the hour instead of showing 60m', () => {
+      // 2h 59m 36s: the minutes round to 60, which must become the next hour.
+      expect(formatCountdown(2 + 59.6 / 60)).toBe('3h');
+    });
+
+    it('carries rounded minutes into the first hour', () => {
+      expect(formatCountdown(59.7 / 60)).toBe('1h');
+    });
   });
 
   describe('next-day deadlines (24-48 hours)', () => {

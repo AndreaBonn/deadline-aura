@@ -209,6 +209,11 @@ function createField(label, control, hint) {
     hintSpan.textContent = hint;
     labelDiv.appendChild(hintSpan);
   }
+  // The visible label is a separate div: give the control its accessible name too.
+  const input = control.matches('input, select') ? control : control.querySelector('input, select');
+  if (input && !input.hasAttribute('aria-label') && !input.id) {
+    input.setAttribute('aria-label', label);
+  }
   div.append(labelDiv, control);
   return div;
 }

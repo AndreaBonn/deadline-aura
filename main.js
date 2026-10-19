@@ -46,6 +46,13 @@ const {
 const { loadConfig, saveConfig } = require('./config/loader');
 const { buildMeetUrlWithAccount: buildMeetUrl } = require('./core/meet-url-builder');
 const { withPostitCodes } = require('./core/postit-renderer');
+const { summarizeSync } = require('./core/sync-status');
+const {
+  onboardingMarkerPath,
+  isFirstRun,
+  markOnboardingDone,
+  isWaylandSession,
+} = require('./core/onboarding');
 const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
 const { maskConfigForRenderer, restoreTokens } = require('./config/secret-masking');
@@ -88,6 +95,7 @@ let overlayWindow = null;
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const UPDATE_INTERVAL_MS = 60000;
+const DEFAULT_DATA_SYNC_MINUTES = 10;
 const MEETING_DOCK_CHECK_MS = 30000;
 const CLEANUP_INTERVAL_MS = ONE_DAY_MS;
 const STRIP_WIDTH = 10;
@@ -103,6 +111,35 @@ let meetingDockWindows = new Map(); // displayId → BrowserWindow
 let desktopCheckInterval = null;
 let currentPaletteHex = '#334155';
 let isUpdateCycleRunning = false;
+// Outcome of the last data sync, shown in the sidebar footer.
+let lastSyncStatus = null;
+let dataSyncTimer = null;
+// True during the very first session, until the user dismisses the "this is the strip" hint.
+let firstRunHintPending = false;
+let dataSyncIntervalMinutes = null;
+
+/**
+ * (Re)starts the periodic data sync with the interval currently in the config.
+ * Called at startup and after a settings save, so a new interval applies without a restart.
+ */
+function scheduleDataSync() {
+  const minutes = config.sync.data_interval_minutes || DEFAULT_DATA_SYNC_MINUTES;
+  if (dataSyncTimer && minutes === dataSyncIntervalMinutes) {
+    return;
+  }
+  clearInterval(dataSyncTimer);
+  dataSyncIntervalMinutes = minutes;
+  const syncDaemonModule = require('./core/sync-daemon');
+  dataSyncTimer = setInterval(async () => {
+    try {
+      const syncResult = await syncDaemonModule.sync(config);
+      lastSyncStatus = summarizeSync(syncResult, Date.now());
+      runUpdateCycle({ force: true });
+    } catch (err) {
+      console.error('[data-sync] error:', err.message);
+    }
+  }, minutes * 60000);
+}
 
 function openSettingsWindow() {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -164,6 +201,18 @@ function createSidebar() {
   sidebarWindow.webContents.once('did-finish-load', () => {
     sidebarReady = true;
     runUpdateCycle({ force: true });
+    if (firstRunHintPending) {
+      // First launch only: show the sidebar once, so the user learns what the strip opens.
+      sidebarManualOpen = true;
+      sidebarManualClose = false;
+      showSidebarOnDisplay(screen.getPrimaryDisplay());
+      // Written only once the sidebar is on screen, so a crash before this point retries.
+      try {
+        markOnboardingDone(onboardingMarkerPath(os.homedir()));
+      } catch (err) {
+        console.warn('onboarding: could not write marker:', err.message);
+      }
+    }
   });
 
   sidebarWindow.on('closed', () => {
@@ -568,6 +617,9 @@ async function runUpdateCycle({ force = false } = {}) {
         favoriteTaskIds: favoriteIds,
         clinicalNote,
         stressForecast,
+        syncStatus: lastSyncStatus,
+        googleCalendarReady: gcal.isGoogleCalendarReady(config),
+        showFirstRunHint: firstRunHintPending,
       });
     }
 
@@ -647,6 +699,16 @@ app.whenReady().then(() => {
 
   syncCaptureBinSafely();
 
+  if (isFirstRun(onboardingMarkerPath(os.homedir()))) {
+    firstRunHintPending = true;
+  }
+  if (isWaylandSession(process.env)) {
+    notifier.sendSystemNotice(
+      i18n.t('notifications.wayland_title'),
+      i18n.t('notifications.wayland_body'),
+    );
+  }
+
   initSidebar();
 
   meetingFlyby.init();
@@ -657,16 +719,7 @@ app.whenReady().then(() => {
   setInterval(() => meetingFlyby.checkAndLaunch({ config, db, screen }), MEETING_DOCK_CHECK_MS);
   setInterval(() => db.cleanupOldRecords(), CLEANUP_INTERVAL_MS);
 
-  const syncDaemonModule = require('./core/sync-daemon');
-  const dataSyncIntervalMs = (config.sync.data_interval_minutes || 10) * 60000;
-  setInterval(async () => {
-    try {
-      await syncDaemonModule.sync(config);
-      runUpdateCycle({ force: true });
-    } catch (err) {
-      console.error('[data-sync] error:', err.message);
-    }
-  }, dataSyncIntervalMs);
+  scheduleDataSync();
 
   const burnoutIntervalMs = (config.burnout?.check_interval_hours || 2) * 3600000;
   setInterval(() => {
@@ -685,6 +738,10 @@ app.whenReady().then(() => {
 
   ipcMain.on('sidebar:toggle', () => {
     toggleSidebar();
+  });
+
+  ipcMain.on('onboarding:dismiss-hint', () => {
+    firstRunHintPending = false;
   });
 
   ipcMain.on('meeting-dock:open-link', (_event, url) => {
@@ -742,6 +799,7 @@ app.whenReady().then(() => {
     try {
       const syncDaemon = require('./core/sync-daemon');
       const syncResult = await syncDaemon.sync(config);
+      lastSyncStatus = summarizeSync(syncResult, Date.now());
       if (syncResult.errors && syncResult.errors.length > 0) {
         console.error('[sync-now] errors:', JSON.stringify(syncResult.errors));
       }
@@ -829,10 +887,22 @@ app.whenReady().then(() => {
     restoreTokens(newConfig, config);
     const result = configSchema.safeParse(newConfig);
     if (!result.success) {
-      return { ok: false, errors: result.error.flatten().fieldErrors };
+      return {
+        ok: false,
+        errors: result.error.flatten().fieldErrors,
+        // Full paths let the settings window name the tab and field to fix.
+        issues: result.error.issues.map((issue) => ({
+          path: issue.path.join('.'),
+          code: issue.code,
+          minimum: issue.minimum,
+          maximum: issue.maximum,
+          message: issue.message,
+        })),
+      };
     }
     saveConfig(result.data);
     config = loadConfig();
+    scheduleDataSync();
     if (sidebarWindow && !sidebarWindow.isDestroyed()) {
       sidebarWindow.webContents.send('config-changed', config);
     }
@@ -1024,6 +1094,7 @@ app.whenReady().then(() => {
     .sync(config)
     .then((syncResult) => {
       console.log(`[startup-sync] complete: gcal=${syncResult.gcal}, jira=${syncResult.jira}`);
+      lastSyncStatus = summarizeSync(syncResult, Date.now());
       if (syncResult.errors && syncResult.errors.length > 0) {
         console.error('[startup-sync] errors:', JSON.stringify(syncResult.errors));
       }
@@ -1036,6 +1107,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
+  clearInterval(dataSyncTimer);
   meetingFlyby.destroyAll();
   destroyStrips();
   db.close();

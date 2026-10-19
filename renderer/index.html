@@ -33,6 +33,10 @@
           </svg>
         </button>
         <div class="flyby-menu" id="flybyMenu" role="menu" hidden>
+          <div class="flyby-menu-head">
+            <div class="flyby-menu-title" data-i18n="flyby_menu.title">Gatto avvisi riunioni</div>
+            <div class="flyby-menu-state" id="flybyMenuState"></div>
+          </div>
           <button
             class="flyby-menu-item"
             type="button"
@@ -69,6 +73,7 @@
           >
             Per sempre
           </button>
+          <div class="flyby-menu-sep" role="separator"></div>
           <button
             class="flyby-menu-item flyby-menu-item--reactivate"
             type="button"
@@ -108,6 +113,17 @@
             </button>
           </span>
         </div>
+        <button
+          class="ai-notes-toggle"
+          id="aiNotesToggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="aiNotesPanel"
+          hidden
+        >
+          <span data-i18n="sidebar.ai_notes_toggle">Nota AI e previsione 5 giorni</span>
+          <span class="ai-notes-chevron" aria-hidden="true">&#9662;</span>
+        </button>
       </div>
 
       <div class="ai-notes-panel" id="aiNotesPanel">
@@ -117,19 +133,64 @@
 
       <div class="score-breakdown-panel" id="scoreBreakdownPanel" hidden></div>
 
+      <div class="first-run-hint" id="firstRunHint" role="status" hidden>
+        <p data-i18n="sidebar.first_run_hint">
+          Questa è DeadlineAura. Si apre e si chiude cliccando la striscia colorata sul bordo dello
+          schermo: il suo colore è il tuo carico di lavoro.
+        </p>
+        <button class="first-run-ok" id="firstRunOk" type="button" data-i18n="sidebar.first_run_ok">
+          Ho capito
+        </button>
+      </div>
+
       <div class="divider"></div>
 
       <div class="tasks-container" id="tasksContainer">
-        <div class="empty-state" data-i18n="sidebar.no_tasks">Nessun task in arrivo</div>
+        <div class="empty-state" data-i18n="sidebar.loading">Caricamento dei task...</div>
+      </div>
+
+      <div class="sync-problem" id="syncProblem" role="status" hidden>
+        <span id="syncProblemText"></span>
+        <button
+          class="sync-problem-btn"
+          id="syncProblemOpen"
+          type="button"
+          data-i18n="sidebar.sync_problem_open"
+        >
+          Apri impostazioni
+        </button>
       </div>
 
       <div class="sidebar-footer">
-        <button class="footer-btn" id="btnConfig" data-i18n-title="common.config" title="Config">
-          &#9881;
+        <button
+          class="footer-btn"
+          id="btnConfig"
+          type="button"
+          data-i18n-title="common.config"
+          title="Impostazioni"
+          aria-label="Impostazioni"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="8" r="2.3" />
+            <path
+              d="M8 1.8v1.8M8 12.4v1.8M1.8 8h1.8M12.4 8h1.8M3.6 3.6l1.3 1.3M11.1 11.1l1.3 1.3M3.6 12.4l1.3-1.3M11.1 4.9l1.3-1.3"
+            />
+          </svg>
         </button>
         <button
           class="footer-btn footer-btn--text"
           id="btnLayout"
+          type="button"
           data-i18n-title="common.layout"
           data-i18n="common.layout"
           title="Layout"
@@ -137,17 +198,50 @@
           Layout
         </button>
         <span class="footer-spacer"></span>
-        <span class="sync-status" id="syncStatus">--</span>
-        <button class="footer-btn" id="btnSync" data-i18n-title="common.sync" title="Sync">
-          &#8635;
+        <span class="sync-status" id="syncStatus" aria-live="polite">--</span>
+        <button
+          class="footer-btn"
+          id="btnSync"
+          type="button"
+          data-i18n-title="common.sync"
+          title="Aggiorna ora"
+          aria-label="Aggiorna ora"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" />
+          </svg>
         </button>
         <button
           class="footer-btn footer-btn--close"
           id="btnClose"
+          type="button"
           data-i18n-title="common.close"
           title="Chiudi"
+          aria-label="Chiudi"
         >
-          &#10005;
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
         </button>
       </div>
     </div>
@@ -155,6 +249,8 @@
     <script src="i18n-renderer.js"></script>
     <script src="sidebar-utils.js"></script>
     <script src="shift-countdown.js"></script>
+    <script src="sidebar-ui.js"></script>
+    <script src="sidebar-onboarding.js"></script>
     <script src="sidebar.js"></script>
   </body>
 </html>

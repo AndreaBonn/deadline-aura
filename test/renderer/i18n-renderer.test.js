@@ -71,3 +71,45 @@ describe('t', () => {
     expect(result).toBe('');
   });
 });
+
+describe('translateDom accessible names', () => {
+  function fakeElement(attrs) {
+    return {
+      attrs: { ...attrs },
+      title: attrs.title || '',
+      getAttribute(name) {
+        return this.attrs[name] ?? null;
+      },
+      hasAttribute(name) {
+        return name in this.attrs;
+      },
+      setAttribute(name, value) {
+        this.attrs[name] = value;
+      },
+    };
+  }
+
+  it('translates the aria-label of an icon-only button along with its title', async () => {
+    const iconButton = fakeElement({ 'data-i18n-title': 'common.close', 'aria-label': 'Chiudi' });
+    vi.stubGlobal('document', {
+      querySelectorAll: (selector) => (selector === '[data-i18n-title]' ? [iconButton] : []),
+    });
+
+    await initI18n({ getTranslations: async () => ({ common: { close: 'Close' } }) });
+
+    expect(iconButton.title).toBe('Close');
+    expect(iconButton.attrs['aria-label']).toBe('Close');
+  });
+
+  it('does not add an aria-label to elements that only had a title', async () => {
+    const labelled = fakeElement({ 'data-i18n-title': 'common.close' });
+    vi.stubGlobal('document', {
+      querySelectorAll: (selector) => (selector === '[data-i18n-title]' ? [labelled] : []),
+    });
+
+    await initI18n({ getTranslations: async () => ({ common: { close: 'Close' } }) });
+
+    expect(labelled.title).toBe('Close');
+    expect(labelled.hasAttribute('aria-label')).toBe(false);
+  });
+});

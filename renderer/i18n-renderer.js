@@ -57,6 +57,10 @@ function translateDom() {
     var titleVal = t(titleKey);
     if (titleVal !== titleKey) {
       titleElements[j].title = titleVal;
+      // Icon-only buttons carry their name in aria-label: keep it in the same language.
+      if (titleElements[j].hasAttribute('aria-label')) {
+        titleElements[j].setAttribute('aria-label', titleVal);
+      }
     }
   }
   var phElements = document.querySelectorAll('[data-i18n-placeholder]');

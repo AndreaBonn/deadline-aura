@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('deadlineAura', {
   onUpdate: (callback) => ipcRenderer.on('update', (_event, data) => callback(data)),
   onStripColor: (callback) => ipcRenderer.on('strip-color', (_event, hex) => callback(hex)),
   toggleSidebar: () => ipcRenderer.send('sidebar:toggle'),
+  dismissFirstRunHint: () => ipcRenderer.send('onboarding:dismiss-hint'),
   openConfig: () => ipcRenderer.send('settings:open'),
   syncNow: () => ipcRenderer.send('sync:run'),
   openLink: (url) => ipcRenderer.send('shell:open-link', url),

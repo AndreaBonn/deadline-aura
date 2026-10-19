@@ -101,9 +101,9 @@ describe('postit-renderer renderPostit', () => {
   });
 
   it.each([
-    [1, '#ef4444'],
-    [2, '#f97316'],
-    [99, '#3b82f6'],
+    [1, '#b91c1c'],
+    [2, '#c2410c'],
+    [99, '#2563eb'],
   ])('paints priority %s with accent %s', (priority, color) => {
     const ctx = makeCtx();
 
