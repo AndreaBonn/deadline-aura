@@ -152,6 +152,38 @@ function jiraVerifyMessage(result, translate) {
   };
 }
 
+function buildMonthGridCells(monthKey, monthData) {
+  const daysPerWeek = 7;
+  const [yearStr, monthStr] = monthKey.split('-');
+  const year = Number(yearStr);
+  const month = Number(monthStr) - 1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDow = new Date(year, month, 1).getDay();
+  const startOffset = firstDow === 0 ? daysPerWeek - 1 : firstDow - 1;
+  const cells = Array.from({ length: startOffset }, () => null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dayStr = String(day);
+    const slots = monthData[dayStr];
+    cells.push({ day, dayStr, hasShift: slots && slots.length > 0, slots });
+  }
+  while (cells.length === 0 || cells.length % daysPerWeek !== 0) {
+    cells.push(null);
+  }
+  return cells;
+}
+
+function describeSaveError(result, t, labelForTab) {
+  const issue = (result.issues || [])[0];
+  if (!issue) {
+    return t('settings.save_error_generic');
+  }
+  const tab = tabForIssuePath(issue.path);
+  if (!tab) {
+    return t('settings.save_error_generic') + ' (' + issue.path + ')';
+  }
+  return t('settings.save_error_tab', { tab: labelForTab(tab), detail: describeIssue(issue, t) });
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     isConfigDirty,
@@ -162,5 +194,7 @@ if (typeof module !== 'undefined') {
     describeIssue,
     googleAuthMessage,
     jiraVerifyMessage,
+    buildMonthGridCells,
+    describeSaveError,
   };
 }

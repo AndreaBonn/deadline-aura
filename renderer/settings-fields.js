@@ -1,7 +1,7 @@
 'use strict';
 
 /* eslint-disable no-unused-vars */
-/* global t */
+/* global t, buildMonthGridCells */
 /* Field rendering helpers for settings UI — consumed by settings.js via <script> */
 
 function createToggle(value, onChange) {
@@ -406,31 +406,22 @@ function createVariableMonthGrid(monthKey, monthData, onChange) {
   }
   container.appendChild(dayHeaders);
 
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDow = new Date(year, month, 1).getDay();
-  const startOffset = firstDow === 0 ? 6 : firstDow - 1;
-
-  let row = document.createElement('div');
-  row.className = 'variable-grid-row';
-
-  for (let blank = 0; blank < startOffset; blank++) {
-    const cell = document.createElement('div');
-    cell.className = 'variable-grid-cell variable-grid-empty';
-    row.appendChild(cell);
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const cellIdx = (startOffset + day - 1) % 7;
-    if (cellIdx === 0 && day > 1) {
-      container.appendChild(row);
+  const daysPerWeek = 7;
+  let row;
+  buildMonthGridCells(monthKey, monthData).forEach((dayCell, index) => {
+    if (index % daysPerWeek === 0) {
       row = document.createElement('div');
       row.className = 'variable-grid-row';
+      container.appendChild(row);
     }
-
     const cell = document.createElement('div');
     cell.className = 'variable-grid-cell';
-    const dayStr = String(day);
-    const hasShift = monthData[dayStr] && monthData[dayStr].length > 0;
+    row.appendChild(cell);
+    if (!dayCell) {
+      cell.classList.add('variable-grid-empty');
+      return;
+    }
+    const { day, dayStr, hasShift, slots } = dayCell;
 
     const dayLabel = document.createElement('div');
     dayLabel.className = 'variable-grid-day-num';
@@ -441,24 +432,14 @@ function createVariableMonthGrid(monthKey, monthData, onChange) {
       cell.classList.add('has-shift');
       const slotInfo = document.createElement('div');
       slotInfo.className = 'variable-grid-slot-info';
-      slotInfo.textContent = monthData[dayStr].map((s) => `${s.start}-${s.end}`).join(', ');
+      slotInfo.textContent = slots.map((s) => `${s.start}-${s.end}`).join(', ');
       cell.appendChild(slotInfo);
     }
 
     cell.addEventListener('click', () => {
       showDayShiftEditor(container, monthKey, dayStr, monthData, onChange);
     });
-
-    row.appendChild(cell);
-  }
-
-  const remaining = 7 - row.children.length;
-  for (let blank = 0; blank < remaining; blank++) {
-    const cell = document.createElement('div');
-    cell.className = 'variable-grid-cell variable-grid-empty';
-    row.appendChild(cell);
-  }
-  container.appendChild(row);
+  });
 
   const actions = document.createElement('div');
   actions.className = 'variable-month-actions';

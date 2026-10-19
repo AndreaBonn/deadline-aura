@@ -6,7 +6,7 @@
    createTimeSlotList, createVariableMonthGrid, createSecretInput, initI18n, t,
    renderCaptureControl, isConfigDirty, tabForIssuePath, isGoogleConfigured,
    isJiraConfigured, hasAnyAiKey, createNotice, createCollapsible, createGoogleSteps,
-   createProviderLabel, AI_PROVIDERS, describeIssue, createSourceStatusBox,
+   createProviderLabel, AI_PROVIDERS, describeSaveError, createSourceStatusBox,
    createActionWithResult, googleAuthMessage, jiraVerifyMessage */
 
 let config = {};
@@ -96,19 +96,6 @@ document.getElementById('settingsNav').addEventListener('click', (e) => {
   selectTab(btn.dataset.tab);
 });
 
-function describeSaveError(result) {
-  const issue = (result.issues || [])[0];
-  if (!issue) {
-    return t('settings.save_error_generic');
-  }
-  const tab = tabForIssuePath(issue.path);
-  if (!tab) {
-    return t('settings.save_error_generic') + ' (' + issue.path + ')';
-  }
-  const tabLabel = document.querySelector(`.nav-item[data-tab="${tab}"]`).textContent.trim();
-  return t('settings.save_error_tab', { tab: tabLabel, detail: describeIssue(issue, t) });
-}
-
 // Rebuilds the status box in place, without re-rendering the fields being edited.
 function refreshSourceStatus() {
   const slot = document.getElementById('sourceStatusSlot');
@@ -133,7 +120,9 @@ async function saveSettings() {
   }
   // The error stays until the next save: the user needs time to find the field.
   feedback.classList.add('save-feedback--error');
-  feedback.textContent = describeSaveError(result);
+  feedback.textContent = describeSaveError(result, t, (tab) =>
+    document.querySelector(`.nav-item[data-tab="${tab}"]`).textContent.trim(),
+  );
   const issue = (result.issues || [])[0];
   const tab = issue && tabForIssuePath(issue.path);
   if (tab && tab !== activeTab) {

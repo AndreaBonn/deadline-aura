@@ -6,7 +6,100 @@ const {
   isGoogleConfigured,
   isJiraConfigured,
   hasAnyAiKey,
+  buildMonthGridCells,
+  describeSaveError,
 } = require('../../renderer/settings-helpers');
+
+describe('buildMonthGridCells', () => {
+  it.each([
+    ['2026-02', 28, 6, 35],
+    ['2024-02', 29, 3, 35],
+    ['2000-02', 29, 1, 35],
+    ['1900-02', 28, 3, 35],
+    ['2026-04', 30, 2, 35],
+    ['2026-03', 31, 6, 42],
+    ['2026-06', 30, 0, 35],
+    ['2021-02', 28, 0, 28],
+  ])('lays out %s Monday-first', (monthKey, days, offset, total) => {
+    const cells = buildMonthGridCells(monthKey, {});
+    const dates = cells.filter(Boolean);
+
+    expect(cells).toHaveLength(total);
+    expect(cells.slice(0, offset)).toEqual(Array(offset).fill(null));
+    expect(dates.map((cell) => cell.day)).toEqual(
+      Array.from({ length: days }, (_, index) => index + 1),
+    );
+    expect(cells[offset]).toEqual({ day: 1, dayStr: '1', hasShift: undefined, slots: undefined });
+    expect(cells.slice(offset + days)).toEqual(Array(total - offset - days).fill(null));
+  });
+
+  it('keeps each day shift state and slots without changing month data', () => {
+    const slots = Object.freeze([Object.freeze({ start: '09:00', end: '17:00' })]);
+    const monthData = Object.freeze({ 1: slots, 2: Object.freeze([]) });
+
+    expect(buildMonthGridCells('2026-06', monthData).slice(0, 3)).toEqual([
+      { day: 1, dayStr: '1', hasShift: true, slots: [{ start: '09:00', end: '17:00' }] },
+      { day: 2, dayStr: '2', hasShift: false, slots: [] },
+      { day: 3, dayStr: '3', hasShift: undefined, slots: undefined },
+    ]);
+    expect(monthData).toEqual({ 1: [{ start: '09:00', end: '17:00' }], 2: [] });
+  });
+
+  it.each([undefined, null])('preserves the error for absent month data: %s', (monthData) => {
+    expect(buildMonthGridCells('2026-06', {})).toHaveLength(35);
+    expect(() => buildMonthGridCells('2026-06', monthData)).toThrow(TypeError);
+  });
+
+  it.each(['bad', '2026', '2026-nope', ''])('keeps one empty row for invalid %j', (key) => {
+    expect(buildMonthGridCells(key, {})).toEqual(Array(7).fill(null));
+  });
+
+  it('preserves Date normalization of an overflowing month', () => {
+    expect(buildMonthGridCells('2026-13', {})).toEqual(buildMonthGridCells('2027-01', {}));
+  });
+
+  it('preserves the error for a non-string month key', () => {
+    expect(buildMonthGridCells('bad', {})).toEqual(Array(7).fill(null));
+    expect(() => buildMonthGridCells(null, {})).toThrow(TypeError);
+  });
+});
+
+describe('describeSaveError', () => {
+  const translate = (key, params = {}) => [key, ...Object.values(params)].join(':');
+  const labelForTab = (tab) => ({ ai: 'AI', sorgenti: 'Sources' })[tab];
+
+  it.each([{}, { issues: [] }, { issues: null }])('uses the generic error for %j', (result) => {
+    expect(describeSaveError(result, translate, labelForTab)).toBe('settings.save_error_generic');
+  });
+
+  it.each([
+    [{ code: 'too_big', maximum: 20 }, 'settings.err_max:20'],
+    [{ code: 'too_small', minimum: 1 }, 'settings.err_min:1'],
+    [{ code: 'invalid_type' }, 'settings.save_error_generic'],
+    [{ code: 'too_big' }, 'settings.save_error_generic'],
+    [{ code: 'too_small' }, 'settings.save_error_generic'],
+  ])('describes the first issue %j using the injected tab label', (issue, detail) => {
+    const result = { issues: [{ ...issue, path: 'ai.provider_timeout_ms' }, { path: 'unknown' }] };
+    expect(describeSaveError(result, translate, labelForTab)).toBe(
+      `settings.save_error_tab:AI:${detail}`,
+    );
+  });
+
+  it('passes the owning tab to the label resolver', () => {
+    expect(describeSaveError({ issues: [{ path: 'sources.jira' }] }, translate, labelForTab)).toBe(
+      'settings.save_error_tab:Sources:settings.save_error_generic',
+    );
+  });
+
+  it('includes an unknown path without looking up a tab label', () => {
+    const resolveLabel = () => {
+      throw new Error('Unexpected tab lookup');
+    };
+    expect(
+      describeSaveError({ issues: [{ path: 'unknown.field' }] }, translate, resolveLabel),
+    ).toBe('settings.save_error_generic (unknown.field)');
+  });
+});
 
 describe('isConfigDirty', () => {
   it('is clean when nothing changed since the last save', () => {
