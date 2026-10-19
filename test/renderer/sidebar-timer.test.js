@@ -236,4 +236,147 @@ describe('TimerController', () => {
     expect(() => controller.updateDisplay()).not.toThrow();
     expect(element.textContent).toBe('');
   });
+
+  describe('stop() while start() is still waiting for the calendar', () => {
+    const STOP_AT = new Date('2026-10-19T09:31:00.000Z');
+    let answer;
+    beforeEach(() => {
+      api.logTimeToCalendar.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    });
+
+    it('closes the late-created event at the stop moment instead of leaving it orphaned', async () => {
+      let clock = NOW;
+      controller.deps.now = () => clock;
+      const started = controller.start(task, 'work');
+      clock = STOP_AT;
+      await controller.stop();
+      answer({ ok: true, eventId: 'late-1' });
+      await started;
+
+      expect(api.updateCalendarEvent).toHaveBeenCalledWith({
+        calendarId: 'work',
+        eventId: 'late-1',
+        endTime: STOP_AT.toISOString(),
+      });
+      expect(state.activeTimer).toBeNull();
+      expect(store.has(KEY)).toBe(false);
+      expect(state.timerUiInterval).toBeNull();
+      expect(state.timerSyncInterval).toBeNull();
+      expect(api.setDefaultLogCalendar).not.toHaveBeenCalled();
+    });
+
+    it('does nothing for a failed late answer after stop', async () => {
+      const started = controller.start(task, 'work');
+      await controller.stop();
+      answer({ ok: false });
+      await started;
+      expect(api.updateCalendarEvent).not.toHaveBeenCalled();
+      expect(state.activeTimer).toBeNull();
+    });
+
+    it('does not attach the late event to a timer started after the stop', async () => {
+      const first = controller.start(task, 'work');
+      await controller.stop();
+      api.logTimeToCalendar.mockResolvedValue({ ok: true, eventId: 'ev-2' });
+      await controller.start({ id: 'T2', title: 'Other' }, 'work');
+      answer({ ok: true, eventId: 'late-1' });
+      await first;
+
+      expect(state.activeTimer).toMatchObject({ taskId: 'T2', eventId: 'ev-2' });
+      expect(api.updateCalendarEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ eventId: 'late-1' }),
+      );
+      controller.clearIntervals();
+    });
+
+    it('a failed late answer of the first timer does not roll back the second one', async () => {
+      const first = controller.start(task, 'work');
+      await controller.stop();
+      api.logTimeToCalendar.mockResolvedValue({ ok: true, eventId: 'ev-2' });
+      await controller.start({ id: 'T2', title: 'Other' }, 'work');
+      answer({ ok: false });
+      await first;
+      expect(state.activeTimer).toMatchObject({ taskId: 'T2', eventId: 'ev-2' });
+      controller.clearIntervals();
+    });
+  });
+
+  it('start rolls back state, storage and intervals when the IPC call rejects', async () => {
+    api.logTimeToCalendar.mockRejectedValue(new Error('ipc down'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(controller.start(task, 'work')).resolves.toBeUndefined();
+
+    expect(state.activeTimer).toBeNull();
+    expect(store.has(KEY)).toBe(false);
+    expect(state.timerUiInterval).toBeNull();
+    expect(state.timerSyncInterval).toBeNull();
+    expect(api.setDefaultLogCalendar).not.toHaveBeenCalled();
+    expect(rerender).toHaveBeenCalledTimes(2);
+    expect(log).toHaveBeenCalledWith('timer start failed:', 'ipc down');
+    log.mockRestore();
+  });
+
+  it('stop keeps the timer stopped, shows no "logged" badge and logs when closing the event rejects', async () => {
+    await controller.start(task, 'work');
+    rerender.mockClear();
+    api.updateCalendarEvent.mockRejectedValue(new Error('ipc down'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(controller.stop()).resolves.toBeUndefined();
+
+    expect(state.activeTimer).toBeNull();
+    expect(store.has(KEY)).toBe(false);
+    expect(state.temporaryLoggedTaskId).toBeNull();
+    expect(rerender).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('timer stop failed:', 'ipc down');
+    log.mockRestore();
+  });
+
+  it('stop shows no "logged" badge and logs when the calendar refuses to close the event', async () => {
+    await controller.start(task, 'work');
+    rerender.mockClear();
+    api.updateCalendarEvent.mockResolvedValue({ ok: false, error: 'quota exceeded' });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await controller.stop();
+
+    expect(state.activeTimer).toBeNull();
+    expect(state.temporaryLoggedTaskId).toBeNull();
+    expect(rerender).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('timer stop failed:', 'quota exceeded');
+    log.mockRestore();
+  });
+
+  it('logs when the calendar refuses to close the event of a timer stopped while starting', async () => {
+    let answer;
+    api.logTimeToCalendar.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    api.updateCalendarEvent.mockResolvedValue({ ok: false, error: 'quota exceeded' });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const starting = controller.start(task, 'work');
+    await controller.stop();
+
+    answer({ ok: true, eventId: 'ev-late' });
+    await starting;
+    await Promise.resolve();
+
+    expect(api.updateCalendarEvent).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('closing the late timer event failed:', 'quota exceeded');
+    log.mockRestore();
+  });
+
+  it('logs when the calendar refuses the periodic sync of the running timer', async () => {
+    await controller.start(task, 'work');
+    api.updateCalendarEvent.mockResolvedValue({ ok: false, error: 'quota exceeded' });
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    controller.sync();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(api.updateCalendarEvent).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('timer sync failed:', 'quota exceeded');
+    log.mockRestore();
+    controller.clearIntervals();
+  });
 });

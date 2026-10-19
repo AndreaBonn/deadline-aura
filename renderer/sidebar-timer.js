@@ -102,16 +102,22 @@ class TimerController {
         eventId: state.activeTimer.eventId,
         endTime: now().toISOString(),
       })
-      .catch(function (err) {
-        console.error('timer sync failed:', err.message);
-      });
+      .then(
+        (result) => {
+          if (!result || !result.ok) {
+            console.error('timer sync failed:', result?.error);
+          }
+        },
+        (err) => console.error('timer sync failed:', err.message),
+      );
   }
 
   start(task, calendarId) {
     const { state, getApi, now, summaryFor } = this.deps;
     const summary = summaryFor(task);
     const startTime = now().toISOString();
-    state.activeTimer = createTimerState(task, { startTime, calendarId, summary });
+    const timer = createTimerState(task, { startTime, calendarId, summary });
+    state.activeTimer = timer;
     this.save();
     state.timerPickerTaskId = null;
     this.deps.rerender();
@@ -122,15 +128,27 @@ class TimerController {
         durationMinutes: TIMER_DEFAULT_DURATION_MIN,
         calendarId,
       })
-      .then((result) => this.onEventLogged(result, calendarId));
+      .then(
+        (result) => this.onEventLogged(result, timer),
+        (err) => {
+          console.error('timer start failed:', err.message);
+          this.onEventLogged({ ok: false }, timer);
+        },
+      );
   }
 
-  onEventLogged(result, calendarId) {
+  // `timer` is the state object start() created: by the time the calendar answers it may have
+  // been stopped (or replaced by a newer timer), and the answer belongs to it either way.
+  onEventLogged(result, timer) {
     const { state, getApi } = this.deps;
+    if (state.activeTimer !== timer) {
+      this.closeEventOfStoppedTimer(result, timer);
+      return;
+    }
     if (result.ok && result.eventId) {
       state.activeTimer.eventId = result.eventId;
       this.save();
-      getApi().setDefaultLogCalendar(calendarId);
+      getApi().setDefaultLogCalendar(timer.calendarId);
       this.startIntervals();
       return;
     }
@@ -138,6 +156,29 @@ class TimerController {
     this.save();
     this.clearIntervals();
     this.deps.rerender();
+  }
+
+  // stop() ran before the event existed: close the event the calendar just created at the
+  // moment of the stop, as stop() would have, so it is not left at the default 30 minutes.
+  closeEventOfStoppedTimer(result, timer) {
+    if (!result.ok || !result.eventId) {
+      return;
+    }
+    this.deps
+      .getApi()
+      .updateCalendarEvent({
+        calendarId: timer.calendarId,
+        eventId: result.eventId,
+        endTime: timer.stoppedAt,
+      })
+      .then(
+        (closed) => {
+          if (!closed || !closed.ok) {
+            console.error('closing the late timer event failed:', closed?.error);
+          }
+        },
+        (err) => console.error('closing the late timer event failed:', err.message),
+      );
   }
 
   stop() {
@@ -151,6 +192,7 @@ class TimerController {
     this.save();
 
     if (!timer.eventId) {
+      timer.stoppedAt = now().toISOString();
       this.deps.rerender();
       return Promise.resolve();
     }
@@ -160,7 +202,19 @@ class TimerController {
         eventId: timer.eventId,
         endTime: now().toISOString(),
       })
-      .then(() => this.showLoggedBadge(timer.taskId));
+      .then(
+        (result) =>
+          result && result.ok
+            ? this.showLoggedBadge(timer.taskId)
+            : this.reportStopFailure(result?.error),
+        (err) => this.reportStopFailure(err.message),
+      );
+  }
+
+  // The timer is already cleared: repaint the card, but do not claim the time was logged.
+  reportStopFailure(message) {
+    console.error('timer stop failed:', message);
+    this.deps.rerender();
   }
 
   showLoggedBadge(taskId) {
