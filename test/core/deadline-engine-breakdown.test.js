@@ -156,6 +156,7 @@ describe('computeGlobalScore breakdown', () => {
         source: 'jira',
         ai_stress: 8,
         ai_category: 'work-critical',
+        web_url: 'https://acme.atlassian.net/browse/AB-1',
       }),
     ];
     const result = computeGlobalScore(tasks);
@@ -166,6 +167,7 @@ describe('computeGlobalScore breakdown', () => {
       source: 'jira',
       ai_stress: 8,
       ai_category: 'work-critical',
+      web_url: 'https://acme.atlassian.net/browse/AB-1',
     });
     expect(top).toHaveProperty('urgency_score');
     expect(top).toHaveProperty('hours_remaining');

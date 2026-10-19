@@ -113,6 +113,26 @@ function sendBurnoutWarning(warning, config) {
   }
 }
 
+/**
+ * Shows a one-off desktop notice, outside the urgency and burnout cooldowns.
+ * Asynchronous on purpose: it runs during startup and must never hold it up.
+ *
+ * @param {string} title - Notification title.
+ * @param {string} body - Notification text.
+ */
+function sendSystemNotice(title, body) {
+  try {
+    const child = childProcess.spawn('notify-send', ['--app-name=DeadlineAura', title, body], {
+      stdio: 'ignore',
+      detached: true,
+    });
+    child.on('error', (err) => console.warn('notify-send failed:', err.message));
+    child.unref();
+  } catch (err) {
+    console.warn('notify-send failed:', err.message);
+  }
+}
+
 function _resetForTest() {
   lastNotifiedAt = 0;
   lastBurnoutNotifiedAt = 0;
@@ -120,6 +140,7 @@ function _resetForTest() {
 
 module.exports = {
   send,
+  sendSystemNotice,
   shouldNotify,
   findMostUrgentTask,
   formatCountdown,

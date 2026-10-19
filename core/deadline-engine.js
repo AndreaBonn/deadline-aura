@@ -184,6 +184,7 @@ function pickTopDrivers(sortedTasks, count) {
     ai_stress: t.ai_stress || null,
     ai_category: t.ai_category || null,
     hours_remaining: t.hours_remaining,
+    web_url: t.web_url || null,
   }));
 }
 

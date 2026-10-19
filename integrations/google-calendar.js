@@ -265,6 +265,21 @@ function isInvalidGrant(errorMessage) {
   return typeof errorMessage === 'string' && errorMessage.includes('invalid_grant');
 }
 
+/**
+ * Whether Google Calendar can be used right now: switched on, with client credentials
+ * and an authorization already granted by the user.
+ *
+ * @param {object} config - Application config.
+ * @returns {boolean} True when time logging and the live timer can write events.
+ */
+function isGoogleCalendarReady(config) {
+  if (!config?.sources?.google_calendar?.enabled) {
+    return false;
+  }
+  const { clientId, clientSecret } = resolveGoogleOAuth(config);
+  return Boolean(clientId && clientSecret) && fs.existsSync(TOKEN_PATH);
+}
+
 function deleteToken() {
   try {
     fs.unlinkSync(TOKEN_PATH);
@@ -432,6 +447,7 @@ module.exports = {
   updateEvent,
   isInvalidGrant,
   deleteToken,
+  isGoogleCalendarReady,
   fetchCalendarEvents,
   TOKEN_PATH,
 };
