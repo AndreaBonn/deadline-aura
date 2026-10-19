@@ -8,6 +8,7 @@ const {
   hasAnyAiKey,
   buildMonthGridCells,
   describeSaveError,
+  withRenderFills,
 } = require('../../renderer/settings-helpers');
 
 describe('buildMonthGridCells', () => {
@@ -245,5 +246,50 @@ describe('jiraVerifyMessage', () => {
     expect(jiraVerifyMessage({ ok: false, error: 'HTTP_502' }, translate).text).toBe(
       'settings.jira_verify_http:HTTP_502',
     );
+  });
+});
+
+describe('withRenderFills', () => {
+  it('adds a block the render filled in and the saved snapshot lacks', () => {
+    const saved = { sidebar: { width: 260 } };
+    const before = { sidebar: { width: 300 } };
+    const after = { sidebar: { width: 300 }, meeting_dock: { enabled: true } };
+    expect(withRenderFills(saved, before, after)).toEqual({
+      sidebar: { width: 260 },
+      meeting_dock: { enabled: true },
+    });
+  });
+
+  it('adds a key the render filled inside an existing block, keeping edited values', () => {
+    const saved = { ai: { enabled: true } };
+    const before = { ai: { enabled: false } };
+    const after = { ai: { enabled: false, timeout: 30 } };
+    expect(withRenderFills(saved, before, after)).toEqual({ ai: { enabled: true, timeout: 30 } });
+  });
+
+  it('leaves out a key the user created before the render', () => {
+    const saved = { months: {} };
+    const before = { months: { '2026-11': { 15: [] } } };
+    const after = { months: { '2026-11': { 15: [] } } };
+    expect(withRenderFills(saved, before, after)).toEqual({ months: {} });
+  });
+
+  it('keeps saved arrays as they are', () => {
+    const saved = { tags: ['a'] };
+    expect(withRenderFills(saved, { tags: ['a', 'b'] }, { tags: ['a', 'b'] })).toEqual({
+      tags: ['a'],
+    });
+  });
+
+  it('returns a new object and leaves every input unchanged', () => {
+    const saved = { a: { b: 1 } };
+    const before = { a: { b: 1 } };
+    const after = { a: { b: 1, c: 2 } };
+    const result = withRenderFills(saved, before, after);
+    expect(result).not.toBe(saved);
+    expect(saved).toEqual({ a: { b: 1 } });
+    expect(before).toEqual({ a: { b: 1 } });
+    expect(after).toEqual({ a: { b: 1, c: 2 } });
+    expect(result.a).toEqual({ b: 1, c: 2 });
   });
 });

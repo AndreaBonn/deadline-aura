@@ -184,6 +184,35 @@ function describeSaveError(result, t, labelForTab) {
   return t('settings.save_error_tab', { tab: labelForTab(tab), detail: describeIssue(issue, t) });
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Copy of `saved` plus the keys a tab render added to the config: present in `after`,
+ * absent from both `before` (the config just before the render) and `saved`, at any
+ * depth. Tabs fill missing config blocks while rendering; adding those fills to the
+ * saved snapshot keeps them from counting as unsaved changes. A key the user created
+ * with an edit already exists in `before`, so it stays an unsaved change.
+ *
+ * @param {object} saved - Snapshot of the last saved config.
+ * @param {object} before - Config right before the render.
+ * @param {object} after - Config right after the render.
+ * @returns {object} New snapshot; no input is mutated.
+ */
+function withRenderFills(saved, before, after) {
+  const result = { ...saved };
+  for (const [key, value] of Object.entries(after)) {
+    if (!(key in result) && !(key in before)) {
+      result[key] = JSON.parse(JSON.stringify(value));
+    } else if (isPlainObject(result[key]) && isPlainObject(value)) {
+      const beforeValue = isPlainObject(before[key]) ? before[key] : {};
+      result[key] = withRenderFills(result[key], beforeValue, value);
+    }
+  }
+  return result;
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     isConfigDirty,
@@ -196,5 +225,6 @@ if (typeof module !== 'undefined') {
     jiraVerifyMessage,
     buildMonthGridCells,
     describeSaveError,
+    withRenderFills,
   };
 }

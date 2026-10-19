@@ -1,6 +1,6 @@
 'use strict';
 
-/* global settingsApi, initI18n, t, isConfigDirty, tabForIssuePath, describeSaveError,
+/* global settingsApi, initI18n, t, isConfigDirty, tabForIssuePath, describeSaveError, withRenderFills,
    refreshSourceStatus, renderSorgenti, renderGenerale, renderAI, renderWallpaper, renderLimiti,
    renderSidebar, renderNotifiche, renderUI, renderTurno, renderAvanzate */
 
@@ -17,7 +17,8 @@ const unsavedDialog = document.getElementById('unsavedDialog');
 const FEEDBACK_MS = 2000;
 
 // Tabs fill in missing config blocks when they render. Until the user edits something,
-// every render refreshes the saved snapshot, so those fills never count as changes.
+// every render refreshes the saved snapshot; after that, only the filled-in keys are
+// copied into it (withRenderFills), so those fills never count as changes.
 let userTouched = false;
 const NON_EDITING_CONTROLS = '.link-btn--external, .secret-toggle, summary, .setup-steps button';
 
@@ -191,13 +192,14 @@ function createTabContext() {
 
 function renderTab() {
   content.innerHTML = '';
+  const before = JSON.parse(JSON.stringify(config));
   const groups = renderers[activeTab](createTabContext());
   for (const g of groups) {
     content.appendChild(g);
   }
-  if (!userTouched) {
-    savedConfig = JSON.parse(JSON.stringify(config));
-  }
+  savedConfig = userTouched
+    ? withRenderFills(savedConfig, before, config)
+    : JSON.parse(JSON.stringify(config));
 }
 
 // Init
