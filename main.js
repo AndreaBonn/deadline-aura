@@ -59,7 +59,7 @@ const { DEFAULTS } = require('./config/defaults');
 const { configSchema } = require('./config/schema');
 const { maskConfigForRenderer, restoreTokens } = require('./config/secret-masking');
 const i18n = require('./i18n');
-const { cleanupPastHolidays, cleanupExpiredMonths } = require('./core/work-shift');
+const { cleanupWorkShiftConfig } = require('./core/work-shift');
 const { collectUsage } = require('./core/ai-usage');
 const {
   sourceDir: captureSourceDir,
@@ -71,25 +71,10 @@ let config = loadConfig();
 i18n.setLanguage(config.language || 'it');
 
 // Auto-cleanup past holidays and expired variable months at startup
-if (config.work_shift) {
-  let changed = false;
-  if (config.work_shift.regular?.holidays?.length) {
-    const cleaned = cleanupPastHolidays(config.work_shift.regular.holidays);
-    if (cleaned.length !== config.work_shift.regular.holidays.length) {
-      config.work_shift.regular.holidays = cleaned;
-      changed = true;
-    }
-  }
-  if (config.work_shift.variable?.months && Object.keys(config.work_shift.variable.months).length) {
-    const cleaned = cleanupExpiredMonths(config.work_shift.variable.months);
-    if (Object.keys(cleaned).length !== Object.keys(config.work_shift.variable.months).length) {
-      config.work_shift.variable.months = cleaned;
-      changed = true;
-    }
-  }
-  if (changed) {
-    saveConfig(config);
-  }
+const cleanedWorkShift = cleanupWorkShiftConfig(config.work_shift);
+if (cleanedWorkShift.changed) {
+  config.work_shift = cleanedWorkShift.workShift;
+  saveConfig(config);
 }
 
 let settingsWindow = null;

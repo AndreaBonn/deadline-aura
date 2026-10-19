@@ -244,7 +244,25 @@ function cleanupExpiredMonths(months, now) {
   return cleaned;
 }
 
+function cleanupWorkShiftConfig(workShift) {
+  let next = workShift;
+  if (workShift?.regular?.holidays?.length) {
+    const holidays = cleanupPastHolidays(workShift.regular.holidays);
+    if (holidays.length !== workShift.regular.holidays.length) {
+      next = { ...next, regular: { ...workShift.regular, holidays } };
+    }
+  }
+  if (workShift?.variable?.months && Object.keys(workShift.variable.months).length) {
+    const months = cleanupExpiredMonths(workShift.variable.months);
+    if (Object.keys(months).length !== Object.keys(workShift.variable.months).length) {
+      next = { ...next, variable: { ...workShift.variable, months } };
+    }
+  }
+  return { workShift: next, changed: next !== workShift };
+}
+
 module.exports = {
+  cleanupWorkShiftConfig,
   parseTime,
   formatRemainingMs,
   cleanupPastHolidays,
