@@ -1,7 +1,7 @@
 'use strict';
 
 const { google } = require('googleapis');
-const gcal = require('../../integrations/google-calendar');
+const googleAuth = require('../../integrations/google-auth');
 const tasksModulePath = require.resolve('../../integrations/google-tasks');
 
 function makeConfig(overrides = {}) {
@@ -26,7 +26,7 @@ describe('google-tasks fetchTasks', () => {
   beforeEach(() => {
     previousModule = require.cache[tasksModulePath];
     delete require.cache[tasksModulePath];
-    authSpy = vi.spyOn(gcal, 'getAuthenticatedClient').mockResolvedValue({});
+    authSpy = vi.spyOn(googleAuth, 'getAuthenticatedClient').mockResolvedValue({});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     service = {
       tasklists: { list: vi.fn().mockResolvedValue({ data: { items: [] } }) },

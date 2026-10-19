@@ -73,6 +73,7 @@ module.exports = [
       'renderer/settings-helpers.js',
       'store/db.js',
       'store/migrations.js',
+      'integrations/google-auth.js',
     ],
     rules: {
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],

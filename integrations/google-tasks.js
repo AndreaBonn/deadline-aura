@@ -1,7 +1,7 @@
 'use strict';
 
 const { google } = require('googleapis');
-const { getAuthenticatedClient, resolveGoogleOAuth } = require('./google-calendar');
+const { getAuthenticatedClient, resolveGoogleOAuth } = require('./google-auth');
 
 const DEFAULT_PRIORITY = 3;
 const HIGH_PRIORITY = 2;
