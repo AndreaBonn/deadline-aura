@@ -110,6 +110,32 @@ function createSecretInput(value, { placeholder = '' } = {}, onChange) {
   return wrap;
 }
 
+function buildTagChip(text, onRemove) {
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.textContent = text;
+  const btn = document.createElement('button');
+  btn.className = 'tag-remove';
+  btn.textContent = '×';
+  btn.addEventListener('click', onRemove);
+  tag.appendChild(btn);
+  return tag;
+}
+
+function buildTagEntry(placeholder, onAdd) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'tag-input';
+  input.placeholder = placeholder;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      e.preventDefault();
+      onAdd(input.value.trim());
+    }
+  });
+  return input;
+}
+
 function createTagInput(values, { placeholder } = {}, onChange) {
   const defaultPlaceholder =
     typeof t === 'function' ? t('settings.tag_add_placeholder') : 'Aggiungi...';
@@ -120,44 +146,47 @@ function createTagInput(values, { placeholder } = {}, onChange) {
 
   function render() {
     container.innerHTML = '';
-    for (let i = 0; i < currentValues.length; i++) {
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      tag.textContent = currentValues[i];
-      const btn = document.createElement('button');
-      btn.className = 'tag-remove';
-      btn.textContent = '\u00d7';
-      btn.addEventListener('click', () => {
-        currentValues.splice(i, 1);
-        onChange([...currentValues]);
-        render();
-      });
-      tag.appendChild(btn);
-      container.appendChild(tag);
-    }
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'tag-input';
-    input.placeholder = placeholder;
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && input.value.trim()) {
-        e.preventDefault();
-        currentValues.push(input.value.trim());
-        onChange([...currentValues]);
-        render();
-      }
+    currentValues.forEach((text, i) => {
+      container.appendChild(
+        buildTagChip(text, () => {
+          currentValues.splice(i, 1);
+          onChange([...currentValues]);
+          render();
+        }),
+      );
     });
-    container.appendChild(input);
+    container.appendChild(
+      buildTagEntry(placeholder, (text) => {
+        currentValues.push(text);
+        onChange([...currentValues]);
+        render();
+      }),
+    );
   }
 
   render();
   return container;
 }
 
+function buildPriorityButton(symbol, disabled, onClick) {
+  const btn = document.createElement('button');
+  btn.className = 'priority-btn';
+  btn.textContent = symbol;
+  btn.disabled = disabled;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+
 function createPriorityList(values, onChange) {
   const container = document.createElement('div');
   container.className = 'priority-list';
   const current = [...values];
+
+  function swapWithNext(i) {
+    [current[i], current[i + 1]] = [current[i + 1], current[i]];
+    onChange([...current]);
+    render();
+  }
 
   function render() {
     container.innerHTML = '';
@@ -167,24 +196,8 @@ function createPriorityList(values, onChange) {
       const idx = document.createElement('span');
       idx.textContent = `${i + 1}. ${current[i]}`;
       idx.style.flex = '1';
-      const up = document.createElement('button');
-      up.className = 'priority-btn';
-      up.textContent = '\u25b2';
-      up.disabled = i === 0;
-      up.addEventListener('click', () => {
-        [current[i - 1], current[i]] = [current[i], current[i - 1]];
-        onChange([...current]);
-        render();
-      });
-      const down = document.createElement('button');
-      down.className = 'priority-btn';
-      down.textContent = '\u25bc';
-      down.disabled = i === current.length - 1;
-      down.addEventListener('click', () => {
-        [current[i], current[i + 1]] = [current[i + 1], current[i]];
-        onChange([...current]);
-        render();
-      });
+      const up = buildPriorityButton('▲', i === 0, () => swapWithNext(i - 1));
+      const down = buildPriorityButton('▼', i === current.length - 1, () => swapWithNext(i));
       item.append(idx, up, down);
       container.appendChild(item);
     }
