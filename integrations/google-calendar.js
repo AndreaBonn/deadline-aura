@@ -85,22 +85,21 @@ function eventBoundaryMs(boundary) {
   return null;
 }
 
-function normalizeEvent(event, priorityKeywords) {
+// An all-day event counts as ended only after its last second, not at midnight.
+function isSkippedEvent(event) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
     : event.end?.date
       ? new Date(event.end.date + 'T23:59:59').getTime()
       : null;
-
   if (endTime && endTime < Date.now()) {
-    return null;
+    return true;
   }
+  return event.status === 'cancelled' || isDeclinedByUser(event);
+}
 
-  if (event.status === 'cancelled') {
-    return null;
-  }
-
-  if (isDeclinedByUser(event)) {
+function normalizeEvent(event, priorityKeywords) {
+  if (isSkippedEvent(event)) {
     return null;
   }
 
