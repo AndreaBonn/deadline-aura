@@ -277,6 +277,22 @@ function isDeclinedByUser(event) {
   return selfAttendee?.responseStatus === 'declined';
 }
 
+/**
+ * Converts a Google Calendar start/end object to epoch milliseconds.
+ *
+ * @param {{dateTime?: string, date?: string}|null|undefined} boundary - Event start or end.
+ * @returns {number|null} dateTime as instant, all-day date as local midnight, null when absent.
+ */
+function eventBoundaryMs(boundary) {
+  if (boundary?.dateTime) {
+    return new Date(boundary.dateTime).getTime();
+  }
+  if (boundary?.date) {
+    return new Date(boundary.date + 'T00:00:00').getTime();
+  }
+  return null;
+}
+
 function normalizeEvent(event, priorityKeywords) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
@@ -297,16 +313,8 @@ function normalizeEvent(event, priorityKeywords) {
   }
 
   const allDay = !event.end?.dateTime && !!event.end?.date;
-  const startAt = event.start?.dateTime
-    ? new Date(event.start.dateTime).getTime()
-    : event.start?.date
-      ? new Date(event.start.date + 'T00:00:00').getTime()
-      : null;
-  const dueAt = event.end?.dateTime
-    ? new Date(event.end.dateTime).getTime()
-    : event.end?.date
-      ? new Date(event.end.date + 'T00:00:00').getTime()
-      : null;
+  const startAt = eventBoundaryMs(event.start);
+  const dueAt = eventBoundaryMs(event.end);
 
   return {
     id: `gcal_${event.id}`,
@@ -500,6 +508,7 @@ async function updateEvent(config, { calendarId, eventId, endTime }) {
 module.exports = {
   fetchEvents,
   normalizeEvent,
+  eventBoundaryMs,
   isDeclinedByUser,
   assignPriority,
   extractMeetUrl,

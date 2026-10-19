@@ -4,6 +4,7 @@ const {
   normalizeEvent,
   assignPriority,
   extractMeetUrl,
+  eventBoundaryMs,
 } = require('../../integrations/google-calendar');
 
 describe('google-calendar — assignPriority', () => {
@@ -268,5 +269,33 @@ describe('google-calendar — normalizeEvent', () => {
     const result = normalizeEvent(event);
 
     expect(result).toEqual(expect.objectContaining({ id: 'gcal_red', priority: 1 }));
+  });
+});
+
+describe('google-calendar — eventBoundaryMs', () => {
+  it('parses a dateTime with offset to epoch ms', () => {
+    expect(eventBoundaryMs({ dateTime: '2026-03-10T09:00:00+01:00' })).toBe(
+      Date.UTC(2026, 2, 10, 8, 0, 0),
+    );
+  });
+
+  it('parses a dateTime in UTC', () => {
+    expect(eventBoundaryMs({ dateTime: '2026-03-10T09:00:00Z' })).toBe(
+      Date.UTC(2026, 2, 10, 9, 0, 0),
+    );
+  });
+
+  it('returns local midnight for an all-day date', () => {
+    expect(eventBoundaryMs({ date: '2026-03-10' })).toBe(new Date(2026, 2, 10).getTime());
+  });
+
+  it('prefers dateTime when both fields are present', () => {
+    expect(eventBoundaryMs({ dateTime: '2026-03-10T09:00:00Z', date: '2026-03-10' })).toBe(
+      Date.UTC(2026, 2, 10, 9, 0, 0),
+    );
+  });
+
+  it.each([[null], [undefined], [{}]])('returns null for %j', (boundary) => {
+    expect(eventBoundaryMs(boundary)).toBeNull();
   });
 });
