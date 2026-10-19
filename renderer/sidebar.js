@@ -3,7 +3,7 @@
 /* global t, _i18nReady, initI18n, formatElapsed, localStorage,
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
    priorityKey, formatScore100, flybyStateKey, formatSyncStatus,
-   urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections,
+   urgencyToTextColor, buildScoreBreakdownHtml, groupTasksForSections, parseStoredTimer, createTimerState,
    createIcon, createIconButton, createActionMenu, createUndoToast, createStartCard */
 
 const COLLAPSED_LIMIT = 5;
@@ -42,13 +42,12 @@ function saveTimerState() {
 function restoreTimerState() {
   try {
     const raw = localStorage.getItem(TIMER_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
-    const saved = JSON.parse(raw);
-    if (saved && saved.taskId && saved.startTime && saved.eventId) {
+    const saved = parseStoredTimer(raw);
+    if (saved) {
       activeTimer = saved;
       startTimerIntervals();
+    } else if (raw) {
+      localStorage.removeItem(TIMER_STORAGE_KEY);
     }
   } catch (err) {
     void err;
@@ -107,13 +106,7 @@ function startTimer(task, calendarId) {
   const summary = buildEventSummary(jiraKey, task.title);
   const startTime = new Date().toISOString();
 
-  activeTimer = {
-    taskId: task.id,
-    startTime: startTime,
-    calendarId: calendarId,
-    eventId: null,
-    summary: summary,
-  };
+  activeTimer = createTimerState(task, { startTime, calendarId, summary });
   saveTimerState();
   timerPickerTaskId = null;
   renderTaskList(lastTasks, lastPalette);
