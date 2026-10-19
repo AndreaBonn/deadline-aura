@@ -28,6 +28,8 @@ Tutto quello che serve per installare Deadline Aura e usarla ogni giorno. Non se
 
 Deadline Aura gira su Linux con GNOME su X11. Non funziona su Wayland, Windows o macOS. Se non sai quale sessione stai usando, guarda la pagina "Informazioni" nelle impostazioni di sistema, oppure esci e controlla l'icona dell'ingranaggio nella schermata di accesso, dove si sceglie il tipo di sessione.
 
+Se avvii l'app da una sessione Wayland, ti mostra una notifica che spiega come cambiare: esci, apri l'icona dell'ingranaggio nella schermata di accesso e scegli "GNOME su Xorg".
+
 Per installare non serve altro. Gli account Google, Outlook e Jira sono tutti facoltativi: l'app funziona anche con i soli task che scrivi tu.
 
 ## Installare l'app
@@ -49,9 +51,11 @@ sudo apt install ./deadlineaura_*.deb
 
 Sul bordo destro di ogni schermo collegato compare una striscia colorata sottile. Quella striscia è tutta l'interfaccia a riposo: il suo colore è il tuo carico di lavoro del momento.
 
-Clicca la striscia e la sidebar si apre. In alto trovi l'orologio, la barra di urgenza con il punteggio e l'icona di un gatto. In mezzo i tuoi task, raggruppati per provenienza. In basso una fila di pulsanti: impostazioni (ingranaggio), Layout, sync manuale e chiusura.
+Al primissimo avvio la sidebar si apre da sola, una volta, con un suggerimento: la sidebar si apre e si chiude cliccando la striscia colorata sul bordo dello schermo, e il colore della striscia indica il carico di lavoro. Premi **Ho capito** per chiuderlo. Nei lanci successivi non riappare.
 
-Senza account collegati la sidebar è quasi vuota, ed è normale. Le sezioni che seguono la riempiono.
+In alto nella sidebar trovi l'orologio, la barra di urgenza con il punteggio su 100 (per esempio 63/100) accanto alla parola della fascia, e l'icona di un gatto. In mezzo i tuoi task, raggruppati per provenienza. In basso una fila di pulsanti: impostazioni (ingranaggio), **Sposta post-it**, aggiorna adesso e chiusura. Sopra i pulsanti c'è la riga **Aggiornato HH:MM**, l'ora dell'ultimo aggiornamento dei dati. Se una sorgente non ha risposto, compare una riga arancione, per esempio **Non risponde: Jira**, con il link **Apri impostazioni**.
+
+Senza account collegati la sidebar mostra la scheda **Inizia da qui**, con tre passi: scrivere il primo task (pulsante **Nuovo task**), collegare un calendario o Jira (pulsante **Apri collegamenti**, che apre le impostazioni) e capire cosa significano i colori. Il **+** per creare un task personale è sempre presente, anche con zero task. Le sezioni che seguono riempiono il resto.
 
 ## Collegare Google Calendar
 
@@ -71,17 +75,17 @@ http://localhost:34567/oauth/callback
 
 Clicca **Crea**. Google ti mostra un **Client ID** e un **Client Secret**: lascia aperta quella finestra.
 
-**4. Incollali nell'app.** In Deadline Aura clicca l'ingranaggio in fondo alla sidebar, vai nel tab **Sorgenti** e incolla client ID e client secret nei campi Google. Salva.
+**4. Incollali nell'app.** In Deadline Aura clicca l'ingranaggio in fondo alla sidebar, vai nel tab **Collegamenti** e incolla client ID e client secret nei campi Google. Finché mancano le credenziali, il tab mostra una guida in 3 passi che riassume questi stessi punti: un link **Apri la console**, l'indirizzo di reindirizzamento con il pulsante **Copia**, e i campi dove incollare Client ID e Client Secret. Compilarli accende da solo Google Calendar.
 
-**5. Autorizza.** Si apre una finestra del browser che chiede di concedere l'accesso. Accedi con l'account di cui vuoi il calendario e conferma.
+**5. Autorizza.** Premi **Collega account Google**. L'app salva le modifiche in sospeso e apre il browser, dove ti viene chiesto di concedere l'accesso: accedi con l'account di cui vuoi il calendario e conferma. Al termine l'app dice com'è andata: collegato, già collegato, credenziali mancanti, porta 34567 occupata, oppure il motivo del problema. L'autorizzazione non aspetta il prossimo aggiornamento in background: finisce subito.
 
 L'app chiede accesso al calendario in lettura e scrittura, non in sola lettura. La lettura è ciò che colora il desktop; la scrittura è ciò che permette al time log e al timer live di creare voci sul calendario. Se non hai intenzione di usarli, puoi concedere comunque l'accesso e semplicemente non premere quei pulsanti.
 
 Dopo la conferma, la sidebar comincia a riempirsi con i tuoi impegni.
 
-**Quali eventi contano come importanti.** Un evento che hai colorato di rosso in Google Calendar ha la priorità massima. Subito dopo vengono gli eventi che contengono nel titolo o nella descrizione una delle keyword di priorità (di default `urgent`, `deadline`, `release`, `deploy`, `critico`); tutto il resto ha priorità normale. L'elenco delle keyword si cambia in **Impostazioni → Sorgenti**, e Outlook ha il suo elenco nella stessa scheda.
+**Quali eventi contano come importanti.** Un evento che hai colorato di rosso in Google Calendar ha la priorità massima. Subito dopo vengono gli eventi che contengono nel titolo o nella descrizione una delle keyword di priorità (di default `urgent`, `deadline`, `release`, `deploy`, `critico`); tutto il resto ha priorità normale. L'elenco delle keyword si cambia in **Impostazioni → Collegamenti → Altre opzioni**, e Outlook ha il suo elenco nella stessa scheda.
 
-**Se nel browser usi più di un account Google**, scrivi quello legato al calendario di lavoro nel campo **Account Google** della stessa scheda. I link Meet della dock si aprono allora con quell'account, invece che con il profilo scelto dal browser.
+**Se nel browser usi più di un account Google**, scrivi quello legato al calendario di lavoro nel campo **Account Google** della stessa scheda, sempre sotto **Altre opzioni**. Lì trovi anche la scelta dei calendari. I link Meet della dock si aprono allora con quell'account, invece che con il profilo scelto dal browser.
 
 ## Collegare Outlook
 
@@ -89,7 +93,7 @@ Outlook non richiede account, password né permessi dal reparto IT. Deadline Aur
 
 **1. Pubblica il calendario.** In Outlook sul web apri **Impostazioni → Calendario → Calendari condivisi → Pubblica un calendario**. Scegli il calendario, imposta il permesso su **Tutti i dettagli** e pubblica. Outlook mostra due link: copia quello **ICS**.
 
-**2. Incollalo nell'app.** In Deadline Aura apri **Impostazioni → Sorgenti → Outlook**, attiva la sorgente, incolla il link e salva.
+**2. Incollalo nell'app.** In Deadline Aura apri **Impostazioni → Collegamenti → Outlook**, incolla il link e salva. Compilare il link accende Outlook da solo.
 
 Due cose da sapere:
 
@@ -100,22 +104,26 @@ Le riunioni ricorrenti sono gestite come si deve: ogni occorrenza compare alla s
 
 ## Collegare Jira
 
-Apri **Impostazioni → Sorgenti → Jira** e compila:
+Apri **Impostazioni → Collegamenti → Jira** e compila:
 
 - **Dominio**: il tuo indirizzo Atlassian, per esempio `tuaazienda.atlassian.net`
 - **Email**: l'indirizzo del tuo account Atlassian
-- **API token**: creane uno su [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
-- **JQL**: quali issue portare dentro. Il valore predefinito, `assignee = currentUser() AND statusCategory != Done`, vuol dire "tutto quello che è assegnato a me e non è finito"
+- **API token**: creane uno su [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens). Come gli altri segreti, resta nascosto: il pulsante **Mostra** lo rivela
+- **Quali issue mostrare** (il campo JQL): quali issue portare dentro. Il valore predefinito, `assignee = currentUser() AND statusCategory != Done`, vuol dire "tutto quello che è assegnato a me e non è finito". Il link **Ripristina predefinito** lo rimette com'era
 
-Se lavori su più siti Jira, clicca **+ Aggiungi istanza** e compila un secondo gruppo di campi. Ogni sito può avere il suo filtro. Quando un sito è lento o rifiuta le richieste per un po', l'app ritenta qualche volta e poi lo salta per quel giro: gli altri siti si aggiornano comunque.
+Completare un'istanza accende Jira da solo. Una sorgente accesa ma non ancora configurata mostra **Acceso ma non collegato**.
+
+Ogni istanza ha un pulsante **Verifica connessione**: dice quante issue trova il filtro, oppure il problema (email o token non validi, sito non trovato, filtro non valido, sito non raggiungibile, dominio che deve essere solo l'indirizzo).
+
+Se lavori su più siti Jira, clicca **+ Aggiungi istanza** e compila un secondo gruppo di campi. Ogni sito può avere il suo filtro. Quando un sito è lento o rifiuta le richieste per un po', l'app ritenta qualche volta e poi lo salta per quel giro: gli altri siti si aggiornano comunque, mentre i task del sito che non risponde restano sul desktop come erano. In fondo alla sidebar compare la riga «Non risponde: Jira» finché il sito non torna raggiungibile.
 
 ## Attivare l'AI scoring
 
 Questo passaggio è facoltativo e l'app funziona anche senza. Quando è attivo, un modello AI legge i titoli dei tuoi impegni in arrivo e stima quanto pesa il carico, di solito avvicinandosi alla realtà più di quanto faccia il semplice conteggio delle scadenze.
 
-Apri **Impostazioni → AI** e incolla una chiave API di almeno uno fra Groq, Gemini, OpenAI e Anthropic. Groq e Gemini hanno entrambi un piano gratuito. Se ne indichi più di uno, l'app li prova in ordine e passa al successivo quando un provider non risponde.
+Apri **Impostazioni → AI**: le chiavi vengono per prime. Incolla una chiave API di almeno uno fra Groq, Gemini, OpenAI e Anthropic. Groq e Gemini sono marcati "gratuito" e ognuno ha il link **Ottieni una chiave**. Se ne indichi più di uno, l'app li prova in ordine e passa al successivo quando un provider non risponde. Ordine dei provider, timeout e **Creatività delle risposte** (la temperatura) stanno sotto **Opzioni avanzate**, chiuse di default.
 
-Tieni presente cosa esce dal tuo computer: i titoli degli eventi e, dove ci sono, descrizione, organizzatore e numero di partecipanti vengono inviati al provider che hai scelto. Se i titoli delle tue riunioni sono riservati, lascia la funzione spenta. Il resto dell'app non ne risente: il punteggio viene allora calcolato solo da date e priorità.
+Tieni presente cosa esce dal tuo computer: i titoli degli eventi e, dove ci sono, descrizione, organizzatore e numero di partecipanti vengono inviati al provider che hai scelto. Se i titoli delle tue riunioni sono riservati, lascia la funzione spenta. Il resto dell'app non ne risente: il punteggio viene allora calcolato solo da date e priorità. Con l'AI accesa ma senza nessuna chiave, il tab mostra "AI spenta: aggiungi almeno una chiave...".
 
 ## Leggere i colori
 
@@ -131,7 +139,7 @@ Striscia, tinta del wallpaper e barra di urgenza mostrano tutte lo stesso numero
 
 Il colore nasce da una miscela: la valutazione AI pesa il 70 per cento, il calcolo meccanico su date e priorità il 30. Senza un provider AI, la parte meccanica è l'intero punteggio.
 
-La visualizzazione si aggiorna ogni 60 secondi. I dati vengono recuperati ogni 10 minuti e l'AI ricalcola quando cambiano gli eventi oppure ogni 6 ore, a seconda di cosa arriva prima. Tutti e tre gli intervalli sono configurabili.
+La visualizzazione si aggiorna ogni 60 secondi. I dati vengono scaricati ogni 10 minuti (il campo **Scarica i dati ogni**, nel tab Generale, vale subito senza riavviare l'app) e l'AI ricalcola quando cambiano gli eventi oppure ogni 6 ore, a seconda di cosa arriva prima. Tutti e tre gli intervalli sono configurabili.
 
 Lo sfondo porta anche una breve agenda nell'angolo in alto a sinistra, intitolata **PROSSIME 24H**: orario, sorgente e titolo di ogni evento o task in scadenza nelle prossime 24 ore. Quando l'elenco è troppo lungo per lo spazio disponibile, l'ultima riga dice quanti altri ce ne sono.
 
@@ -152,11 +160,11 @@ La barretta è bianca sotto il 70 per cento, ambra fino all'89 e rossa dal 90 in
 | `n/d`        | Il dato non c'è ancora                                                         |
 | `agg. 01:06` | L'ultimo dato ha più di 30 minuti: da allora non ne è arrivato uno nuovo       |
 
-I dati di Codex arrivano da soli, dai log che Codex scrive sul tuo computer. Per Claude serve un passaggio una volta sola: in **Impostazioni → Wallpaper** premi **Installa cattura**. L'app aggiunge un piccolo script davanti alla statusline di Claude Code, che continua a funzionare come prima. Lo script salva solo le percentuali e gli orari di reset, non legge mai le credenziali e richiede `python3`. La modifica riguarda `~/.claude/settings.json` e quindi tutti i profili Cloak, che condividono quel file; prima di scriverlo l'app ne salva una copia in `~/.local/share/deadlineaura/backups/statusline`.
+I dati di Codex arrivano da soli, dai log che Codex scrive sul tuo computer. Per Claude serve un passaggio una volta sola: in **Impostazioni → Limiti Claude/Codex** premi **Installa cattura**. L'app aggiunge un piccolo script davanti alla statusline di Claude Code, che continua a funzionare come prima. Lo script salva solo le percentuali e gli orari di reset, non legge mai le credenziali e richiede `python3`. La modifica riguarda `~/.claude/settings.json` e quindi tutti i profili Cloak, che condividono quel file; prima di scriverlo l'app ne salva una copia in `~/.local/share/deadlineaura/backups/statusline`.
 
 Un account si aggiorna solo quando hai una sessione di Claude Code aperta su quell'account. Lo sfondo si ridisegna quando cambia qualcosa di visibile e comunque almeno ogni 15 minuti, quindi una percentuale può restare indietro di qualche punto, al massimo per un quarto d'ora.
 
-Se la fascia non ti serve, spegnila da **Impostazioni → Wallpaper → Mostra consumo limiti Claude/Codex**.
+Se la fascia non ti serve, spegnila da **Impostazioni → Limiti Claude/Codex → Mostra consumo limiti Claude/Codex**.
 
 ## Lavorare con i task
 
@@ -170,41 +178,47 @@ Apri la sidebar cliccando la striscia. I task sono raggruppati in sezioni, e una
 6. **Preferiti Jira** - le issue Jira che hai stellato
 7. **Jira** - tutto il resto che rientra nel tuo filtro
 
-Ogni card mostra titolo, countdown, punteggio di urgenza e un badge con la sorgente. Cliccando una card Jira o Google Calendar la apri nel browser. Le card Outlook non aprono nulla, perché un feed pubblicato non porta con sé una pagina per singolo evento.
+Ogni card mostra titolo, countdown, il colore della sua urgenza sul bordo sinistro e la priorità a parole (Critico, Alto, Medio, Basso). Cliccando una card Jira o Google Calendar la apri nel browser. Le card Outlook non aprono nulla, perché un feed pubblicato non porta con sé una pagina per singolo evento.
 
-**Creare un task.** Clicca **+** nell'intestazione della sezione Locale, scrivi un titolo, scegli una data e una priorità da P1 a P4, premi Invio.
+**Creare un task.** Clicca **+** nell'intestazione della sezione Personali, scrivi un titolo, scegli una data e una priorità (da «P1 - Critico» a «P4 - Basso»), premi Invio.
 
-**Agire su un task.** Le icone su ogni card permettono di modificarlo, segnarlo come fatto, eliminarlo, stellarlo (solo Jira), fissarlo sul desktop, registrare tempo o avviare un timer.
+**Agire su un task.** Su ogni card restano sempre visibili tre azioni: completa (solo task personali), stella (solo Jira) e avvia timer (Jira e task personali). Le altre stanno nel menu **⋯**, con etichette scritte: **Modifica**, **Appunta sul desktop** (o **Rimuovi dal desktop**), **Registra tempo** ed **Elimina** (solo task personali).
 
-**Fissare sul desktop.** L'icona a puntina trasforma un task in un post-it disegnato dentro lo sfondo, così lo vedi senza aprire niente. Per risistemare i biglietti clicca **Layout** in fondo alla sidebar: si apre un livello trasparente dove trascini ogni post-it dove preferisci. Clicca Salva, oppure premi Esc per buttare via le modifiche. Le posizioni sono salvate in percentuale, quindi sopravvivono a un cambio di risoluzione o di monitor. Per togliere un biglietto dal desktop dal livello trasparente, clicca la × nel suo angolo e poi Salva.
+L'eliminazione non è immediata: compare per 5 secondi una barra "«titolo» eliminato" con il pulsante **Annulla**. Passati i 5 secondi il task è eliminato davvero. I preferiti Jira non compaiono più anche nell'elenco Jira sotto.
 
-**Quando un task fissato sparisce.** Se una issue fissata viene chiusa in Jira o un evento fissato viene cancellato dal calendario, il post-it non sparisce: prende un bordo rosso, così te ne accorgi. Dopo 48 ore il task viene rimosso definitivamente, e il post-it con lui.
+Sotto la barra di urgenza c'è il pulsante **Nota AI e previsione 5 giorni**, che apre una valutazione scritta del carico attuale e una previsione dello stress a cinque giorni. Compare solo quando c'è una nota o una previsione.
+
+**Fissare sul desktop.** **Appunta sul desktop**, nel menu **⋯**, trasforma un task in un post-it disegnato dentro lo sfondo, così lo vedi senza aprire niente. Per risistemare i biglietti clicca **Sposta post-it** in fondo alla sidebar: si apre un livello trasparente dove trascini ogni post-it dove preferisci. Clicca Salva, oppure premi Esc per buttare via le modifiche. Le posizioni sono salvate in percentuale, quindi sopravvivono a un cambio di risoluzione o di monitor. Per togliere un biglietto dal desktop dal livello trasparente, clicca la × nel suo angolo e poi Salva.
+
+**Quando un task fissato sparisce.** Se una issue fissata viene chiusa in Jira o un evento fissato viene cancellato dal calendario, il post-it non sparisce: prende un bordo rosso e la scritta "Chiuso alla fonte: sparisce da solo fra 48 ore", così te ne accorgi. I task personali sono etichettati "Personale". Dopo 48 ore il task viene rimosso definitivamente, e il post-it con lui.
 
 ## Tracciare il tempo
 
 Due strade, entrambe scrivono sul tuo Google Calendar.
 
-**Registrare il tempo a posteriori.** Clicca l'icona dell'orologio su una card. Compare un modulo con data e ora (che partono da adesso, arrotondate al quarto d'ora), una durata fra 15 e 480 minuti e il calendario su cui scrivere. La voce viene creata come `[CODICE-JIRA] - Titolo`, il formato che Tempo e strumenti simili si aspettano. Il calendario scelto viene ricordato per la volta dopo.
+**Registrare il tempo a posteriori.** Apri il menu **⋯** di una card e scegli **Registra tempo**. Compare un modulo con i campi **Giorno**, **Inizio** (che partono da adesso, arrotondati al quarto d'ora), **Durata (minuti)**, fra 15 e 480, con i pulsanti rapidi 15 min, 30 min, 1h e 1h 30m, e il **Calendario** su cui scrivere. Se manca qualcosa, una riga rossa dice cosa (per esempio, scegli il calendario). La voce viene creata come `[CODICE-JIRA] - Titolo`, il formato che Tempo e strumenti simili si aspettano. Il calendario scelto viene ricordato per la volta dopo.
 
-**Cronometrare dal vivo.** Clicca il pulsante verde di avvio. Una voce sul calendario viene creata subito e il suo orario di fine viene spostato in avanti ogni 60 secondi finché il timer gira. Il pulsante diventa uno stop rosso che mostra il tempo trascorso; premendolo la voce si chiude alla durata esatta. Un solo timer alla volta: avviarne un secondo ferma il primo. Se l'app si chiude a timer acceso, lo riprende alla riapertura.
+**Cronometrare dal vivo.** Clicca il pulsante verde di avvio sulla card. Una voce sul calendario viene creata subito e il suo orario di fine viene spostato in avanti ogni 60 secondi finché il timer gira. Il pulsante diventa uno stop rosso che mostra il tempo trascorso; premendolo la voce si chiude alla durata esatta. Un solo timer alla volta: avviarne un secondo ferma il primo. Se l'app si chiude a timer acceso, lo riprende alla riapertura.
 
-Per un task locale che non ha un codice Jira nel titolo ti viene chiesto di associarne uno, scegliendolo fra le tue issue o digitandolo.
+Per un task personale il codice Jira è facoltativo: se vuoi, **+ Collega a una issue Jira (facoltativo)** permette di sceglierlo fra le tue issue o di digitarlo. Il cronometro dal vivo di un task personale senza codice Jira parte subito, se l'app conosce già un calendario predefinito.
+
+Senza Google Calendar collegato, il pulsante del timer è nascosto e il menu **⋯** offre **Collega Google** (apre le impostazioni) al posto di **Registra tempo**. Un timer già in corso mantiene sempre il suo pulsante di stop.
 
 ## Promemoria delle riunioni
 
 Tre cose distinte ti avvisano di una riunione, dalla più discreta alla più insistente.
 
-**La dock.** Una barra traslucida in fondo a ogni schermo che elenca le riunioni in partenza entro 10 minuti, con il link cliccabile per Meet, Teams o Zoom. Compare quando c'è qualcosa da mostrare e sparisce quando non c'è, e non ruba mai spazio alle tue finestre. La × su una riunione la nasconde solo su quello schermo, se l'hai già vista e vuoi recuperare lo spazio.
+**La dock.** Una barra traslucida in fondo a ogni schermo che elenca le riunioni in partenza entro 10 minuti, con il pulsante **Entra** per Meet, Teams o Zoom. Compare quando c'è qualcosa da mostrare e sparisce quando non c'è, e non ruba mai spazio alle tue finestre. La × su una riunione la nasconde solo su quello schermo, se l'hai già vista e vuoi recuperare lo spazio.
 
 **Il flyby.** Sessanta secondi prima dell'inizio, un gatto in pixel art attraversa ogni schermo trainando uno striscione con il titolo della riunione e il countdown, poi se ne va dopo una ventina di secondi. Esiste per il caso in cui la dock sia nascosta dietro una finestra a schermo intero.
 
-Per comandarlo, clicca l'icona del gatto in cima alla sidebar:
+Per comandarlo, clicca l'icona del gatto in cima alla sidebar. Il menu si apre con l'intestazione **Gatto avvisi riunioni** e lo stato attuale (attivo, sospeso fino a un'ora precisa, spento):
 
-| Voce di menu           | Effetto                                          |
-| ---------------------- | ------------------------------------------------ |
-| Sospendi 1h / 3h / 24h | Silenzio, poi torna da solo                      |
-| Per sempre             | Spento finché non lo riaccendi                   |
-| Riattiva               | Annulla subito una sospensione o uno spegnimento |
+| Voce di menu           | Effetto                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------- |
+| Sospendi 1h / 3h / 24h | Silenzio, poi torna da solo                                                                    |
+| Per sempre             | Spento finché non lo riaccendi                                                                 |
+| Riattiva               | Annulla subito una sospensione o uno spegnimento (compare solo mentre gli avvisi sono sospesi) |
 
 Mentre gli avvisi sono sospesi, l'icona del gatto è disegnata sbarrata, così te ne accorgi al volo.
 
@@ -212,27 +226,36 @@ Mentre gli avvisi sono sospesi, l'icona del gatto è disegnata sbarrata, così t
 
 ## Capire il punteggio
 
-Accanto al punteggio di urgenza c'è un pulsante `?`. Apre un pannello che spiega da dove arriva il numero: cosa ha valutato l'AI e quanto ha pesato il suo parere, cosa ha prodotto il calcolo meccanico compreso l'amplificatore che entra in gioco su un calendario affollato e quanti eventi di assenza sono rimasti fuori, e quali tre task stanno spingendo il numero verso l'alto. Se nessun provider AI ha risposto, il pannello lo dichiara e riporta il solo punteggio meccanico.
+Accanto al punteggio di urgenza c'è un pulsante `?`. Apre un pannello che spiega da dove arriva il numero, in quest'ordine:
+
+1. **Cosa pesa di più adesso**: i tre task che spingono il numero verso l'alto, ognuno con un pulsante **Apri** quando ha un link.
+2. **Perché questo colore**: la spiegazione in frasi semplici.
+3. **Come è calcolato**, una sezione chiusa di default: cosa ha valutato l'AI e quanto ha pesato il suo parere, cosa ha prodotto il calcolo meccanico (compreso l'amplificatore che entra in gioco su un calendario affollato e quanti eventi di assenza sono rimasti fuori) e la miscela 70/30 fra le due.
+
+Se nessun provider AI ha risposto, il pannello lo dichiara e riporta il solo punteggio meccanico.
 
 I giorni segnati come ferie o assenza non contano come carico, quindi una settimana di vacanza risulta tranquilla invece che un muro di eventi.
 
-Cliccando la barra colorata di urgenza si apre invece un altro pannello: una valutazione scritta del carico attuale e una previsione dello stress a cinque giorni.
-
 ## Le impostazioni, tab per tab
 
-Clicca l'ingranaggio in fondo alla sidebar. Ogni tab ha il suo pulsante **Reset sezione**, così puoi annullare le modifiche in un'area senza toccare le altre.
+Clicca l'ingranaggio in fondo alla sidebar. La finestra si apre sul tab **Collegamenti**. Ogni tab ha il suo pulsante **Ripristina sezione**, così puoi annullare le modifiche in un'area senza toccare le altre.
 
-| Tab         | Cosa ci trovi                                                                                       |
-| ----------- | --------------------------------------------------------------------------------------------------- |
-| Generale    | Ogni quanto si aggiorna la visualizzazione, ogni quanto si scaricano i dati, quanto guardare avanti |
-| Sorgenti    | Credenziali e calendari Google, feed Outlook, istanze e filtro Jira                                 |
-| AI          | Chiavi dei provider, ordine in cui vengono provati, intervallo di ricalcolo, timeout, temperatura   |
-| Wallpaper   | Se colorare lo sfondo, quali immagini usare, opzioni dei post-it, fascia dei limiti Claude e Codex  |
-| Sidebar     | Su quale lato si apre, quanto è larga, quanto è trasparente                                         |
-| Notifiche   | Notifiche desktop, punteggio che le fa scattare, pausa fra una e l'altra, e la meeting dock         |
-| Interfaccia | Lingua, quanti task mostrare, formato del countdown                                                 |
-| Turno       | I tuoi giorni e orari di lavoro, e le ferie                                                         |
-| Avanzate    | Le costanti dietro il calcolo dell'urgenza                                                          |
+| Tab                 | Cosa ci trovi                                                                                                                     |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Collegamenti        | Lo stato dei collegamenti, credenziali e calendari Google, feed Outlook, istanze e filtro Jira                                    |
+| AI                  | Chiavi dei provider; sotto Opzioni avanzate ordine di prova, timeout e creatività delle risposte                                  |
+| Notifiche           | Notifiche desktop, soglia di urgenza che le fa scattare, pausa fra una e l'altra, e la meeting dock                               |
+| Turno               | I tuoi giorni e orari di lavoro, e le ferie                                                                                       |
+| Wallpaper           | Se colorare lo sfondo, quali immagini usare, opzioni dei post-it                                                                  |
+| Limiti Claude/Codex | Se mostrare la fascia dei consumi di Claude e Codex, e i pulsanti per installare o rimuovere la cattura di Claude                 |
+| Sidebar             | Su quale lato si apre, quanto è larga, quanto è trasparente                                                                       |
+| Interfaccia         | Lingua, quanti task mostrare, formato del countdown                                                                               |
+| Generale            | Ogni quanto si aggiorna la visualizzazione, ogni quanto si scaricano i dati (**Scarica i dati ogni**), **Quanto guardare avanti** |
+| Avanzate            | Le costanti dietro il calcolo dell'urgenza (gruppo **Calcolo dell'urgenza**, con la **Velocità di crescita (K)**)                 |
+
+In cima al tab Collegamenti, **Stato dei collegamenti** mostra per Google Calendar, Outlook e Jira una di queste voci: Collegato, Spento, Da configurare, Da autorizzare, Errore all'ultimo aggiornamento. Accanto c'è l'ora dell'ultimo aggiornamento. Lo stato si riferisce alle impostazioni già salvate, non a quelle che stai ancora scrivendo.
+
+Se hai modifiche non salvate, accanto a **Salva** compare **● Modifiche non salvate**. Chiudere la finestra con la × in quel caso chiede "Hai modifiche non salvate", con tre scelte: **Salva ed esci**, **Esci senza salvare**, **Continua a modificare**. Se un salvataggio fallisce, l'app nomina il tab e il limite, per esempio "Controlla la scheda «AI»: Inserisci un valore non superiore a 30000.", e passa a quel tab.
 
 Il tab **Turno** alimenta il countdown mostrato sotto l'orologio: quanto manca alla fine del turno, o quando comincia il prossimo. Non modifica il punteggio di urgenza. Gli orari si possono descrivere in due modi:
 
@@ -267,7 +290,7 @@ I due file sotto `.config` sono scritti in modo che li possa leggere solo il tuo
 
 **Nessuna notifica desktop.** Passano da `notify-send`, che sta nel pacchetto `libnotify-bin`. Installalo se manca.
 
-**Il calendario resta vuoto.** Controlla l'orario dell'ultimo sync in fondo alla sidebar, poi premi il pulsante di sync per forzare un aggiornamento. Se non cambia niente, la causa più comune è l'URI di reindirizzamento scritto male nella console Google Cloud: deve essere esattamente `http://localhost:34567/oauth/callback`, senza barra finale.
+**Il calendario resta vuoto.** Controlla l'ora **Aggiornato HH:MM** in fondo alla sidebar e la riga arancione **Non risponde: ...**, se c'è, poi premi il pulsante di aggiornamento per forzare un giro. Apri anche **Stato dei collegamenti** in **Impostazioni → Collegamenti**: dice quale sorgente è spenta, da configurare o in errore, e per Jira **Verifica connessione** ne dice il motivo. Se non cambia niente, la causa più comune è l'URI di reindirizzamento scritto male nella console Google Cloud: deve essere esattamente `http://localhost:34567/oauth/callback`, senza barra finale.
 
 **Google smette di funzionare dopo un po'.** Se la schermata di consenso su Google Cloud è ancora in modalità test, Google fa scadere l'autorizzazione a intervalli regolari. Pubblicare la schermata di consenso risolve; in alternativa basta riautorizzare quando succede.
 
@@ -287,7 +310,7 @@ Per rimuoverla:
 sudo apt remove deadlineaura
 ```
 
-Se hai installato la cattura dei limiti di Claude, premi prima **Rimuovi cattura** in **Impostazioni → Wallpaper**: rimette la statusline com'era. Se te ne dimentichi, non si rompe niente: lo script resta in `~/.local/share/deadlineaura/bin` e continua a passare i dati alla tua statusline; per toglierlo dopo, esegui `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
+Se hai installato la cattura dei limiti di Claude, premi prima **Rimuovi cattura** in **Impostazioni → Limiti Claude/Codex**: rimette la statusline com'era. Se te ne dimentichi, non si rompe niente: lo script resta in `~/.local/share/deadlineaura/bin` e continua a passare i dati alla tua statusline; per toglierlo dopo, esegui `~/.local/share/deadlineaura/bin/claude-capture.py uninstall`.
 
 Impostazioni e database restano al loro posto, quindi reinstallando più avanti ritrovi tutto. Per cancellare anche quelli, elimina `~/.config/deadlineaura` e `~/.local/share/deadlineaura`.
 
