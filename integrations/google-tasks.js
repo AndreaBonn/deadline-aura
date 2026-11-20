@@ -78,6 +78,10 @@ async function fetchTasks(config) {
         allTasks.push(...tasks);
       } catch (err) {
         console.error(`Google Tasks: error fetching list "${taskList.title}":`, err.message);
+        // Partial results would make the daemon mark the failed list's tasks stale.
+        throw new Error(`Google Tasks: list "${taskList.title}" could not be fetched`, {
+          cause: err,
+        });
       }
     }
   } catch (err) {

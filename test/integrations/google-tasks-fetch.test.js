@@ -61,7 +61,7 @@ describe('google-tasks fetchTasks', () => {
     ]);
   });
 
-  it('logs a failed task list and continues fetching the remaining lists', async () => {
+  it('fails the whole fetch, naming the list, when one task list cannot be read', async () => {
     service.tasklists.list.mockResolvedValue({
       data: {
         items: [
@@ -77,12 +77,18 @@ describe('google-tasks fetchTasks', () => {
       return { data: { items: [{ id: 'home-task', title: 'Home task', status: 'needsAction' }] } };
     });
 
-    const result = await fetchTasks(makeConfig());
-
-    expect(result).toEqual([
-      expect.objectContaining({ id: 'gtasks_home-task', title: 'Home task' }),
-    ]);
+    await expect(fetchTasks(makeConfig())).rejects.toThrow(/"Work"/);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Work'), 'list unavailable');
+  });
+
+  it('does not put the list contents or the upstream message in the thrown error', async () => {
+    service.tasklists.list.mockResolvedValue({ data: { items: [{ id: 'work', title: 'Work' }] } });
+    service.tasks.list.mockRejectedValue(new Error('token ya29.SECRET rejected'));
+
+    const failure = await fetchTasks(makeConfig()).catch((err) => err);
+
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.message).not.toContain('ya29.SECRET');
   });
 
   it('logs and rethrows a failure to fetch task lists', async () => {
