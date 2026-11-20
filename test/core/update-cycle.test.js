@@ -241,4 +241,26 @@ describe('update cycle: forced call during a running cycle', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(deps.wallpaperChanger.update).toHaveBeenCalledTimes(1);
   });
+
+  it('logs the error of a failing replay without an unhandled rejection', async () => {
+    const { run, deps, release } = blockedCycle();
+    deps.wallpaperChanger.update.mockRejectedValueOnce(new Error('replay boom'));
+    const first = run();
+    await run({ force: true });
+    release();
+    await first;
+    await vi.waitFor(() =>
+      expect(deps.log.error).toHaveBeenCalledWith('Update cycle error:', 'replay boom'),
+    );
+  });
+
+  it('does not log an error when the replay succeeds', async () => {
+    const { run, deps, release } = blockedCycle();
+    const first = run();
+    await run({ force: true });
+    release();
+    await first;
+    await vi.waitFor(() => expect(deps.wallpaperChanger.update).toHaveBeenCalledTimes(2));
+    expect(deps.log.error).not.toHaveBeenCalled();
+  });
 });
