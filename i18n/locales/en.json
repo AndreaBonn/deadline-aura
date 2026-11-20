@@ -197,6 +197,7 @@
     "background_error_UNSUPPORTED_FORMAT": "Unsupported format: use PNG or JPEG",
     "background_error_UNREADABLE": "The file is not a readable image",
     "background_error_COPY_FAILED": "Could not copy the image",
+    "background_error_SAVE_FAILED": "Could not save the choice",
     "resolution": "Resolution",
     "auto": "Automatic",
     "custom": "Custom",
