@@ -173,3 +173,35 @@ it('characterizes empty global result and fresh and stale AI breakdowns', () => 
     });
   }
 });
+
+describe('describeMechanicalScore — volume amplification values', () => {
+  function calendarTasks(count, urgency) {
+    return Array.from({ length: count }, (_, i) => ({
+      id: `gcal_${i}`,
+      source: 'gcal',
+      priority: 3,
+      urgency_score: urgency,
+    }));
+  }
+
+  it('amplifies when the base urgency sits exactly on the 0.3 gate', () => {
+    // 6 calendar events: one above the threshold of 5, boost 0.15 -> 0.3 + 0.15 * 0.7
+    const detail = describeMechanicalScore(calendarTasks(6, 0.3), [2.0, 1.5, 1.0, 0.5]);
+
+    expect([detail.score, detail.volume_amp_applied]).toEqual([0.405, true]);
+  });
+
+  it('adds 0.15 per event above five, scaled by the remaining headroom', () => {
+    // 10 events: boost 5 * 0.15 = 0.75 -> 0.5 + 0.75 * 0.5
+    const detail = describeMechanicalScore(calendarTasks(10, 0.5), [2.0, 1.5, 1.0, 0.5]);
+
+    expect(detail.score).toBe(0.875);
+  });
+
+  it('caps the amplified score at 1.0 when the boost exceeds the headroom', () => {
+    // 30 events: boost 25 * 0.15 = 3.75 -> 0.5 + 3.75 * 0.5 = 2.375, capped
+    const detail = describeMechanicalScore(calendarTasks(30, 0.5), [2.0, 1.5, 1.0, 0.5]);
+
+    expect(detail.score).toBe(1);
+  });
+});
