@@ -2,6 +2,9 @@
 
 const DEFAULT_DATA_SYNC_MINUTES = 10;
 const MINUTE_MS = 60000;
+// Past this age a cycle counts as hung (a request with no answer): new syncs stop waiting for
+// it. Above the 5 minutes a Google consent page may legitimately keep a cycle open.
+const STALE_CYCLE_MS = 10 * MINUTE_MS;
 
 class DataSync {
   #deps;
@@ -10,6 +13,13 @@ class DataSync {
   #lastStatus = null;
   #timer = null;
   #timerMinutes = null;
+  // The cycle in flight, {promise, startedAt}. Startup, manual and periodic syncs share it:
+  // two overlapping cycles pay the AI scoring twice and the last to finish overwrites the
+  // newer status.
+  #inFlight = null;
+  // A manual sync asked while a cycle runs: it runs once after it, since the user may have just
+  // authorized a source the running cycle started without.
+  #manualRerun = null;
 
   constructor(deps) {
     this.#deps = deps;
@@ -18,25 +28,71 @@ class DataSync {
   }
 
   // Public methods are arrow fields: main.js passes them around detached.
+  #runningCycle() {
+    const now = (this.#deps.now || Date.now)();
+    if (this.#inFlight && now - this.#inFlight.startedAt < STALE_CYCLE_MS) {
+      return this.#inFlight.promise;
+    }
+    return null;
+  }
+
+  // A request that finds a cycle running gets that cycle, with that cycle's options (force
+  // included): what it needs is fresh data, which the running cycle is fetching.
   runSyncAndRefresh = (options) => {
+    const running = this.#runningCycle();
+    if (running) {
+      return running;
+    }
     const { runSyncCycle, summarize, refresh, log } = this.#deps;
-    return runSyncCycle({
-      summarize,
-      onStatus: (summary) => {
-        this.#lastStatus = summary;
-      },
-      refresh: (...args) => refresh(...args),
-      log,
-      ...options,
+    const entry = { startedAt: (this.#deps.now || Date.now)(), promise: null };
+    entry.promise = Promise.resolve(
+      runSyncCycle({
+        summarize,
+        onStatus: (summary) => {
+          this.#lastStatus = summary;
+        },
+        refresh: (...args) => refresh(...args),
+        log,
+        ...options,
+      }),
+    ).finally(() => {
+      // A hung cycle replaced by a newer one must not clear the newer one.
+      if (this.#inFlight === entry) {
+        this.#inFlight = null;
+      }
     });
+    this.#inFlight = entry;
+    return entry.promise;
   };
 
-  runManualSync = () =>
-    this.runSyncAndRefresh({
+  runManualSync = () => {
+    const options = {
       tag: 'sync-now',
       failureLabel: 'Manual sync error:',
       sync: () => this.#deps.getSyncDaemon().sync(this.#deps.getConfig()),
-    });
+    };
+    const running = this.#runningCycle();
+    if (!running) {
+      return this.runSyncAndRefresh(options);
+    }
+    if (!this.#manualRerun) {
+      this.#manualRerun = this.#afterCycle(running).then(() => {
+        this.#manualRerun = null;
+        return this.runSyncAndRefresh(options);
+      });
+    }
+    return this.#manualRerun;
+  };
+
+  // Settles when the running cycle ends or turns stale, whichever comes first. Only the order
+  // matters here: the running cycle reports its own failure to its callers.
+  #afterCycle(running) {
+    const now = (this.#deps.now || Date.now)();
+    const remaining = this.#inFlight.startedAt + STALE_CYCLE_MS - now;
+    let timeout;
+    const stale = new Promise((resolve) => (timeout = setTimeout(resolve, remaining)));
+    return Promise.race([running.catch(() => {}), stale]).finally(() => clearTimeout(timeout));
+  }
 
   /** (Re)starts the periodic sync; a changed interval applies without a restart. */
   scheduleDataSync = () => {
@@ -77,7 +133,10 @@ class DataSync {
 
   getLastStatus = () => this.#lastStatus;
 
-  stop = () => this.#clearIntervalFn(this.#timer);
+  stop = () => {
+    this.#clearIntervalFn(this.#timer);
+    this.#timer = null;
+  };
 }
 
 /**

@@ -135,3 +135,119 @@ describe('stop', () => {
     expect(cleared.list).toEqual([timers[0]]);
   });
 });
+
+describe('one sync at a time', () => {
+  function holdSync(syncDaemon) {
+    const finishes = [];
+    syncDaemon.sync.mockImplementation(
+      () =>
+        new Promise((resolve) => finishes.push(() => resolve({ gcal: 0, jira: 0, errors: [] }))),
+    );
+    return finishes;
+  }
+
+  it('a periodic tick while a sync runs is skipped, and the next one syncs again', async () => {
+    const { dataSync, syncDaemon, timers } = setup();
+    const finishes = holdSync(syncDaemon);
+    dataSync.scheduleDataSync();
+
+    const manual = dataSync.runManualSync();
+    timers[0].fn();
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(1);
+    finishes[0]();
+    await manual;
+
+    timers[0].fn();
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed sync does not block the next one', async () => {
+    const { dataSync, syncDaemon } = setup();
+    syncDaemon.sync.mockRejectedValueOnce(new Error('offline'));
+    await expect(dataSync.runManualSync()).rejects.toThrow('offline');
+    await dataSync.runManualSync();
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('stop then schedule', () => {
+  it('a schedule after stop arms a new timer even with the same interval', () => {
+    const { dataSync, timers } = setup();
+    dataSync.scheduleDataSync();
+    dataSync.stop();
+    dataSync.scheduleDataSync();
+    expect(timers).toHaveLength(2);
+  });
+});
+
+describe('single flight edge cases', () => {
+  it('a manual sync asked during a running cycle runs once more after it ends', async () => {
+    const { dataSync, syncDaemon } = setup();
+    const finishes = [];
+    syncDaemon.sync.mockImplementation(
+      () =>
+        new Promise((resolve) => finishes.push(() => resolve({ gcal: 0, jira: 0, errors: [] }))),
+    );
+    const startup = dataSync.startupSync();
+    const first = dataSync.runManualSync();
+    const second = dataSync.runManualSync();
+    finishes[0]();
+    await startup;
+    for (let i = 0; i < 10; i++) {
+      await Promise.resolve();
+    }
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+    finishes[1]();
+    await Promise.all([first, second]);
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+  });
+
+  it('a cycle hung past the stale limit no longer blocks new syncs', async () => {
+    vi.useFakeTimers();
+    try {
+      const { dataSync, syncDaemon } = setup();
+      syncDaemon.sync.mockImplementationOnce(() => new Promise(() => {}));
+      dataSync.startupSync();
+      vi.advanceTimersByTime(15 * MINUTE_MS);
+      await dataSync.runManualSync();
+      expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('hung cycles', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('a slow cycle that ends after a newer one started does not release the newer one', async () => {
+    const { dataSync, syncDaemon } = setup();
+    let finishSlow;
+    syncDaemon.sync.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSlow = () => resolve({ errors: [] }))),
+    );
+    dataSync.startupSync();
+    vi.advanceTimersByTime(15 * MINUTE_MS);
+    syncDaemon.sync.mockImplementationOnce(() => new Promise(() => {}));
+    dataSync.runSyncAndRefresh({ sync: () => syncDaemon.sync() });
+
+    finishSlow();
+    await vi.advanceTimersByTimeAsync(0);
+    dataSync.runSyncAndRefresh({ sync: () => syncDaemon.sync() });
+
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+  });
+
+  it('a manual sync asked during a hung cycle runs when the cycle turns stale', async () => {
+    const { dataSync, syncDaemon } = setup();
+    syncDaemon.sync.mockImplementationOnce(() => new Promise(() => {}));
+    dataSync.startupSync();
+
+    const manual = dataSync.runManualSync();
+    await vi.advanceTimersByTimeAsync(10 * MINUTE_MS);
+    await manual;
+
+    expect(syncDaemon.sync).toHaveBeenCalledTimes(2);
+  });
+});
