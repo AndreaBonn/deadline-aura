@@ -263,3 +263,19 @@ describe('meeting flyby orchestration', () => {
     });
   });
 });
+
+describe('staggered launches and quit', () => {
+  it('destroyAll cancels the launches still waiting for their stagger delay', () => {
+    db.getUpcomingCalendarEvents.mockReturnValue([
+      MEETING,
+      { ...MEETING, id: 'review', title: 'Review' },
+    ]);
+    flyby.checkAndLaunch({ config: CONFIG, db, screen });
+    expect(windows).toHaveLength(1);
+
+    flyby.destroyAll();
+    vi.advanceTimersByTime(STAGGER_MS);
+
+    expect(windows).toHaveLength(1);
+  });
+});

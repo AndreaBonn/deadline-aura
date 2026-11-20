@@ -12,6 +12,9 @@ const STAGGER_DELAY_MS = 2500;
 const CHOREOGRAPHY_MS = 9000;
 const cooldownMap = new Map();
 const activeFlybys = new Map();
+// Launches still waiting for their stagger delay: destroyAll cancels them, or a flyby could
+// open while the app quits.
+const pendingLaunches = new Set();
 let initialized = false;
 
 function cleanupCooldowns() {
@@ -182,14 +185,20 @@ function checkAndLaunch({ config, db, screen }) {
     if (delay === 0) {
       displays.forEach((display) => launchFlyby({ meeting, display, durationSeconds }));
     } else {
-      setTimeout(() => {
+      const launch = setTimeout(() => {
+        pendingLaunches.delete(launch);
         displays.forEach((display) => launchFlyby({ meeting, display, durationSeconds }));
       }, delay);
+      pendingLaunches.add(launch);
     }
   });
 }
 
 function destroyAll() {
+  for (const launch of pendingLaunches) {
+    clearTimeout(launch);
+  }
+  pendingLaunches.clear();
   for (const [win, state] of activeFlybys) {
     if (state.safetyTimer) {
       clearTimeout(state.safetyTimer);
