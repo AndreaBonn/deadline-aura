@@ -19,7 +19,7 @@ Correggere tre difetti di produzione e scomporre cinque moduli (`deadline-engine
 - [ ] Smoke manuale (`npm start`) a fine lavoro: countdown del turno nella sidebar coerente con l'ora in turno, prima del turno e fuori turno; agenda del wallpaper con un task personale entro 24 h che mostra `PERS.`; dopo l'aggiunta di un task personale e un sync con cache valida, nessun punteggio AI spostato su un task diverso (dettaglio spiegazione punteggio nella sidebar).
 - [ ] Un commit per cambiamento logico su `main`, Conventional Commits in inglese, push non eseguito.
 
-SIGNAL: riga `[ai] cache hit: applied <n> of <m> scores, skipped <k> inactive` nello stdout di `npm start` (prodotta da T002) | atteso `n + k = m` e, dopo l'aggiunta di un task personale, il punteggio AI di quel task vuoto fino al ricalcolo | entro il primo sync dopo l'avvio con cache valida (intervallo `sync.data_interval_minutes`, default 10 minuti). Per R3, R4 e per i refactor nessun segnale runtime oltre allo smoke: app desktop senza telemetria.
+SIGNAL: riga `[ai] cache hit: <n> of <m> scored tasks still active` (nome e testo definitivi in `0ef25a3`) nello stdout di `npm start` (prodotta da T002) | atteso `n + k = m` e, dopo l'aggiunta di un task personale, il punteggio AI di quel task vuoto fino al ricalcolo | entro il primo sync dopo l'avvio con cache valida (intervallo `sync.data_interval_minutes`, default 10 minuti). Per R3, R4 e per i refactor nessun segnale runtime oltre allo smoke: app desktop senza telemetria.
 
 ## Assunzioni
 
@@ -47,7 +47,7 @@ Nessuna scelta architetturale aperta: D1-D5 fissano le tre che c'erano. Due scel
 
 ## Complessità introdotta
 
-- Campo `scored_task_ids` nella voce di cache AI -> R1, R2 | più semplice scartata: applicare per indice come oggi, perché è il difetto.
+- Campo `task_ids` (nel piano originale `scored_task_ids`) nella voce di cache AI -> R1, R2 | più semplice scartata: applicare per indice come oggi, perché è il difetto.
 - Riga di log `[ai] cache hit: ...` -> SIGNAL | più semplice scartata: nessun log, perché senza la riga un punteggio spostato non si vede da fuori.
 - File golden `test/fixtures/prompt/scoring-prompt-{it,en}.txt` -> R8 | più semplice scartata: `toMatchSnapshot`, perché il repo non usa snapshot e `vitest -u` li rigenera in silenzio; un'asserzione su frammenti del prompt non garantisce l'identità byte per byte che serve a dire "refactor senza effetto sul prompt".
 - Nessun modulo, dipendenza o astrazione nuova: gli helper estratti sono funzioni private nello stesso file.

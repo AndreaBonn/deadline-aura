@@ -8,6 +8,14 @@ Commit diretti su `main`, Conventional Commits in inglese, push escluso. Rollbac
 - T003 fatto in `fe4442c`, con deviazione: badge `PERSONALE` / `PERSONAL` (colore viola tenue), e il fallback JIRA per sorgenti sconosciute è stato lasciato com'è. Il cambio del fallback è una decisione dell'utente, non presa.
 - T004 fatto in `22d4a86`.
 - Fuori piano, dall'audit dei test: `eb60baa` pinna contextIsolation, nodeIntegration e preload delle cinque finestre del main process.
+- T010-T013: `4a6f3f1`, `e2d8bdd`, `ef4dc7c`, `2ad4788`, più `fd7efcb` (gate di volume e tetto) e `d674660` (lint rosso lasciato da `2ad4788`, commenti ripristinati).
+- T020-T022: `03f71e2`, `f041efa`, `7cda6d8`, più `fe975f7` (issue Jira parziali verso lo scoring AI).
+- T030-T032: `c4e7a3c`, `d4f3465`, `f5cfca1`, più `b668c3d`.
+- T040-T042: `b965742`, `a433678`, `81e6a60`, più `9f155e8`.
+- T050: `eaf3ded` (il fallback JIRA per sorgenti sconosciute resta, vedi R3).
+- SIGNAL e `/analyze` A1: `0ef25a3` (log del cache hit e della riga di cache illeggibile).
+- T060: gate eseguiti tranne lo smoke con `npm start`, che resta all'utente (ricompila i moduli nativi per Electron).
+- Fuori piano, difetti emersi dall'audit e corretti con test di regressione: `7a520e3`, `4a1ef40`, `45bd631`, `64e978f`, `f4e8852`, `9d5b537`, `4d9afa0`, `b9d7a6d`, `ce4f8c8`, `6463d1a`. Test sui finding ad alta severità: `2ec31d5`, `b9f1d01`, `150c0d6`, `3a67bab`, `58526ed`.
 
 Regole comuni:
 
