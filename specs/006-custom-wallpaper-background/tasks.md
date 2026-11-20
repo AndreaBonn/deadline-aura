@@ -40,4 +40,4 @@ Integrazioni dal security-reviewer (prevalgono sul testo delle righe della tabel
 - [x] T007 IPC pick-background / background-status + preload | dip: T005,T006
 - [x] T008 Selettore dynamic/gradient + i18n | dip: T001
 - [x] T009 Opzione custom: bottone, stato, errori | dip: T007,T008
-- [ ] T010 Click-through, misura render, pacchetto .deb | dip: T003,T004,T009
+- [?] T010 Click-through, misura render, pacchetto .deb | dip: T003,T004,T009 (Q: click-through sull'app reale e .deb: li fai tu o con me presente?)
