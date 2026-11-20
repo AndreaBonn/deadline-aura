@@ -11,7 +11,7 @@ function validateCalendarLogTime({ summary, startTime, durationMinutes }) {
   if (!summary || typeof summary !== 'string') {
     return 'INVALID_SUMMARY';
   }
-  if (!startTime || typeof durationMinutes !== 'number' || durationMinutes < MIN_DURATION_MINUTES) {
+  if (!startTime || !Number.isFinite(durationMinutes) || durationMinutes < MIN_DURATION_MINUTES) {
     return 'INVALID_TIME';
   }
   return null;

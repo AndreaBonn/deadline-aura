@@ -22,10 +22,13 @@ describe('validateCalendarLogTime', () => {
     expect(result).toBe('INVALID_TIME');
   });
 
-  it.each([0, -1, 0.5, '30', undefined, null])('rejects invalid duration %j', (durationMinutes) => {
-    const result = validateCalendarLogTime({ ...validInput, durationMinutes });
-    expect(result).toBe('INVALID_TIME');
-  });
+  it.each([0, -1, 0.5, '30', undefined, null, Number.NaN, Infinity])(
+    'rejects invalid duration %s',
+    (durationMinutes) => {
+      const result = validateCalendarLogTime({ ...validInput, durationMinutes });
+      expect(result).toBe('INVALID_TIME');
+    },
+  );
 
   it.each([1, 1.5, 30])(
     'accepts a numeric duration of at least one minute: %j',
