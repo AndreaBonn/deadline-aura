@@ -162,3 +162,36 @@ describe('scoreEvents', () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe('scoreEvents — sampling temperature', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
+  });
+
+  async function temperatureSentFor(aiConfig) {
+    process.env.GROQ_API_KEYS = 'key-temperature';
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ global_stress: 3, per_event: [] }) } }],
+      }),
+    });
+
+    await scoreEvents([{ id: '1', title: 'Focus block' }], {
+      ai: { provider_priority: ['groq'], ...aiConfig },
+    });
+
+    return JSON.parse(fetchSpy.mock.calls[0][1].body).temperature;
+  }
+
+  it('sends a configured temperature of 0 unchanged', async () => {
+    expect(await temperatureSentFor({ temperature: 0 })).toBe(0);
+  });
+
+  it('sends the 0.15 default when no temperature is configured', async () => {
+    expect(await temperatureSentFor({})).toBe(0.15);
+  });
+});

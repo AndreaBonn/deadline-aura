@@ -95,7 +95,7 @@ async function scoreEvents(events, config) {
   const prompt = buildScoringPrompt(events, config.language || 'it');
   const providerTimeout = config.ai?.provider_timeout_ms || 5000;
   const totalTimeout = config.ai?.total_timeout_ms || 15000;
-  const temperature = config.ai?.temperature || 0.15;
+  const temperature = config.ai?.temperature ?? 0.15;
 
   const deadline = Date.now() + totalTimeout;
 
