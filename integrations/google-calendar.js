@@ -43,12 +43,13 @@ function isDeclinedByUser(event) {
   return selfAttendee?.responseStatus === 'declined';
 }
 
-// An all-day event counts as ended only after its last second, not at midnight.
+// Google's end.date of an all-day event is exclusive: the event is over from local
+// midnight of that date, which eventBoundaryMs already returns.
 function isSkippedEvent(event) {
   const endTime = event.end?.dateTime
     ? new Date(event.end.dateTime).getTime()
     : event.end?.date
-      ? new Date(event.end.date + 'T23:59:59').getTime()
+      ? eventBoundaryMs(event.end)
       : null;
   if (endTime && endTime < Date.now()) {
     return true;

@@ -263,6 +263,18 @@ describe('google-calendar — normalizeEvent', () => {
     expect(upcoming).toEqual(expect.objectContaining({ id: 'gcal_past-all-day', all_day: true }));
   });
 
+  it('normalizeEvent_one_day_all_day_event_is_over_the_next_morning', () => {
+    // Google's end.date is exclusive: a one-day event starting on the 8th ends on the 9th.
+    const event = { id: 'one-day', start: { date: '2030-05-08' }, end: { date: '2030-05-09' } };
+
+    const sameDay = normalizeEvent(event);
+    vi.setSystemTime(new Date(2030, 4, 9, 10, 0, 0));
+    const nextMorning = normalizeEvent(event);
+
+    expect(sameDay).toEqual(expect.objectContaining({ id: 'gcal_one-day', all_day: true }));
+    expect(nextMorning).toBeNull();
+  });
+
   it('normalizeEvent_red_event_returns_highest_priority', () => {
     const event = { id: 'red', colorId: '11', end: { dateTime: '2030-05-08T13:00:00Z' } };
 
