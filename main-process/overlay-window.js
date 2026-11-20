@@ -38,12 +38,12 @@ class OverlayWindow {
       return;
     }
     const { BrowserWindow, screen, wallpaperChanger } = this.#dependencies;
-    wallpaperChanger.setOverlayOpen(true);
-
     const targetDisplay =
       findDisplayById(screen.getAllDisplays(), displayId) || screen.getPrimaryDisplay();
 
     const window = new BrowserWindow(overlayOptions(targetDisplay));
+    // Only once the window exists: a failed creation must not freeze the wallpaper.
+    wallpaperChanger.setOverlayOpen(true);
     this.#window = window;
     window.loadFile(path.join(__dirname, '..', 'renderer', 'overlay.html'));
     window.webContents.once('did-finish-load', () => this.#sendInit(displayId, targetDisplay));

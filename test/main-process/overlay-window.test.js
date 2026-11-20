@@ -151,3 +151,22 @@ describe('OverlayWindow IPC channels', () => {
     expect(pinnedQueries.updatePositions).not.toHaveBeenCalled();
   });
 });
+
+describe('OverlayWindow when the window cannot be created', () => {
+  it('does not leave the wallpaper frozen as if the overlay were open', () => {
+    const overlayStates = [];
+    const overlay = createOverlayWindow({
+      BrowserWindow: function () {
+        throw new Error('no GPU');
+      },
+      screen: createFakeElectron().screen,
+      wallpaperChanger: { setOverlayOpen: (open) => overlayStates.push(open) },
+      pinnedQueries: { getByDisplay: () => [] },
+      withPostitCodes: (tasks) => tasks,
+      refresh: vi.fn(),
+    });
+
+    expect(() => overlay.open('2')).toThrow('no GPU');
+    expect(overlayStates.at(-1) ?? false).toBe(false);
+  });
+});
