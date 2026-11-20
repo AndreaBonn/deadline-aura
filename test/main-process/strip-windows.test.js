@@ -299,3 +299,52 @@ describe('StripWindows destroyStrips', () => {
     expect(electron.windows[1].closeCount).toBe(1);
   });
 });
+
+describe('StripWindows rebuilt while the sidebar covers a strip', () => {
+  it('a display change does not bring back the strip hidden under the open sidebar', () => {
+    setPlatform('darwin');
+    const { strips, electron } = setup();
+    strips.createStrips();
+    electron.windows.forEach((w) => w.finishLoad());
+    strips.hideStrip('2');
+
+    strips.createStrips();
+    electron.windows.slice(2).forEach((w) => w.finishLoad());
+
+    expect(electron.windows.slice(2).map((w) => w.visible)).toEqual([true, false]);
+    strips.showStrip('2');
+    expect(electron.windows[3].visible).toBe(true);
+  });
+});
+
+describe('StripWindows first show after a hidden load on X11', () => {
+  it('the rightmost strip still sets its strut when the sidebar uncovers it', () => {
+    setPlatform('linux', ':0');
+    const { strips, electron } = setup();
+    strips.hideStrip('2');
+    strips.createStrips();
+    electron.windows[1].finishLoad();
+    expect(xprop.calls).toEqual([]);
+
+    strips.showStrip('2');
+    finishNextXprop();
+    finishNextXprop();
+
+    expect(electron.windows[1].visible).toBe(true);
+    expect(xprop.calls.some((call) => call.includes('_NET_WM_STRUT_PARTIAL'))).toBe(true);
+  });
+});
+
+describe('StripWindows hidden mark of a removed display', () => {
+  it('is dropped, so the display reconnected later shows its strip', () => {
+    setPlatform('darwin');
+    const { strips, electron } = setup();
+    strips.hideStrip('2');
+    electron.state.displays = [electron.primary];
+    strips.createStrips();
+    electron.state.displays = [electron.primary, electron.secondary];
+    strips.createStrips();
+    electron.windows.slice(-2).forEach((w) => w.finishLoad());
+    expect(electron.windows.slice(-2).map((w) => w.visible)).toEqual([true, true]);
+  });
+});

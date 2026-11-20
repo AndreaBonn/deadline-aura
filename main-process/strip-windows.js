@@ -68,6 +68,10 @@ function showLoadedStrip(window, { display, screen, rightmost }) {
 
 class StripWindows {
   #windows = new Map();
+  // Displays whose strip the open sidebar covers: a rebuild after a display change keeps them hidden.
+  #hiddenIds = new Set();
+  // First show of a strip that loaded while hidden: it still has to set the X11 strut.
+  #firstShows = new Map();
   #paletteHex = '#334155';
   #dependencies;
 
@@ -79,6 +83,9 @@ class StripWindows {
     this.destroyStrips();
     const { screen } = this.#dependencies;
     const displays = screen.getAllDisplays();
+    // A display that went away takes its hidden mark with it.
+    const present = new Set(displays.map((display) => String(display.id)));
+    this.#hiddenIds = new Set([...this.#hiddenIds].filter((id) => present.has(id)));
     const virtualWidth = getVirtualScreenWidth(screen);
     for (const display of displays) {
       this.#createStrip(display, isRightmost(display, virtualWidth));
@@ -95,7 +102,12 @@ class StripWindows {
     window.loadFile(path.join(__dirname, '..', 'renderer', 'strip.html'));
     window.webContents.once('did-finish-load', () => {
       window.webContents.send('strip-color', this.#paletteHex);
-      showLoadedStrip(window, { display, screen, rightmost });
+      const firstShow = () => showLoadedStrip(window, { display, screen, rightmost });
+      if (this.#hiddenIds.has(String(display.id))) {
+        this.#firstShows.set(String(display.id), firstShow);
+      } else {
+        firstShow();
+      }
     });
     this.#windows.set(String(display.id), window);
   }
@@ -107,6 +119,7 @@ class StripWindows {
       }
     }
     this.#windows = new Map();
+    this.#firstShows = new Map();
   }
 
   updateStripColor(hex) {
@@ -119,6 +132,7 @@ class StripWindows {
   }
 
   hideStrip(displayId) {
+    this.#hiddenIds.add(displayId);
     const window = this.#windows.get(displayId);
     if (window && !window.isDestroyed()) {
       window.hide();
@@ -126,9 +140,16 @@ class StripWindows {
   }
 
   showStrip(displayId) {
+    this.#hiddenIds.delete(displayId);
     const window = this.#windows.get(displayId);
     if (window && !window.isDestroyed()) {
-      window.show();
+      const firstShow = this.#firstShows.get(displayId);
+      this.#firstShows.delete(displayId);
+      if (firstShow) {
+        firstShow();
+      } else {
+        window.show();
+      }
     }
   }
 }
