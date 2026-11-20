@@ -77,91 +77,71 @@ function computeMechanicalScore(scored, priorityWeights) {
   return describeMechanicalScore(scored, priorityWeights).score;
 }
 
-/**
- * Compute the mechanical score and return rich diagnostics about how the
- * result was reached. Used by the score-explainability breakdown.
- */
-function describeMechanicalScore(scored, priorityWeights) {
-  if (scored.length === 0) {
-    return {
-      score: 0,
-      reason_key: 'empty',
-      base: 0,
-      active_count: 0,
-      ooo_filtered_count: 0,
-      volume_amp_applied: false,
-      effective_volume: 0,
-      calendar_count: 0,
-      backlog_count: 0,
-    };
-  }
+function emptyMechanicalDetail(reasonKey, oooCount) {
+  return {
+    score: 0,
+    reason_key: reasonKey,
+    base: 0,
+    active_count: 0,
+    ooo_filtered_count: oooCount,
+    volume_amp_applied: false,
+    effective_volume: 0,
+    calendar_count: 0,
+    backlog_count: 0,
+  };
+}
 
-  // Drop OOO/vacation tasks before aggregation and volume counting — they
-  // represent absence, not load. Without this filter, a week of all-day
-  // "ferie" events saturates the volume amplifier and pegs mechanical at 1.0.
-  const active = scored.filter((t) => t.ai_category !== 'off');
-  const oooCount = scored.length - active.length;
-
-  if (active.length === 0) {
-    return {
-      score: 0,
-      reason_key: 'all_off',
-      base: 0,
-      active_count: 0,
-      ooo_filtered_count: oooCount,
-      volume_amp_applied: false,
-      effective_volume: 0,
-      calendar_count: 0,
-      backlog_count: 0,
-    };
-  }
-
+function weightedBase(active, priorityWeights) {
   let weightedSum = 0;
   let totalWeight = 0;
-
   for (const task of active) {
     const weight = taskWeight(task, priorityWeights);
     weightedSum += task.urgency_score * weight;
     totalWeight += weight;
   }
+  return totalWeight > 0 ? weightedSum / totalWeight : 0;
+}
 
-  const rawBase = totalWeight > 0 ? weightedSum / totalWeight : 0;
-  let finalBase = rawBase;
-
-  const calendarCount = active.filter((t) => isCalendarSource(t.source)).length;
+function amplifyByVolume(rawBase, active) {
+  const calendarCount = active.filter((task) => isCalendarSource(task.source)).length;
   const backlogCount = active.length - calendarCount;
   const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
+  const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
+  const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
+  const applied = rawBase >= VOLUME_AMP_MIN_BASE && volumeBoost > 0;
+  const finalBase = applied ? Math.min(1, rawBase + volumeBoost * (1 - rawBase)) : rawBase;
+  return { calendarCount, backlogCount, effectiveVolume, applied, finalBase };
+}
 
-  // Volume amplification only applies when there is already real urgency to
-  // compound. A calendar full of distant events (low urgency) does not
-  // manufacture stress — that would peg mechanical at 1.0 for any user with
-  // a populated multi-day calendar regardless of actual proximity.
-  let volumeAmpApplied = false;
-  if (rawBase >= VOLUME_AMP_MIN_BASE) {
-    const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
-    const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
-    if (volumeBoost > 0) {
-      finalBase = Math.min(1, rawBase + volumeBoost * (1 - rawBase));
-      volumeAmpApplied = true;
-    }
+function mechanicalReasonKey(rawBase, volumeAmpApplied) {
+  if (volumeAmpApplied) {
+    return 'volume_amplified';
   }
+  return rawBase < VOLUME_AMP_MIN_BASE ? 'no_imminent_urgency' : 'urgency_below_volume_threshold';
+}
 
-  const reasonKey = volumeAmpApplied
-    ? 'volume_amplified'
-    : rawBase < VOLUME_AMP_MIN_BASE
-      ? 'no_imminent_urgency'
-      : 'urgency_below_volume_threshold';
-
+/**
+ * Compute the mechanical score and return rich diagnostics about how the
+ * result was reached. Used by the score-explainability breakdown.
+ */
+function describeMechanicalScore(scored, priorityWeights) {
+  const active = scored.filter((task) => task.ai_category !== 'off');
+  const oooCount = scored.length - active.length;
+  if (active.length === 0) {
+    return emptyMechanicalDetail(scored.length === 0 ? 'empty' : 'all_off', oooCount);
+  }
+  const rawBase = weightedBase(active, priorityWeights);
+  const volume = amplifyByVolume(rawBase, active);
   return {
-    score: Math.round(finalBase * 1000) / 1000,
-    reason_key: reasonKey,
+    score: Math.round(volume.finalBase * 1000) / 1000,
+    reason_key: mechanicalReasonKey(rawBase, volume.applied),
     base: Math.round(rawBase * 1000) / 1000,
     active_count: active.length,
     ooo_filtered_count: oooCount,
-    volume_amp_applied: volumeAmpApplied,
-    effective_volume: Math.round(effectiveVolume * 10) / 10,
-    calendar_count: calendarCount,
-    backlog_count: backlogCount,
+    volume_amp_applied: volume.applied,
+    effective_volume: Math.round(volume.effectiveVolume * 10) / 10,
+    calendar_count: volume.calendarCount,
+    backlog_count: volume.backlogCount,
   };
 }
 
