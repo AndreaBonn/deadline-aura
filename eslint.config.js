@@ -73,7 +73,7 @@ module.exports = [
       'test/**',
       'scripts/**',
       '*.config.js',
-      'ai/prompt.js',
+      'ai/prompt.js', // the scoring prompt template literal is one unit of text, kept whole
       'ai/provider-manager.js',
       'ai/providers/anthropic.js',
       'ai/providers/gemini.js',

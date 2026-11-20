@@ -232,13 +232,68 @@ const VALID_COGNITIVE_TYPES = new Set([
 const VALID_LEVELS = new Set(['low', 'medium', 'high']);
 const VALID_ADEQUACY = new Set(['sufficient', 'marginal', 'insufficient']);
 
-function parseAiResponse(text) {
-  const cleaned = text
+function stripCodeFences(text) {
+  return text
     .replace(/```json\n?/g, '')
     .replace(/```\n?/g, '')
     .trim();
+}
 
-  const parsed = JSON.parse(cleaned);
+function clampScore(value) {
+  return Math.max(1, Math.min(10, Math.round(value)));
+}
+
+function normalizePerEvent(events) {
+  for (const event of events) {
+    if (typeof event.stress === 'number') {
+      event.stress = clampScore(event.stress);
+    } else {
+      console.warn(`[ai] per_event id=${event.id} missing stress, defaulting to 5`);
+      event.stress = 5;
+    }
+    if (event.category && !VALID_CATEGORIES.has(event.category)) {
+      event.category = 'work-routine';
+    }
+    if (event.cognitive_type && !VALID_COGNITIVE_TYPES.has(event.cognitive_type)) {
+      event.cognitive_type = 'passive';
+    }
+  }
+}
+
+function normalizeDailyBreakdown(days) {
+  for (const day of days) {
+    if (typeof day.stress === 'number') {
+      day.stress = clampScore(day.stress);
+    }
+  }
+}
+
+function normalizeCognitiveFactors(cf) {
+  for (const key of ['context_switching', 'fragmentation', 'emotional_load']) {
+    if (cf[key] && !VALID_LEVELS.has(cf[key])) {
+      cf[key] = 'medium';
+    }
+  }
+  if (cf.decision_fatigue_risk && !VALID_LEVELS.has(cf.decision_fatigue_risk)) {
+    cf.decision_fatigue_risk = 'medium';
+  }
+  if (cf.recovery_adequacy && !VALID_ADEQUACY.has(cf.recovery_adequacy)) {
+    cf.recovery_adequacy = 'marginal';
+  }
+  if (typeof cf.deep_work_ratio === 'number') {
+    cf.deep_work_ratio = Math.max(0, Math.min(1, cf.deep_work_ratio));
+  }
+}
+
+function normalizeNote(parsed) {
+  if (typeof parsed.note !== 'string') {
+    parsed.note = parsed.clinical_note || '';
+  }
+  delete parsed.clinical_note;
+}
+
+function parseAiResponse(text) {
+  const parsed = JSON.parse(stripCodeFences(text));
 
   if (typeof parsed.global_stress !== 'number') {
     throw new Error('Missing or invalid global_stress');
@@ -247,55 +302,18 @@ function parseAiResponse(text) {
   parsed.global_stress = Math.max(1, Math.min(10, Math.round(parsed.global_stress * 10) / 10));
 
   if (Array.isArray(parsed.per_event)) {
-    for (const event of parsed.per_event) {
-      if (typeof event.stress === 'number') {
-        event.stress = Math.max(1, Math.min(10, Math.round(event.stress)));
-      } else {
-        console.warn(`[ai] per_event id=${event.id} missing stress, defaulting to 5`);
-        event.stress = 5;
-      }
-      if (event.category && !VALID_CATEGORIES.has(event.category)) {
-        event.category = 'work-routine';
-      }
-      if (event.cognitive_type && !VALID_COGNITIVE_TYPES.has(event.cognitive_type)) {
-        event.cognitive_type = 'passive';
-      }
-    }
+    normalizePerEvent(parsed.per_event);
   }
-
   if (Array.isArray(parsed.daily_breakdown)) {
-    for (const day of parsed.daily_breakdown) {
-      if (typeof day.stress === 'number') {
-        day.stress = Math.max(1, Math.min(10, Math.round(day.stress)));
-      }
-    }
+    normalizeDailyBreakdown(parsed.daily_breakdown);
   }
-
   if (parsed.cognitive_factors) {
-    const cf = parsed.cognitive_factors;
-    for (const key of ['context_switching', 'fragmentation', 'emotional_load']) {
-      if (cf[key] && !VALID_LEVELS.has(cf[key])) {
-        cf[key] = 'medium';
-      }
-    }
-    if (cf.decision_fatigue_risk && !VALID_LEVELS.has(cf.decision_fatigue_risk)) {
-      cf.decision_fatigue_risk = 'medium';
-    }
-    if (cf.recovery_adequacy && !VALID_ADEQUACY.has(cf.recovery_adequacy)) {
-      cf.recovery_adequacy = 'marginal';
-    }
-    if (typeof cf.deep_work_ratio === 'number') {
-      cf.deep_work_ratio = Math.max(0, Math.min(1, cf.deep_work_ratio));
-    }
+    normalizeCognitiveFactors(parsed.cognitive_factors);
   }
-
   if (!Array.isArray(parsed.patterns)) {
     parsed.patterns = [];
   }
-  if (typeof parsed.note !== 'string') {
-    parsed.note = parsed.clinical_note || '';
-  }
-  delete parsed.clinical_note;
+  normalizeNote(parsed);
 
   return parsed;
 }
