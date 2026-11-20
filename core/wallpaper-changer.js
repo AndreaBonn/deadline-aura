@@ -237,11 +237,16 @@ function resolveBackground({ mode = 'dynamic', customFile = null } = {}) {
  * @param {number} hue - Palette hue to remember as lastScore.
  * @param {string} nextSignature - Usage signature to remember as lastSignature.
  * @param {number} nowMs - Timestamp to remember as lastRenderAt.
- * @returns {{changed: true, method: string|null, path: string}}
+ * @returns {{changed: true, method: string, path: string}|{changed: false, reason: string, path: string}}
  */
 function applyRenderResult(timestampedPath, hue, nextSignature, nowMs) {
   const method = setWallpaper(timestampedPath);
   cleanupOldWallpapers(timestampedPath);
+
+  // Nothing was applied: keep the old render state so the next cycle tries again.
+  if (method === null) {
+    return { changed: false, reason: 'wallpaper not applied', path: timestampedPath };
+  }
 
   lastScore = hue;
   lastSignature = nextSignature;

@@ -188,6 +188,19 @@ describe('wallpaper-changer — update()', () => {
     expect(result.changed).toBe(true);
   });
 
+  it('retries on the next cycle when no tool could set the wallpaper', async () => {
+    const spawn = vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 1 });
+    const nowMs = new Date('2026-05-11T12:00:00Z').getTime();
+
+    const failed = await update(fakePalette, { force: true, nowMs });
+    spawn.mockReturnValue({ status: 0 });
+    const retried = await update(fakePalette, { nowMs });
+
+    expect(failed.changed).toBe(false);
+    expect(retried.changed).toBe(true);
+    expect(retried.method).toBe('gsettings');
+  });
+
   it('returns method in result when wallpaper is set', async () => {
     vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
 
