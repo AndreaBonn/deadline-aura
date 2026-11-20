@@ -1,6 +1,11 @@
 'use strict';
 
 const { z } = require('zod');
+const CUSTOM_BACKGROUND_FILES = [
+  'custom-background.png',
+  'custom-background.jpg',
+  'custom-background.webp',
+];
 
 const configSchema = z.object({
   language: z.enum(['it', 'en']).optional(),
@@ -83,7 +88,8 @@ const configSchema = z.object({
     resolution: z.union([z.literal('auto'), z.string().regex(/^\d+x\d+$/)]),
     show_ai_usage: z.boolean(),
     show_text: z.boolean(),
-    use_backgrounds: z.boolean(),
+    background_mode: z.enum(['dynamic', 'gradient', 'custom']).catch('dynamic'),
+    custom_background: z.enum(CUSTOM_BACKGROUND_FILES).nullable().catch(null),
     postit: z.object({
       enabled: z.boolean(),
       max_per_display: z.number().int().min(1).max(20),
@@ -165,4 +171,4 @@ function validateConfig(config) {
   return configSchema.parse(config);
 }
 
-module.exports = { configSchema, validateConfig };
+module.exports = { configSchema, validateConfig, CUSTOM_BACKGROUND_FILES };

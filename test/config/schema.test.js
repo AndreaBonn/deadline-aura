@@ -174,3 +174,22 @@ describe('config schema', () => {
     });
   });
 });
+
+describe('wallpaper background fields', () => {
+  it('accepts allowed files and replaces invalid paths without losing other fields', () => {
+    const makeConfig = (custom_background) => ({
+      ...DEFAULTS,
+      sync: { ...DEFAULTS.sync, interval_minutes: 17 },
+      wallpaper: { ...DEFAULTS.wallpaper, custom_background },
+    });
+    expect(validateConfig(makeConfig('custom-background.webp')).wallpaper.custom_background).toBe(
+      'custom-background.webp',
+    );
+    const invalid = validateConfig(makeConfig('../x.png'));
+    expect(invalid.wallpaper.custom_background).toBeNull();
+    expect(invalid.sync.interval_minutes).toBe(17);
+    expect(
+      validateConfig(makeConfig('custom-background.jpeg')).wallpaper.custom_background,
+    ).toBeNull();
+  });
+});

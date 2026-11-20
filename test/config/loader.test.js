@@ -171,3 +171,45 @@ describe('saveConfig', () => {
     expect(written.sync.interval_minutes).toBe(99);
   });
 });
+
+describe('legacy wallpaper migration', () => {
+  it.each([
+    [{ use_backgrounds: false }, 'gradient'],
+    [{ use_backgrounds: true }, 'dynamic'],
+    [{}, 'dynamic'],
+    [{ use_backgrounds: false, background_mode: 'custom' }, 'custom'],
+  ])('loads %j as %s without losing other settings', (wallpaper, mode) => {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify({ wallpaper, sync: { interval_minutes: 17 } }));
+    const result = loadConfig();
+    expect(result.wallpaper.background_mode).toBe(mode);
+    expect(result.wallpaper).not.toHaveProperty('use_backgrounds');
+    expect(result.sync.interval_minutes).toBe(17);
+  });
+
+  it('migrates without changing the input', () => {
+    const { migrateLegacyWallpaper } = require('../../config/loader');
+    const input = { wallpaper: { use_backgrounds: false }, sync: { interval_minutes: 17 } };
+    const original = JSON.parse(JSON.stringify(input));
+    expect(migrateLegacyWallpaper(input)).toEqual({
+      wallpaper: { background_mode: 'gradient' },
+      sync: { interval_minutes: 17 },
+    });
+    expect(input).toEqual(original);
+  });
+
+  it('preserves other settings when wallpaper fields are invalid', () => {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(
+      CONFIG_PATH,
+      JSON.stringify({
+        wallpaper: { background_mode: 'invalid', custom_background: '../x.png' },
+        sync: { interval_minutes: 17 },
+      }),
+    );
+    const result = loadConfig();
+    expect(result.wallpaper.background_mode).toBe('dynamic');
+    expect(result.wallpaper.custom_background).toBeNull();
+    expect(result.sync.interval_minutes).toBe(17);
+  });
+});

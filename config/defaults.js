@@ -50,7 +50,8 @@ const DEFAULTS = {
     resolution: 'auto',
     show_ai_usage: true,
     show_text: true,
-    use_backgrounds: true,
+    background_mode: 'dynamic',
+    custom_background: null,
     postit: {
       enabled: true,
       max_per_display: 12,

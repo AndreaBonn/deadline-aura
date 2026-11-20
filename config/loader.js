@@ -26,6 +26,18 @@ function deepMerge(target, source) {
   return result;
 }
 
+function migrateLegacyWallpaper(userConfig) {
+  const wallpaper = userConfig.wallpaper;
+  if (!wallpaper || typeof wallpaper !== 'object' || Array.isArray(wallpaper)) {
+    return { ...userConfig };
+  }
+  const { use_backgrounds: legacy, ...migrated } = wallpaper;
+  if (!Object.hasOwn(wallpaper, 'background_mode') && legacy === false) {
+    migrated.background_mode = 'gradient';
+  }
+  return { ...userConfig, wallpaper: migrated };
+}
+
 function loadConfig() {
   if (!fs.existsSync(CONFIG_PATH)) {
     return { ...DEFAULTS };
@@ -39,7 +51,7 @@ function loadConfig() {
     return { ...DEFAULTS };
   }
 
-  const merged = deepMerge(DEFAULTS, userConfig);
+  const merged = deepMerge(DEFAULTS, migrateLegacyWallpaper(userConfig));
   const result = configSchema.safeParse(merged);
   if (!result.success) {
     const fields = result.error.flatten().fieldErrors;
@@ -58,4 +70,4 @@ function saveConfig(newConfig) {
   fs.chmodSync(CONFIG_PATH, 0o600);
 }
 
-module.exports = { loadConfig, saveConfig, CONFIG_PATH, deepMerge };
+module.exports = { loadConfig, saveConfig, CONFIG_PATH, deepMerge, migrateLegacyWallpaper };
