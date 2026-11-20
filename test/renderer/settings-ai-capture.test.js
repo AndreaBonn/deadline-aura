@@ -121,3 +121,170 @@ describe('showCaptureMessage', () => {
     expect(message).toEqual({ textContent: text || '', className });
   });
 });
+
+describe('renderCaptureControl — install and uninstall actions', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const { Window } = require('happy-dom');
+
+  const SOURCE_FILE = path.resolve(__dirname, '../../renderer/settings-ai-capture.js');
+  const NOTE = 'Edits the statusline';
+  const CONFIRM = 'Proceed?';
+  const CONTROL_TEXT = {
+    ...TRANSLATIONS,
+    'settings.ai_capture.note': NOTE,
+    'settings.ai_capture.confirm': CONFIRM,
+    'settings.ai_capture.working': 'Working',
+  };
+
+  let win;
+
+  beforeEach(() => {
+    win = new Window();
+    vm.runInContext(fs.readFileSync(SOURCE_FILE, 'utf8'), win, { filename: SOURCE_FILE });
+  });
+
+  afterEach(() => {
+    win.close();
+  });
+
+  const flush = async () => {
+    for (let i = 0; i < 20; i += 1) {
+      await Promise.resolve();
+    }
+  };
+
+  async function mountControl({ installed, confirmAnswer = true, install, uninstall }) {
+    const api = {
+      captureStatus: vi.fn().mockResolvedValue({ installed }),
+      captureInstall: vi.fn(install || (async () => ({ ok: true }))),
+      captureUninstall: vi.fn(uninstall || (async () => ({ ok: true }))),
+    };
+    win.confirm = vi.fn(() => confirmAnswer);
+    win.api = api;
+    win.t = (key) => CONTROL_TEXT[key];
+    const container = win.document.createElement('div');
+    win.container = container;
+    vm.runInContext('renderCaptureControl(window.container, window.api, window.t)', win);
+    await flush();
+    const button = container.querySelector('button');
+    const message = container.querySelector('.ai-capture-message');
+    return { api, button, message, confirm: win.confirm };
+  }
+
+  it('does not install when the user declines the confirmation', async () => {
+    const { api, button, message, confirm } = await mountControl({
+      installed: false,
+      confirmAnswer: false,
+    });
+
+    button.click();
+    await flush();
+
+    expect({
+      confirmCalls: confirm.mock.calls.length,
+      installCalls: api.captureInstall.mock.calls.length,
+      uninstallCalls: api.captureUninstall.mock.calls.length,
+      message: message.textContent,
+      buttonDisabled: button.disabled,
+    }).toEqual({
+      confirmCalls: 1,
+      installCalls: 0,
+      uninstallCalls: 0,
+      message: '',
+      buttonDisabled: false,
+    });
+  });
+
+  it('installs once after confirmation, showing the note and the question in the prompt', async () => {
+    const { api, button, message, confirm } = await mountControl({
+      installed: false,
+      confirmAnswer: true,
+    });
+
+    button.click();
+    await flush();
+
+    expect({
+      confirmText: confirm.mock.calls[0][0],
+      installCalls: api.captureInstall.mock.calls.length,
+      uninstallCalls: api.captureUninstall.mock.calls.length,
+      message: message.textContent,
+      messageClass: message.className,
+    }).toEqual({
+      confirmText: `${NOTE}\n\n${CONFIRM}`,
+      installCalls: 1,
+      uninstallCalls: 0,
+      message: 'Capture updated',
+      messageClass: 'ai-capture-message ai-capture-message--success',
+    });
+  });
+
+  it('uninstalls without asking for confirmation when the capture is installed', async () => {
+    const { api, button, message, confirm } = await mountControl({
+      installed: true,
+      confirmAnswer: false,
+    });
+
+    button.click();
+    await flush();
+
+    expect({
+      confirmCalls: confirm.mock.calls.length,
+      installCalls: api.captureInstall.mock.calls.length,
+      uninstallCalls: api.captureUninstall.mock.calls.length,
+      message: message.textContent,
+    }).toEqual({
+      confirmCalls: 0,
+      installCalls: 0,
+      uninstallCalls: 1,
+      message: 'Capture updated',
+    });
+  });
+
+  it('disables the button while the install is running', async () => {
+    let finishInstall;
+    const { button } = await mountControl({
+      installed: false,
+      install: () => new Promise((resolve) => (finishInstall = resolve)),
+    });
+
+    button.click();
+    await flush();
+    const during = { disabled: button.disabled, label: button.textContent };
+    finishInstall({ ok: true });
+    await flush();
+
+    expect({ during, after: button.disabled }).toEqual({
+      during: { disabled: true, label: 'Working' },
+      after: false,
+    });
+  });
+
+  it('shows the error, re-enables the button and reloads the status when install rejects', async () => {
+    const { api, button, message } = await mountControl({
+      installed: false,
+      install: async () => {
+        throw new Error('EACCES');
+      },
+    });
+
+    button.click();
+    await flush();
+
+    expect({
+      message: message.textContent,
+      messageClass: message.className,
+      buttonDisabled: button.disabled,
+      buttonLabel: button.textContent,
+      statusReads: api.captureStatus.mock.calls.length,
+    }).toEqual({
+      message: 'Capture failed: EACCES',
+      messageClass: 'ai-capture-message ai-capture-message--error',
+      buttonDisabled: false,
+      buttonLabel: 'Install',
+      statusReads: 2,
+    });
+  });
+});
