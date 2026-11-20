@@ -4,6 +4,9 @@ const { createCanvas, loadImage } = require('canvas');
 const { getLanguage } = require('../i18n');
 const {
   getBackgroundFile,
+  planBackground,
+  loadBackground,
+  CUSTOM_VEIL_ALPHA,
   BACKGROUNDS_DIR,
   resolveUnpackedDir,
 } = require('./wallpaper-background');
@@ -14,18 +17,6 @@ const { bandTop, drawUsageBand } = require('./ai-usage-band');
 
 function tintIntensity(score) {
   return 0.15 + score * 0.3;
-}
-
-async function loadBackgroundImage(filePath) {
-  if (!filePath) {
-    return null;
-  }
-  try {
-    return await loadImage(filePath);
-  } catch {
-    // Background image not available
-  }
-  return null;
 }
 
 function drawFallbackGradient(ctx, palette, region) {
@@ -76,6 +67,13 @@ function drawBackground(ctx, bgImage, region) {
   ctx.drawImage(bgImage, sx, sy, sw, sh, x, y, width, height);
 }
 
+function drawNeutralVeil(ctx, region) {
+  const { x, y, width, height } = region;
+
+  ctx.fillStyle = `rgba(0, 0, 0, ${CUSTOM_VEIL_ALPHA})`;
+  ctx.fillRect(x, y, width, height);
+}
+
 function drawTintOverlay(ctx, palette, score, region) {
   const { h, s } = palette.hsl;
   const intensity = tintIntensity(score);
@@ -96,12 +94,16 @@ function drawTintOverlay(ctx, palette, score, region) {
 function drawRegion(
   ctx,
   region,
-  { bgImage, palette, score, allTasks, usageRows, pinnedByDisplay, nowMs, lang },
+  { bgImage, veil, palette, score, allTasks, usageRows, pinnedByDisplay, nowMs, lang },
 ) {
   // Background image or fallback gradient
   if (bgImage) {
     drawBackground(ctx, bgImage, region);
-    drawTintOverlay(ctx, palette, score, region);
+    if (veil === 'neutral') {
+      drawNeutralVeil(ctx, region);
+    } else {
+      drawTintOverlay(ctx, palette, score, region);
+    }
   } else {
     drawFallbackGradient(ctx, palette, region);
   }
@@ -139,6 +141,11 @@ function createBaseCanvas(totalWidth, totalHeight) {
   return { canvas, ctx };
 }
 
+function loadRequestedBackground(background, score) {
+  const plan = planBackground({ ...background, score });
+  return loadBackground(plan, { loadImage, log: console, score });
+}
+
 async function render({
   displays,
   palette,
@@ -147,19 +154,19 @@ async function render({
   calendarEvents,
   usageRows = [],
   nowMs = Date.now(),
+  background = { mode: 'dynamic' },
 }) {
-  const geometry = computeCanvasGeometry(displays);
-  const { totalWidth, totalHeight, regions } = geometry;
+  const { totalWidth, totalHeight, regions } = computeCanvasGeometry(displays);
   const { canvas, ctx } = createBaseCanvas(totalWidth, totalHeight);
 
-  const bgFile = getBackgroundFile(score);
-  const bgImage = await loadBackgroundImage(bgFile);
+  const { image: bgImage, veil } = await loadRequestedBackground(background, score);
   const lang = getLanguage();
   const allTasks = calendarEvents || [];
 
   for (const region of regions) {
     drawRegion(ctx, region, {
       bgImage,
+      veil,
       palette,
       score,
       allTasks,

@@ -59,8 +59,52 @@ function planBackground({ mode, customPath, score }) {
   return mode === 'custom' ? { ...plan, fallbackReason: 'NOT_SET' } : plan;
 }
 
+async function loadDynamicImage(file, loadImage) {
+  if (!file) {
+    return null;
+  }
+  try {
+    return await loadImage(file);
+  } catch {
+    // Photo unavailable: the caller paints the fallback gradient
+    return null;
+  }
+}
+
+async function loadFallback(reason, { loadImage, log, score }) {
+  log.warn(`[wallpaper] custom background unavailable (${reason}), falling back to dynamic`);
+  const plan = planBackground({ mode: 'dynamic', score });
+  return { image: await loadDynamicImage(plan.file, loadImage), veil: plan.veil };
+}
+
+/**
+ * Load the image a background plan asks for, falling back to the dynamic
+ * photo (with one warning) when a custom file cannot be used.
+ *
+ * @param {{kind: string, file: string|null, veil: string, fallbackReason?: string}} plan
+ * @param {{loadImage: Function, log: {warn: Function}, score: number}} deps
+ * @returns {Promise<{image: object|null, veil: 'tint'|'neutral'|'none'}>}
+ */
+async function loadBackground(plan, deps) {
+  if (plan.kind === 'gradient') {
+    return { image: null, veil: 'none' };
+  }
+  if (plan.fallbackReason) {
+    return loadFallback(plan.fallbackReason, deps);
+  }
+  if (plan.kind === 'custom') {
+    try {
+      return { image: await deps.loadImage(plan.file), veil: plan.veil };
+    } catch (err) {
+      return loadFallback(err.message, deps);
+    }
+  }
+  return { image: await loadDynamicImage(plan.file, deps.loadImage), veil: plan.veil };
+}
+
 module.exports = {
   planBackground,
+  loadBackground,
   CUSTOM_VEIL_ALPHA,
   getBackgroundFile,
   BACKGROUNDS_DIR,
