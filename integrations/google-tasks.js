@@ -5,6 +5,8 @@ const { getAuthenticatedClient, resolveGoogleOAuth } = require('./google-auth');
 
 const { DEFAULT_PRIORITY } = require('../core/task-priority');
 const HIGH_PRIORITY = 2;
+// Guard against a nextPageToken that never ends: 20 pages of 100 tasks per list.
+const MAX_PAGES = 20;
 const HIGH_PRIORITY_KEYWORDS = ['urgent', 'deadline', 'critico', 'asap', 'importante'];
 
 function assignPriority(title) {
@@ -40,6 +42,25 @@ function normalizeTask(task) {
   };
 }
 
+// Follow nextPageToken with the same query; the cap guards against a token that never ends.
+async function listAllPages(list, params, label) {
+  const items = [];
+  let pageToken;
+  let pages = 0;
+  do {
+    const response = await list({ ...params, pageToken });
+    items.push(...(response.data.items || []));
+    pageToken = response.data.nextPageToken || undefined;
+    pages += 1;
+  } while (pageToken && pages < MAX_PAGES);
+  if (pageToken) {
+    console.warn(
+      `Google Tasks: ${label} still has pages after ${MAX_PAGES}, returning what was read`,
+    );
+  }
+  return items;
+}
+
 async function fetchTasks(config) {
   const gcalConfig = config.sources.google_calendar;
 
@@ -59,21 +80,21 @@ async function fetchTasks(config) {
   const allTasks = [];
 
   try {
-    const taskListsResponse = await service.tasklists.list({ maxResults: 100 });
-    const taskLists = taskListsResponse.data.items || [];
+    const taskLists = await listAllPages(
+      (params) => service.tasklists.list(params),
+      { maxResults: 100 },
+      'the task lists',
+    );
 
     for (const taskList of taskLists) {
       try {
-        const tasksResponse = await service.tasks.list({
-          tasklist: taskList.id,
-          showCompleted: false,
-          showHidden: false,
-          maxResults: 100,
-        });
+        const rawTasks = await listAllPages(
+          (params) => service.tasks.list(params),
+          { tasklist: taskList.id, showCompleted: false, showHidden: false, maxResults: 100 },
+          `list "${taskList.title}"`,
+        );
 
-        const tasks = (tasksResponse.data.items || [])
-          .map((task) => normalizeTask(task))
-          .filter((t) => t !== null);
+        const tasks = rawTasks.map((task) => normalizeTask(task)).filter((t) => t !== null);
 
         allTasks.push(...tasks);
       } catch (err) {
@@ -93,6 +114,7 @@ async function fetchTasks(config) {
 }
 
 module.exports = {
+  MAX_PAGES,
   fetchTasks,
   normalizeTask,
   assignPriority,

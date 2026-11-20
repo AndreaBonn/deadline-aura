@@ -14,6 +14,8 @@ const { DEFAULT_PRIORITY } = require('../core/task-priority');
 
 const PRIORITY_KEYWORDS_DEFAULT = ['urgent', 'deadline', 'release', 'deploy', 'critico'];
 const RED_COLOR_ID = '11';
+// Guard against a nextPageToken that never ends: 20 pages of 50 events per calendar.
+const MAX_PAGES = 20;
 
 function assignPriority(event, priorityKeywords) {
   const keywords = priorityKeywords || PRIORITY_KEYWORDS_DEFAULT;
@@ -82,8 +84,28 @@ function normalizeEvent(event, priorityKeywords) {
   };
 }
 
+async function listAllEvents(calendar, params) {
+  const rawEvents = [];
+  let pageToken;
+  let pages = 0;
+  do {
+    const response = await calendar.events.list({ ...params, pageToken });
+    rawEvents.push(...(response.data.items || []));
+    pageToken = response.data.nextPageToken || undefined;
+    pages += 1;
+  } while (pageToken && pages < MAX_PAGES);
+
+  if (pageToken) {
+    console.warn(
+      `Google Calendar: ${params.calendarId} still has pages after ${MAX_PAGES}, returning what was read`,
+    );
+  }
+  return rawEvents;
+}
+
 async function fetchCalendarEvents(oAuth2Client, gcalConfig) {
   const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
+  const timeMin = new Date().toISOString();
   const timeMax = getLookaheadEnd().toISOString();
 
   const allEvents = [];
@@ -91,16 +113,16 @@ async function fetchCalendarEvents(oAuth2Client, gcalConfig) {
 
   for (const calendarId of gcalConfig.calendars) {
     try {
-      const response = await calendar.events.list({
+      const rawEvents = await listAllEvents(calendar, {
         calendarId,
-        timeMin: new Date().toISOString(),
+        timeMin,
         timeMax,
         singleEvents: true,
         orderBy: 'startTime',
         maxResults: 50,
       });
 
-      const events = (response.data.items || [])
+      const events = rawEvents
         .map((event) => normalizeEvent(event, gcalConfig.priority_keywords))
         .filter((e) => e !== null);
 
@@ -237,5 +259,6 @@ module.exports = {
   listCalendars,
   createEvent,
   updateEvent,
+  MAX_PAGES,
   fetchCalendarEvents,
 };

@@ -1,6 +1,14 @@
 'use strict';
 
-const { fetchEvents } = require('../../integrations/google-calendar');
+const { google } = require('googleapis');
+const {
+  fetchEvents,
+  fetchCalendarEvents,
+  MAX_PAGES,
+} = require('../../integrations/google-calendar');
+
+const CALENDAR_CONFIG = { calendars: ['primary'] };
+const event = (id) => ({ id, summary: id, end: { dateTime: '2030-05-08T13:00:00Z' } });
 
 describe('google-calendar — fetchEvents edge cases', () => {
   const originalEnv = { ...process.env };
@@ -49,5 +57,72 @@ describe('google-calendar — fetchEvents edge cases', () => {
 
     expect(result).toEqual([]);
     consoleSpy.mockRestore();
+  });
+});
+
+describe('google-calendar — fetchCalendarEvents pagination', () => {
+  let list;
+
+  beforeEach(() => {
+    list = vi.fn();
+    vi.spyOn(google, 'calendar').mockReturnValue({ events: { list } });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('follows nextPageToken and returns the events of every page', async () => {
+    list.mockImplementation(async ({ pageToken }) =>
+      pageToken === 'page-2'
+        ? { data: { items: [event('e2')] } }
+        : { data: { items: [event('e1')], nextPageToken: 'page-2' } },
+    );
+
+    const { allEvents, calendarErrors } = await fetchCalendarEvents({}, CALENDAR_CONFIG);
+
+    expect(allEvents.map((e) => e.id)).toEqual(['gcal_e1', 'gcal_e2']);
+    expect(calendarErrors).toEqual([]);
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(list.mock.calls[0][0].pageToken).toBeUndefined();
+    expect(list.mock.calls[1][0]).toMatchObject({ calendarId: 'primary', pageToken: 'page-2' });
+    expect({ ...list.mock.calls[1][0], pageToken: undefined }).toEqual(list.mock.calls[0][0]);
+  });
+
+  it('makes a single call for a calendar without nextPageToken', async () => {
+    list.mockResolvedValue({ data: { items: [event('e1')] } });
+
+    const { allEvents } = await fetchCalendarEvents({}, CALENDAR_CONFIG);
+
+    expect(allEvents.map((e) => e.id)).toEqual(['gcal_e1']);
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the page cap, warns and keeps the events read when nextPageToken never ends', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    list.mockImplementation(async () => ({
+      data: { items: [event('same')], nextPageToken: 'again' },
+    }));
+
+    const { allEvents, calendarErrors } = await fetchCalendarEvents({}, CALENDAR_CONFIG);
+
+    expect(list).toHaveBeenCalledTimes(MAX_PAGES);
+    expect(allEvents).toHaveLength(MAX_PAGES);
+    expect(calendarErrors).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('primary'));
+  });
+
+  it('reports the calendar as failed when a later page cannot be read', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    list.mockImplementation(async ({ pageToken }) => {
+      if (pageToken) {
+        throw new Error('page 2 unavailable');
+      }
+      return { data: { items: [event('e1')], nextPageToken: 'page-2' } };
+    });
+
+    const { calendarErrors } = await fetchCalendarEvents({}, CALENDAR_CONFIG);
+
+    expect(calendarErrors).toEqual([{ calendarId: 'primary', message: 'page 2 unavailable' }]);
   });
 });

@@ -2,6 +2,7 @@
 
 const { google } = require('googleapis');
 const googleAuth = require('../../integrations/google-auth');
+const { MAX_PAGES } = require('../../integrations/google-tasks');
 const tasksModulePath = require.resolve('../../integrations/google-tasks');
 
 function makeConfig(overrides = {}) {
@@ -59,6 +60,92 @@ describe('google-tasks fetchTasks', () => {
       expect.objectContaining({ id: 'gtasks_work', title: 'work task', source: 'gtasks' }),
       expect.objectContaining({ id: 'gtasks_home', title: 'home task', source: 'gtasks' }),
     ]);
+  });
+
+  it('follows nextPageToken and returns the tasks of every page of a list', async () => {
+    service.tasklists.list.mockResolvedValue({ data: { items: [{ id: 'work', title: 'Work' }] } });
+    service.tasks.list.mockImplementation(async ({ pageToken }) =>
+      pageToken === 'page-2'
+        ? { data: { items: [{ id: 't2', title: 'Second', status: 'needsAction' }] } }
+        : {
+            data: {
+              items: [{ id: 't1', title: 'First', status: 'needsAction' }],
+              nextPageToken: 'page-2',
+            },
+          },
+    );
+
+    const result = await fetchTasks(makeConfig());
+
+    expect(result.map((t) => t.id)).toEqual(['gtasks_t1', 'gtasks_t2']);
+    expect(service.tasks.list).toHaveBeenCalledTimes(2);
+    expect(service.tasks.list.mock.calls[0][0].pageToken).toBeUndefined();
+    expect(service.tasks.list.mock.calls[1][0]).toMatchObject({
+      tasklist: 'work',
+      pageToken: 'page-2',
+    });
+  });
+
+  it('follows nextPageToken over the task lists themselves', async () => {
+    service.tasklists.list.mockImplementation(async ({ pageToken }) =>
+      pageToken === 'lists-2'
+        ? { data: { items: [{ id: 'home', title: 'Home' }] } }
+        : { data: { items: [{ id: 'work', title: 'Work' }], nextPageToken: 'lists-2' } },
+    );
+    service.tasks.list.mockImplementation(async ({ tasklist }) => ({
+      data: { items: [{ id: `${tasklist}-1`, title: tasklist, status: 'needsAction' }] },
+    }));
+
+    const result = await fetchTasks(makeConfig());
+
+    expect(result.map((t) => t.id)).toEqual(['gtasks_work-1', 'gtasks_home-1']);
+    expect(service.tasklists.list.mock.calls[1][0]).toMatchObject({ pageToken: 'lists-2' });
+  });
+
+  it('makes a single call for a list without nextPageToken', async () => {
+    service.tasklists.list.mockResolvedValue({ data: { items: [{ id: 'work', title: 'Work' }] } });
+    service.tasks.list.mockResolvedValue({
+      data: { items: [{ id: 't1', title: 'Only', status: 'needsAction' }] },
+    });
+
+    const result = await fetchTasks(makeConfig());
+
+    expect(result.map((t) => t.id)).toEqual(['gtasks_t1']);
+    expect(service.tasks.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the page cap, warns and keeps the tasks read when nextPageToken never ends', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    service.tasklists.list.mockResolvedValue({ data: { items: [{ id: 'work', title: 'Work' }] } });
+    service.tasks.list.mockImplementation(async () => ({
+      data: {
+        items: [{ id: 'same', title: 'Loop', status: 'needsAction' }],
+        nextPageToken: 'again',
+      },
+    }));
+
+    const result = await fetchTasks(makeConfig());
+
+    expect(service.tasks.list).toHaveBeenCalledTimes(MAX_PAGES);
+    expect(result).toHaveLength(MAX_PAGES);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Work'));
+  });
+
+  it('fails the whole fetch when a later page of a list cannot be read', async () => {
+    service.tasklists.list.mockResolvedValue({ data: { items: [{ id: 'work', title: 'Work' }] } });
+    service.tasks.list.mockImplementation(async ({ pageToken }) => {
+      if (pageToken) {
+        throw new Error('page 2 unavailable');
+      }
+      return {
+        data: {
+          items: [{ id: 't1', title: 'First', status: 'needsAction' }],
+          nextPageToken: 'page-2',
+        },
+      };
+    });
+
+    await expect(fetchTasks(makeConfig())).rejects.toThrow(/"Work"/);
   });
 
   it('fails the whole fetch, naming the list, when one task list cannot be read', async () => {
