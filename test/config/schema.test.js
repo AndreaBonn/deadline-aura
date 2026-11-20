@@ -182,9 +182,12 @@ describe('wallpaper background fields', () => {
       sync: { ...DEFAULTS.sync, interval_minutes: 17 },
       wallpaper: { ...DEFAULTS.wallpaper, custom_background },
     });
-    expect(validateConfig(makeConfig('custom-background.webp')).wallpaper.custom_background).toBe(
-      'custom-background.webp',
+    expect(validateConfig(makeConfig('custom-background.png')).wallpaper.custom_background).toBe(
+      'custom-background.png',
     );
+    expect(
+      validateConfig(makeConfig('custom-background.webp')).wallpaper.custom_background,
+    ).toBeNull();
     const invalid = validateConfig(makeConfig('../x.png'));
     expect(invalid.wallpaper.custom_background).toBeNull();
     expect(invalid.sync.interval_minutes).toBe(17);

@@ -1,11 +1,7 @@
 'use strict';
 
 const { z } = require('zod');
-const CUSTOM_BACKGROUND_FILES = [
-  'custom-background.png',
-  'custom-background.jpg',
-  'custom-background.webp',
-];
+const CUSTOM_BACKGROUND_FILES = ['custom-background.png', 'custom-background.jpg'];
 
 const configSchema = z.object({
   language: z.enum(['it', 'en']).optional(),
