@@ -131,8 +131,10 @@ class MeetingDockWindows {
     ipcMain.on('meeting-dock:set-ignore-mouse', (event, ignore) => {
       setIgnoreMouse(BrowserWindow, event, ignore);
     });
-    ipcMain.on('meeting-dock:set-visible', (_event, visible) => {
-      for (const window of this.#windows.values()) {
+    // Each dock renders the meetings it has not dismissed, so it decides only for its own screen.
+    ipcMain.on('meeting-dock:set-visible', (event, visible) => {
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if ([...this.#windows.values()].includes(window)) {
         setDockVisible(window, visible);
       }
     });

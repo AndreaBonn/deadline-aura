@@ -374,41 +374,46 @@ describe('meeting-dock:set-ignore-mouse', () => {
 });
 
 describe('meeting-dock:set-visible', () => {
-  it('shows hidden docks without stealing focus', () => {
+  // Each dock decides for its own screen: the user guide promises that the x hides a meeting
+  // only on that screen.
+  const from = (window) => ({ sender: window.webContents });
+
+  it('shows the dock that asked, without stealing focus, and leaves the others alone', () => {
     setPlatform('darwin');
     const { handlers, docks, electron } = setup();
     docks.createMeetingDocks();
-    handlers['meeting-dock:set-visible']({}, true);
-    expect(electron.windows.map((w) => w.visible)).toEqual([true, true]);
-    expect(electron.windows.map((w) => w.showInactiveCount)).toEqual([1, 1]);
+    handlers['meeting-dock:set-visible'](from(electron.windows[0]), true);
+    expect(electron.windows.map((w) => w.visible)).toEqual([true, false]);
+    expect(electron.windows.map((w) => w.showInactiveCount)).toEqual([1, 0]);
   });
 
-  it('does not re-show docks that are already visible', () => {
+  it('hiding the dock of one screen keeps the dock of the other screen visible', () => {
+    setPlatform('darwin');
+    const { handlers, docks, electron } = setup();
+    docks.createMeetingDocks();
+    electron.windows.forEach((w) => (w.visible = true));
+    handlers['meeting-dock:set-visible'](from(electron.windows[1]), false);
+    expect(electron.windows.map((w) => w.visible)).toEqual([true, false]);
+    expect(electron.windows.map((w) => w.hideCount)).toEqual([0, 1]);
+  });
+
+  it('does not re-show a dock that is already visible', () => {
     setPlatform('darwin');
     const { handlers, docks, electron } = setup();
     docks.createMeetingDocks();
     electron.windows[0].visible = true;
-    handlers['meeting-dock:set-visible']({}, true);
-    expect(electron.windows.map((w) => w.showInactiveCount)).toEqual([0, 1]);
+    handlers['meeting-dock:set-visible'](from(electron.windows[0]), true);
+    expect(electron.windows[0].showInactiveCount).toBe(0);
   });
 
-  it('hides visible docks and leaves hidden ones alone', () => {
-    setPlatform('darwin');
-    const { handlers, docks, electron } = setup();
-    docks.createMeetingDocks();
-    electron.windows[0].visible = true;
-    handlers['meeting-dock:set-visible']({}, false);
-    expect(electron.windows.map((w) => w.visible)).toEqual([false, false]);
-    expect(electron.windows.map((w) => w.hideCount)).toEqual([1, 0]);
-  });
-
-  it('skips destroyed docks', () => {
+  it('ignores a destroyed dock and a sender that is no dock', () => {
     setPlatform('darwin');
     const { handlers, docks, electron } = setup();
     docks.createMeetingDocks();
     electron.windows[0].destroyed = true;
-    handlers['meeting-dock:set-visible']({}, true);
-    expect(electron.windows.map((w) => w.showInactiveCount)).toEqual([0, 1]);
+    handlers['meeting-dock:set-visible'](from(electron.windows[0]), true);
+    handlers['meeting-dock:set-visible']({ sender: {} }, true);
+    expect(electron.windows.map((w) => w.showInactiveCount)).toEqual([0, 0]);
   });
 });
 
