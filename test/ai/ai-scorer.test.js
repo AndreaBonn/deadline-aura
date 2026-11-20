@@ -20,22 +20,42 @@ describe('ai-scorer', () => {
     }
   });
 
-  it('returns null when AI is disabled', async () => {
-    const config = { ai: { enabled: false } };
-    const result = await scoreTasks([{ id: 'test' }], config);
-    expect(result).toBeNull();
+  describe.each([
+    ['AI is disabled', [{ id: 'test' }], { ai: { enabled: false } }],
+    ['the ai section is missing', [{ id: 'test' }], {}],
+    ['the task list is empty', [], { ai: { enabled: true } }],
+    ['the task list is null', null, { ai: { enabled: true } }],
+  ])('when %s', (_label, tasks, config) => {
+    it('returns null without calling the provider manager', async () => {
+      const providerManager = require('../../ai/provider-manager');
+      const scoreSpy = vi.spyOn(providerManager, 'scoreEvents').mockResolvedValue({ marker: 1 });
+
+      try {
+        const result = await scoreTasks(tasks, config);
+
+        expect({ result, calls: scoreSpy.mock.calls.length }).toEqual({ result: null, calls: 0 });
+      } finally {
+        scoreSpy.mockRestore();
+      }
+    });
   });
 
-  it('returns null for empty task list', async () => {
+  it('calls the provider manager when AI is enabled and there are tasks (pairs the skip cases)', async () => {
+    const providerManager = require('../../ai/provider-manager');
+    const scoreSpy = vi.spyOn(providerManager, 'scoreEvents').mockResolvedValue({ marker: 1 });
     const config = { ai: { enabled: true } };
-    const result = await scoreTasks([], config);
-    expect(result).toBeNull();
-  });
+    const tasks = [{ id: 'one' }];
 
-  it('returns null for null task list', async () => {
-    const config = { ai: { enabled: true } };
-    const result = await scoreTasks(null, config);
-    expect(result).toBeNull();
+    try {
+      const result = await scoreTasks(tasks, config);
+
+      expect({ result, calls: scoreSpy.mock.calls }).toEqual({
+        result: { marker: 1 },
+        calls: [[tasks, config]],
+      });
+    } finally {
+      scoreSpy.mockRestore();
+    }
   });
 
   it('returns null when no providers have keys', async () => {

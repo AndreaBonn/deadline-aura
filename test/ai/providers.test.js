@@ -72,11 +72,28 @@ describe('GroqProvider', () => {
     const p = new GroqProvider(['test-key']);
     const result = await p.score('test prompt', { timeout: 5000, temperature: 0.1 });
 
-    expect(result).toBe('{"global_stress": 5}');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.groq.com/openai/v1/chat/completions',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    const [url, init] = global.fetch.mock.calls[0];
+    expect({
+      result,
+      url,
+      method: init.method,
+      headers: init.headers,
+      body: JSON.parse(init.body),
+      hasSignal: init.signal instanceof AbortSignal,
+    }).toEqual({
+      result: '{"global_stress": 5}',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-key' },
+      body: {
+        model: 'llama-3.3-70b-versatile',
+        messages: [{ role: 'user', content: 'test prompt' }],
+        temperature: 0.1,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+      },
+      hasSignal: true,
+    });
 
     vi.restoreAllMocks();
   });
@@ -112,13 +129,30 @@ describe('OpenAIProvider', () => {
     vi.spyOn(global, 'fetch').mockResolvedValueOnce(mockResponse);
 
     const p = new OpenAIProvider(['test-key']);
-    const result = await p.score('test prompt');
+    const result = await p.score('test prompt', { temperature: 0.4 });
 
-    expect(result).toBe('{"global_stress": 3}');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    const [url, init] = global.fetch.mock.calls[0];
+    expect({
+      result,
+      url,
+      method: init.method,
+      headers: init.headers,
+      body: JSON.parse(init.body),
+      hasSignal: init.signal instanceof AbortSignal,
+    }).toEqual({
+      result: '{"global_stress": 3}',
+      url: 'https://api.openai.com/v1/chat/completions',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer test-key' },
+      body: {
+        model: 'gpt-4.1-nano',
+        messages: [{ role: 'user', content: 'test prompt' }],
+        temperature: 0.4,
+        max_tokens: 4000,
+        response_format: { type: 'json_object' },
+      },
+      hasSignal: true,
+    });
 
     vi.restoreAllMocks();
   });
@@ -155,9 +189,31 @@ describe('AnthropicProvider', () => {
     const p = new AnthropicProvider(['ant-key']);
     const result = await p.score('test prompt');
 
-    expect(result).toBe('{"global_stress": 7}');
-    const fetchCall = global.fetch.mock.calls[0];
-    expect(fetchCall[0]).toBe('https://api.anthropic.com/v1/messages');
+    const [url, init] = global.fetch.mock.calls[0];
+    expect({
+      result,
+      url,
+      method: init.method,
+      headers: init.headers,
+      body: JSON.parse(init.body),
+      hasSignal: init.signal instanceof AbortSignal,
+    }).toEqual({
+      result: '{"global_stress": 7}',
+      url: 'https://api.anthropic.com/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': 'ant-key',
+        'anthropic-version': '2023-06-01',
+      },
+      body: {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        temperature: 0.15,
+        messages: [{ role: 'user', content: 'test prompt' }],
+      },
+      hasSignal: true,
+    });
 
     vi.restoreAllMocks();
   });
@@ -220,5 +276,50 @@ describe('GeminiProvider', () => {
     await expect(p.score('prompt')).rejects.toThrow('Gemini 403');
 
     vi.restoreAllMocks();
+  });
+});
+
+describe.each([
+  ['OpenAIProvider', OpenAIProvider],
+  ['AnthropicProvider', AnthropicProvider],
+  ['GeminiProvider', GeminiProvider],
+])('%s timeout', (_name, Provider) => {
+  const abortError = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+
+  function hangUntilAborted() {
+    return vi.spyOn(global, 'fetch').mockImplementation((_url, { signal }) => {
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(abortError));
+      });
+    });
+  }
+
+  it('aborts the request only once the timeout has elapsed', async () => {
+    vi.useFakeTimers();
+    const fetchSpy = hangUntilAborted();
+    const p = new Provider(['test-key']);
+
+    try {
+      let settled = false;
+      const outcome = p.score('prompt', { timeout: 100 }).then(
+        () => (settled = true),
+        (err) => {
+          settled = true;
+          return err;
+        },
+      );
+
+      await vi.advanceTimersByTimeAsync(99);
+      const settledBefore = settled;
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect({ settledBefore, rejection: await outcome }).toEqual({
+        settledBefore: false,
+        rejection: abortError,
+      });
+    } finally {
+      vi.useRealTimers();
+      fetchSpy.mockRestore();
+    }
   });
 });
