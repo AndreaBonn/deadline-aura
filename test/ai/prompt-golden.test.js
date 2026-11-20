@@ -110,6 +110,31 @@ describe('prompt characterization', () => {
     });
   });
 
+  it.each([
+    ['a missing global_stress', '{"per_event": []}'],
+    ['a non-numeric global_stress', '{"global_stress": "7"}'],
+  ])('rejects a response with %s', (_case, text) => {
+    expect(() => parseAiResponse(text)).toThrow('Missing or invalid global_stress');
+  });
+
+  it('rejects a response that is not JSON', () => {
+    expect(() => parseAiResponse('stress is 7')).toThrow(SyntaxError);
+  });
+
+  it('leaves non-array per_event and a null cognitive_factors untouched', () => {
+    const parsed = parseAiResponse(
+      '{"global_stress": 4, "per_event": "none", "cognitive_factors": null, "note": "ok"}',
+    );
+
+    expect(parsed).toEqual({
+      global_stress: 4,
+      per_event: 'none',
+      cognitive_factors: null,
+      patterns: [],
+      note: 'ok',
+    });
+  });
+
   it('limits production dependencies and detects an added require', () => {
     const source = fs.readFileSync(path.join(__dirname, '../../ai/prompt.js'), 'utf8');
     const allowed = ['../core/calendar-sources', 'crypto', 'fs'];
