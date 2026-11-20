@@ -15,6 +15,26 @@ const AI_BLEND_WEIGHT = 0.7; // Weight of AI score in the final blend
 const MECHANICAL_BLEND_WEIGHT = 0.3; // Weight of mechanical score in the final blend
 const TOP_DRIVERS_COUNT = 3; // How many top tasks to include in the breakdown
 
+function taskWeight(task, priorityWeights) {
+  return task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
+}
+
+function scoredTask(task, fields) {
+  return {
+    id: task.id,
+    title: task.title,
+    due_at: fields.due_at,
+    start_at: task.start_at || null,
+    urgency_score: fields.urgency_score,
+    hours_remaining: fields.hours_remaining,
+    priority: task.priority,
+    source: task.source,
+    web_url: task.web_url || null,
+    ai_stress: task.ai_stress || null,
+    ai_category: task.ai_category || null,
+  };
+}
+
 function computeTaskUrgency(
   task,
   { k = DEFAULT_K, priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = {},
@@ -24,57 +44,27 @@ function computeTaskUrgency(
   }
 
   if (task.due_at === null || task.due_at === undefined) {
-    return {
-      id: task.id,
-      title: task.title,
-      due_at: null,
-      start_at: task.start_at || null,
-      urgency_score: 0.1,
-      hours_remaining: null,
-      priority: task.priority,
-      source: task.source,
-      web_url: task.web_url || null,
-      ai_stress: task.ai_stress || null,
-      ai_category: task.ai_category || null,
-    };
+    return scoredTask(task, { due_at: null, urgency_score: 0.1, hours_remaining: null });
   }
 
   const hoursRemaining = (task.due_at - Date.now()) / MS_PER_HOUR;
 
   if (hoursRemaining < 0) {
-    return {
-      id: task.id,
-      title: task.title,
+    return scoredTask(task, {
       due_at: task.due_at,
-      start_at: task.start_at || null,
       urgency_score: 1.0,
       hours_remaining: hoursRemaining,
-      priority: task.priority,
-      source: task.source,
-      web_url: task.web_url || null,
-      ai_stress: task.ai_stress || null,
-      ai_category: task.ai_category || null,
-    };
+    });
   }
 
-  const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
-
-  const urgencyRaw = weight / Math.max(hoursRemaining, 0.5);
+  const urgencyRaw = taskWeight(task, priorityWeights) / Math.max(hoursRemaining, 0.5);
   const urgencyScore = 1 - Math.exp(-k * urgencyRaw);
 
-  return {
-    id: task.id,
-    title: task.title,
+  return scoredTask(task, {
     due_at: task.due_at,
-    start_at: task.start_at || null,
     urgency_score: Math.round(urgencyScore * 1000) / 1000,
     hours_remaining: Math.round(hoursRemaining * 10) / 10,
-    priority: task.priority,
-    source: task.source,
-    web_url: task.web_url || null,
-    ai_stress: task.ai_stress || null,
-    ai_category: task.ai_category || null,
-  };
+  });
 }
 
 /**
@@ -130,7 +120,7 @@ function describeMechanicalScore(scored, priorityWeights) {
   let totalWeight = 0;
 
   for (const task of active) {
-    const weight = task.ai_stress ? task.ai_stress / 5 : priorityWeights[task.priority - 1] || 1.0;
+    const weight = taskWeight(task, priorityWeights);
     weightedSum += task.urgency_score * weight;
     totalWeight += weight;
   }
