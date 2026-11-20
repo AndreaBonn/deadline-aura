@@ -5,6 +5,8 @@ const TIMER_UPDATE_INTERVAL_MS = 60 * 1000;
 const TIMER_DEFAULT_DURATION_MIN = 30;
 const TIMER_UI_TICK_MS = 1000;
 const TIMER_LOGGED_BADGE_MS = 3000;
+// How long stop() waits for slow periodic updates before writing the final end time anyway.
+const TIMER_STOP_WAIT_MS = 5000;
 
 function parseStoredTimer(raw) {
   try {
@@ -34,6 +36,10 @@ function createTimerState(task, { startTime, calendarId, summary }) {
 class TimerController {
   constructor(deps) {
     this.deps = deps;
+    // Periodic end-time updates still in flight: stop() writes its final end time after them,
+    // so a slow tick cannot move the end of a stopped timer back by up to a minute.
+    this.ticksInFlight = new Set();
+    this.badgeTimeout = null;
   }
 
   save() {
@@ -97,7 +103,7 @@ class TimerController {
     if (!state.activeTimer || !state.activeTimer.eventId) {
       return;
     }
-    getApi()
+    const tick = getApi()
       .updateCalendarEvent({
         calendarId: state.activeTimer.calendarId,
         eventId: state.activeTimer.eventId,
@@ -111,10 +117,29 @@ class TimerController {
         },
         (err) => console.error('timer sync failed:', err.message),
       );
+    this.ticksInFlight.add(tick);
+    tick.finally(() => this.ticksInFlight.delete(tick));
   }
 
+  // A picker opened by an earlier click of the same burst must not stay open.
+  closePicker() {
+    if (this.deps.state.timerPickerTaskId !== null) {
+      this.deps.state.timerPickerTaskId = null;
+      this.deps.rerender();
+    }
+  }
+
+  // Only one timer runs: a second start on the same task (a double click, a picker opened
+  // twice) is ignored, a start on another task first stops the running one.
   start(task, calendarId) {
     const { state, getApi, now, summaryFor } = this.deps;
+    if (state.activeTimer) {
+      if (state.activeTimer.taskId === task.id) {
+        this.closePicker();
+        return Promise.resolve();
+      }
+      this.stop();
+    }
     const summary = summaryFor(task);
     const startTime = now().toISOString();
     const timer = createTimerState(task, { startTime, calendarId, summary });
@@ -185,7 +210,7 @@ class TimerController {
   }
 
   stop() {
-    const { state, getApi, now } = this.deps;
+    const { state, now } = this.deps;
     if (!state.activeTimer) {
       return Promise.resolve();
     }
@@ -199,12 +224,28 @@ class TimerController {
       this.deps.rerender();
       return Promise.resolve();
     }
-    return getApi()
-      .updateCalendarEvent({
-        calendarId: timer.calendarId,
-        eventId: timer.eventId,
-        endTime: now().toISOString(),
-      })
+    return this.closeEvent(timer, now().toISOString());
+  }
+
+  // After the periodic updates still in flight, so the final end time is the last one written;
+  // an update that never answers delays it by TIMER_STOP_WAIT_MS at most.
+  waitForTicks() {
+    let timeout;
+    const limit = new Promise((resolve) => (timeout = setTimeout(resolve, TIMER_STOP_WAIT_MS)));
+    return Promise.race([Promise.all(this.ticksInFlight), limit]).finally(() =>
+      clearTimeout(timeout),
+    );
+  }
+
+  closeEvent(timer, endTime) {
+    return this.waitForTicks()
+      .then(() =>
+        this.deps.getApi().updateCalendarEvent({
+          calendarId: timer.calendarId,
+          eventId: timer.eventId,
+          endTime,
+        }),
+      )
       .then(
         (result) =>
           result && result.ok
@@ -224,7 +265,9 @@ class TimerController {
     const { state } = this.deps;
     state.temporaryLoggedTaskId = taskId;
     this.deps.rerender();
-    setTimeout(() => {
+    clearTimeout(this.badgeTimeout);
+    this.badgeTimeout = setTimeout(() => {
+      this.badgeTimeout = null;
       state.temporaryLoggedTaskId = null;
       this.deps.rerender();
     }, TIMER_LOGGED_BADGE_MS);

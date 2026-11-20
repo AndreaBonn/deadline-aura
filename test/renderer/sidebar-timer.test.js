@@ -463,4 +463,166 @@ describe('TimerController', () => {
       controller.clearIntervals();
     });
   });
+
+  describe('one running timer at a time', () => {
+    const other = { id: 'T2', title: 'Other task' };
+
+    it('a second start on the same task (double click) is ignored', async () => {
+      await Promise.all([controller.start(task, 'work'), controller.start(task, 'work')]);
+      expect(api.logTimeToCalendar).toHaveBeenCalledTimes(1);
+      expect(state.activeTimer).toMatchObject({ taskId: 'T1', eventId: 'ev-1' });
+      controller.clearIntervals();
+    });
+
+    it('starting another task first closes the running timer at the switch moment', async () => {
+      await controller.start(task, 'work');
+      api.logTimeToCalendar.mockResolvedValue({ ok: true, eventId: 'ev-2' });
+
+      await controller.start(other, 'work');
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(api.updateCalendarEvent).toHaveBeenCalledWith({
+        calendarId: 'work',
+        eventId: 'ev-1',
+        endTime: NOW.toISOString(),
+      });
+      expect(state.activeTimer).toMatchObject({ taskId: 'T2', eventId: 'ev-2' });
+      controller.clearIntervals();
+    });
+
+    it('a timer replaced while still starting closes its late event at the switch moment', async () => {
+      let answerFirst;
+      api.logTimeToCalendar.mockReturnValueOnce(new Promise((r) => (answerFirst = r)));
+      controller.start(task, 'work');
+      api.logTimeToCalendar.mockResolvedValue({ ok: true, eventId: 'ev-2' });
+      await controller.start(other, 'work');
+
+      answerFirst({ ok: true, eventId: 'ev-1' });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(api.updateCalendarEvent).toHaveBeenCalledWith({
+        calendarId: 'work',
+        eventId: 'ev-1',
+        endTime: NOW.toISOString(),
+      });
+      controller.clearIntervals();
+    });
+  });
+
+  it('stop waits for a periodic sync still in flight, so the final end time is written last', async () => {
+    await controller.start(task, 'work');
+    const order = [];
+    let finishSync;
+    api.updateCalendarEvent.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          finishSync = () => {
+            order.push('sync');
+            r({ ok: true });
+          };
+        }),
+    );
+    vi.advanceTimersByTime(60 * 1000);
+    api.updateCalendarEvent.mockImplementation(() => {
+      order.push('stop');
+      return Promise.resolve({ ok: true });
+    });
+
+    const stopped = controller.stop();
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    finishSync();
+    await stopped;
+
+    expect(order).toEqual(['sync', 'stop']);
+  });
+
+  it('a newer "logged" badge is not cleared by the timeout of an older one', async () => {
+    controller.showLoggedBadge('T1');
+    vi.advanceTimersByTime(2000);
+    controller.showLoggedBadge('T2');
+    vi.advanceTimersByTime(1000);
+    expect(state.temporaryLoggedTaskId).toBe('T2');
+    vi.advanceTimersByTime(2000);
+    expect(state.temporaryLoggedTaskId).toBeNull();
+  });
+});
+
+describe('TimerController extra edges', () => {
+  it('a repeated start on the running task closes a picker left open for it', () => {
+    const state = { activeTimer: { taskId: 'T1' }, timerPickerTaskId: 'T1' };
+    const rerender = vi.fn();
+    const controller = new TimerController({ state, rerender, getApi: () => ({}) });
+    controller.start({ id: 'T1' }, 'work');
+    expect(state.timerPickerTaskId).toBeNull();
+    expect(rerender).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('TimerController stop with periodic updates in flight', () => {
+  const NOW = new Date('2026-10-19T09:30:00.000Z');
+  function build(api) {
+    const state = { activeTimer: null, timerPickerTaskId: null };
+    const controller = new TimerController({
+      state,
+      storage: { setItem() {}, removeItem() {}, getItem: () => null },
+      getApi: () => api,
+      now: () => NOW,
+      rerender: () => {},
+      summaryFor: () => 's',
+      formatElapsed: () => '',
+      root: { querySelector: () => null },
+    });
+    return { state, controller };
+  }
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('waits for every slow tick, not only the last one', async () => {
+    const answers = [];
+    const order = [];
+    const api = {
+      logTimeToCalendar: vi.fn().mockResolvedValue({ ok: true, eventId: 'ev' }),
+      setDefaultLogCalendar: vi.fn(),
+      updateCalendarEvent: vi.fn(
+        () => new Promise((resolve) => answers.push(() => resolve({ ok: true }))),
+      ),
+    };
+    const { controller } = build(api);
+    await controller.start({ id: 'T1' }, 'work');
+    controller.sync();
+    controller.sync();
+    const stopped = controller.stop();
+
+    answers[1]();
+    await vi.advanceTimersByTimeAsync(0);
+    order.push(api.updateCalendarEvent.mock.calls.length);
+    answers[0]();
+    await vi.advanceTimersByTimeAsync(0);
+    order.push(api.updateCalendarEvent.mock.calls.length);
+    answers[2]();
+    await stopped;
+
+    expect(order).toEqual([2, 3]);
+  });
+
+  it('writes the final end time anyway when a tick never answers', async () => {
+    const api = {
+      logTimeToCalendar: vi.fn().mockResolvedValue({ ok: true, eventId: 'ev' }),
+      setDefaultLogCalendar: vi.fn(),
+      updateCalendarEvent: vi.fn().mockReturnValueOnce(new Promise(() => {})),
+    };
+    api.updateCalendarEvent.mockResolvedValue({ ok: true });
+    const { controller, state } = build(api);
+    await controller.start({ id: 'T1' }, 'work');
+    controller.sync();
+
+    const stopped = controller.stop();
+    await vi.advanceTimersByTimeAsync(5000);
+    await stopped;
+
+    expect(api.updateCalendarEvent).toHaveBeenCalledTimes(2);
+    expect(state.temporaryLoggedTaskId).toBe('T1');
+  });
 });

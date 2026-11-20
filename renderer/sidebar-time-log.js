@@ -2,10 +2,9 @@
 
 /* global t, sidebarState, rerender, extractJiraKey, buildEventSummary,
    defaultLogStart, validateTimeLog, formatCountdown, createIconButton, createTimeLogCalendarSelect,
-   saveDefaultLogCalendar */
+   saveDefaultLogCalendar, timerController */
 
 const DURATION_PRESETS_MIN = [15, 30, 60, 90];
-const LOGGED_BADGE_MS = 3000;
 
 function createTimeLogElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -155,12 +154,8 @@ function appendTimeLogFields(form, idBase) {
 function finishTimeLog(task, calendarId) {
   saveDefaultLogCalendar(calendarId);
   sidebarState.timeLogTaskId = null;
-  sidebarState.temporaryLoggedTaskId = task.id;
-  rerender();
-  setTimeout(function () {
-    sidebarState.temporaryLoggedTaskId = null;
-    rerender();
-  }, LOGGED_BADGE_MS);
+  // One badge timeout shared with the timer, so an older one cannot clear a newer badge.
+  timerController.showLoggedBadge(task.id);
 }
 
 function readTimeLogFields(fields, error) {

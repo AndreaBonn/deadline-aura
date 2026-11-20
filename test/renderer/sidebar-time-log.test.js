@@ -108,7 +108,10 @@ describe('calendar loading failures leave a trace', () => {
   let log;
   beforeEach(() => {
     log = vi.spyOn(win.console, 'error').mockImplementation(() => {});
-    vm.runInContext('function rerender() {}', win);
+    vm.runInContext(
+      'function rerender() {} var timerController = { showLoggedBadge: function () {} };',
+      win,
+    );
   });
   afterEach(() => log.mockRestore());
 
