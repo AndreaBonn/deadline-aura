@@ -1,3 +1,33 @@
+## Versione 1.9.0
+
+> La release v1.9.0 permette di usare un'immagine personale come sfondo del desktop e corregge una serie di problemi di sincronizzazione, di concorrenza fra finestre e di salvataggio delle impostazioni.
+
+### Nuove funzionalità
+
+- Scelta dello sfondo nelle impostazioni: dinamico (cambia con la pressione), solo gradiente o immagine personale. L'immagine viene importata con controlli su formato reale e dimensione (fino a 25 MB) e resta sotto il velo che tiene leggibile l'agenda; finché manca un'immagine valida si usa lo sfondo dinamico (19d41be, 393c0a9, a8b4deb, 8528042, 8a7661a, 235034f, b94649f, 96168e6)
+
+### Correzioni
+
+- Google Tasks e Google Calendar leggono tutte le pagine dei risultati: prima gli elementi oltre la prima pagina sparivano e venivano marcati come obsoleti (6463d1a)
+- Un evento di un giorno intero di Google Calendar non resta più sul desktop per tutto il giorno successivo (9d5b537)
+- Una lista di Google Tasks illeggibile segnala l'errore della sorgente invece di far sparire le sue attività (f4e8852)
+- Il collegamento dell'account Google non si interrompe se manca `xdg-open` (64e978f)
+- Un solo ciclo di sincronizzazione alla volta, e i punteggi AI in cache vengono applicati alle attività per cui sono stati calcolati (5442f4c, 94a1879)
+- L'app parte solo nell'istanza che detiene il lock (9c315b1)
+- Il salvataggio delle impostazioni non annulla più le modifiche fatte da altre finestre, e ridisegna lo sfondo (262ca44, e0446c8)
+- La sidebar mantiene aperti form e menu durante l'aggiornamento al minuto e non duplica la chiave Jira negli eventi registrati (28b212c, b9d7a6d)
+- Un solo timer attivo alla volta, con l'ora di fine ordinata correttamente; rifiutata una durata non finita nel registro ore (e3104f7, 7a520e3)
+- Le attività personali hanno il proprio badge nell'agenda dello sfondo (fe4442c)
+- Lo sfondo riprova quando nessuno strumento riesce ad applicarlo e non perde un ridisegno forzato richiesto durante un ciclo in corso (4d9afa0, 84ed4b6)
+- Una temperatura di campionamento AI impostata a 0 viene rispettata (22d4a86)
+- Utilizzo di Codex datato con la cattura che lo ha fornito (ce4f8c8)
+- Correzioni minori a overlay, strisce, meeting dock, flyby e notifiche (686b7ef, eb1071c, ae65eee, e4f1f98, 45bd631, 4a1ef40)
+
+### Manutenzione
+
+- `deadline-engine`, `sync-daemon`, `prompt`, `shift-countdown` e l'agenda dello sfondo scomposti in funzioni più piccole, con test di caratterizzazione scritti prima del refactor (2ad4788, 7cda6d8, 81e6a60, d4f3465, eaf3ded)
+- Nuovi test su OAuth Google, consenso della cattura dei limiti AI, pulizia dello store e isolamento delle finestre (2ec31d5, 3a67bab, 150c0d6, eb60baa)
+
 ## Versione 1.8.0
 
 > La release v1.8.0 rende l'app più semplice da avviare e da usare per chi la apre la prima volta, mostra lo stato delle connessioni nelle impostazioni e rende visibili gli errori di sincronizzazione e di salvataggio che prima andavano persi.

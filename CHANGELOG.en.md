@@ -1,3 +1,33 @@
+## What's Changed in v1.9.0
+
+> This release lets you use your own image as the desktop background and fixes a set of sync, cross-window and settings-save issues.
+
+### New features
+
+- Background choice in the settings: dynamic (follows the pressure), gradient only, or a personal image. The image is imported with checks on its real format and size (up to 25 MB) and sits under the veil that keeps the agenda readable; until a valid image is chosen the dynamic background is used (19d41be, 393c0a9, a8b4deb, 8528042, 8a7661a, 235034f, b94649f, 96168e6)
+
+### Bug fixes
+
+- Google Tasks and Google Calendar read every page of results: items past the first page used to be dropped and marked stale (6463d1a)
+- A one-day all-day Google Calendar event no longer stays on the desktop the whole next day (9d5b537)
+- An unreadable Google Tasks list reports a source failure instead of removing its tasks (f4e8852)
+- Connecting the Google account survives a missing `xdg-open` (64e978f)
+- Run one sync cycle at a time, and apply cached AI scores to the tasks they were computed for (5442f4c, 94a1879)
+- Start the app only in the instance holding the lock (9c315b1)
+- Saving the settings no longer reverts changes made by other windows, and redraws the wallpaper (262ca44, e0446c8)
+- The sidebar keeps open forms and menus across the minute update and no longer doubles the Jira key in logged events (28b212c, b9d7a6d)
+- Allow one running timer and order the final end time; reject a non-finite time log duration (e3104f7, 7a520e3)
+- Personal tasks get their own badge in the wallpaper agenda (fe4442c)
+- The wallpaper retries when no tool could set it and keeps a forced redraw requested during a running cycle (4d9afa0, 84ed4b6)
+- Honour a configured AI sampling temperature of 0 (22d4a86)
+- Date Codex usage by the capture that supplied it (ce4f8c8)
+- Minor fixes to the overlay, strips, meeting dock, flyby and notifications (686b7ef, eb1071c, ae65eee, e4f1f98, 45bd631, 4a1ef40)
+
+### Maintenance
+
+- Split `deadline-engine`, `sync-daemon`, `prompt`, `shift-countdown` and the wallpaper agenda into smaller functions, with characterization tests written before the refactor (2ad4788, 7cda6d8, 81e6a60, d4f3465, eaf3ded)
+- New tests for Google OAuth, the AI usage capture consent, store cleanup and window isolation (2ec31d5, 3a67bab, 150c0d6, eb60baa)
+
 ## What's Changed in v1.8.0
 
 > This release makes the app easier to start and use on first run, shows the status of each connection in the settings, and surfaces sync and save errors that used to be dropped.

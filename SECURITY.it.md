@@ -4,12 +4,12 @@
 
 ## Versioni supportate
 
-La release corrente è `1.8.0`. Le correzioni di sicurezza vengono applicate all'ultima release e al branch `main`. Le release precedenti non ricevono patch: la strada per aggiornarsi è installare il `.deb` più recente, che conserva i dati esistenti.
+La release corrente è `1.9.0`. Le correzioni di sicurezza vengono applicate all'ultima release e al branch `main`. Le release precedenti non ricevono patch: la strada per aggiornarsi è installare il `.deb` più recente, che conserva i dati esistenti.
 
 | Versione | Supportata                      |
 | -------- | ------------------------------- |
-| 1.8.x    | Sì                              |
-| < 1.8    | No, aggiorna all'ultima release |
+| 1.9.x    | Sì                              |
+| < 1.9    | No, aggiorna all'ultima release |
 
 ## Segnalare una vulnerabilità
 
