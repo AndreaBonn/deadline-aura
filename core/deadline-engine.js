@@ -158,77 +158,66 @@ function pickTopDrivers(sortedTasks, count) {
   }));
 }
 
+function emptyGlobalScore(computedAt, priorityWeights) {
+  return {
+    global_score: 0,
+    tasks: [],
+    computed_at: computedAt,
+    breakdown: {
+      global_score: 0,
+      ai: null,
+      mechanical: describeMechanicalScore([], priorityWeights),
+      blend: { ai_weight: 0, mechanical_weight: 1 },
+      top_drivers: [],
+      computed_at: computedAt,
+    },
+  };
+}
+
+function resolveAiScore(options) {
+  if (options.aiScore) {
+    return options.aiScore;
+  }
+  try {
+    return db.getLatestAiScore();
+  } catch {
+    // DB not available (e.g. in tests), fall through to mechanical
+    return null;
+  }
+}
+
+function describeAiScore(aiScore, computedAt) {
+  if (!aiScore) {
+    return null;
+  }
+  return {
+    global_stress: aiScore.global_stress,
+    normalized: aiScore.global_stress / 10,
+    computed_at: aiScore.computed_at,
+    age_ms: computedAt - aiScore.computed_at,
+    fresh: computedAt - aiScore.computed_at < AI_SCORE_MAX_AGE_MS,
+  };
+}
+
 function computeGlobalScore(tasks, options = {}) {
   const { priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = options;
   const computedAt = Date.now();
-
   const scored = tasks
     .map((task) => computeTaskUrgency(task, options))
     .filter((result) => result !== null);
-
   if (scored.length === 0) {
-    return {
-      global_score: 0,
-      tasks: [],
-      computed_at: computedAt,
-      breakdown: {
-        global_score: 0,
-        ai: null,
-        mechanical: describeMechanicalScore([], priorityWeights),
-        blend: { ai_weight: 0, mechanical_weight: 1 },
-        top_drivers: [],
-        computed_at: computedAt,
-      },
-    };
+    return emptyGlobalScore(computedAt, priorityWeights);
   }
-
   const mechanicalDetail = describeMechanicalScore(scored, priorityWeights);
-  const mechanicalScore = mechanicalDetail.score;
-
-  // Check for recent AI score — it reflects true psychological load
-  let aiScore = options.aiScore || null;
-  if (!aiScore) {
-    try {
-      aiScore = db.getLatestAiScore();
-    } catch {
-      // DB not available (e.g. in tests), fall through to mechanical
-    }
-  }
-
-  const aiFresh = aiScore && computedAt - aiScore.computed_at < AI_SCORE_MAX_AGE_MS;
-
-  let globalScore;
-  let aiBreakdown = null;
-
-  if (aiFresh) {
-    const aiNormalized = aiScore.global_stress / 10;
-    // AI is authoritative, but blend with mechanical for recency sensitivity
-    globalScore =
-      Math.round(
-        (aiNormalized * AI_BLEND_WEIGHT + mechanicalScore * MECHANICAL_BLEND_WEIGHT) * 1000,
-      ) / 1000;
-    aiBreakdown = {
-      global_stress: aiScore.global_stress,
-      normalized: aiNormalized,
-      computed_at: aiScore.computed_at,
-      age_ms: computedAt - aiScore.computed_at,
-      fresh: true,
-    };
-  } else {
-    globalScore = mechanicalScore;
-    if (aiScore) {
-      aiBreakdown = {
-        global_stress: aiScore.global_stress,
-        normalized: aiScore.global_stress / 10,
-        computed_at: aiScore.computed_at,
-        age_ms: computedAt - aiScore.computed_at,
-        fresh: false,
-      };
-    }
-  }
-
+  const aiBreakdown = describeAiScore(resolveAiScore(options), computedAt);
+  const globalScore = aiBreakdown?.fresh
+    ? Math.round(
+        (aiBreakdown.normalized * AI_BLEND_WEIGHT +
+          mechanicalDetail.score * MECHANICAL_BLEND_WEIGHT) *
+          1000,
+      ) / 1000
+    : mechanicalDetail.score;
   const sortedTasks = scored.sort((a, b) => b.urgency_score - a.urgency_score);
-
   return {
     global_score: globalScore,
     tasks: sortedTasks,
@@ -237,7 +226,7 @@ function computeGlobalScore(tasks, options = {}) {
       global_score: globalScore,
       ai: aiBreakdown,
       mechanical: mechanicalDetail,
-      blend: aiFresh
+      blend: aiBreakdown?.fresh
         ? { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT }
         : { ai_weight: 0, mechanical_weight: 1 },
       top_drivers: pickTopDrivers(sortedTasks, TOP_DRIVERS_COUNT),

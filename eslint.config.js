@@ -81,7 +81,6 @@ module.exports = [
       'ai/providers/openai.js',
       'core/burnout-detector.js',
       'core/color-mapper.js',
-      'core/deadline-engine.js',
       'core/display-controller.js',
       'core/ics-parser.js',
       'core/meeting-flyby.js',
