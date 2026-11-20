@@ -10,6 +10,7 @@ const gcal = require('../../integrations/google-calendar');
 const gtasks = require('../../integrations/google-tasks');
 const jira = require('../../integrations/jira');
 const outlook = require('../../integrations/outlook');
+const aiScorer = require('../../ai/ai-scorer');
 const { sync } = require('../../core/sync-daemon');
 
 const config = {
@@ -80,4 +81,16 @@ it('partial Jira results update returned issues without marking missing issues s
   expect(result.errors).toEqual([{ source: 'jira', message: 'site unavailable' }]);
   expect(row('jira_old').is_stale).toBe(0);
   expect(row('jira_new').is_stale).toBe(0);
+});
+
+it('sends the issues of the healthy Jira sites to AI scoring when another site failed', async () => {
+  const error = new Error('site unavailable');
+  error.partialIssues = [task('jira_partial', 'jira')];
+  jira.fetchIssues.mockRejectedValue(error);
+  const scoreSpy = vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue(null);
+
+  await sync({ ...config, ai: { enabled: true, recalc_hours: 6 }, sync: { lookahead_hours: 72 } });
+
+  expect(scoreSpy).toHaveBeenCalledTimes(1);
+  expect(scoreSpy.mock.calls[0][0].map((t) => t.id)).toContain('jira_partial');
 });
