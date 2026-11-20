@@ -129,7 +129,9 @@ function buildEventSummary(jiraKey, title) {
   if (!jiraKey) {
     return title;
   }
+  // A title already shaped as "[KEY] - text" loses its brackets with the key.
   const cleanTitle = title
+    .replace('[' + jiraKey + ']', '')
     .replace(jiraKey, '')
     .replace(/^[\s·-]+/, '')
     .trim();

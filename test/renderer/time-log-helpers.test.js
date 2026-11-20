@@ -53,6 +53,11 @@ describe('time-log helpers', () => {
       expect(result).toBe('Just a local task');
     });
 
+    it('does not repeat the key of a title already written as "[KEY] - text"', () => {
+      expect(buildEventSummary('ABC-12', '[ABC-12] - Fix login')).toBe('[ABC-12] - Fix login');
+      expect(buildEventSummary('ABC-1', '[ABC-1] Fix')).toBe('[ABC-1] - Fix');
+    });
+
     it('handles key at start without separator', () => {
       const result = buildEventSummary('TEAM-1', 'TEAM-1 deploy');
       expect(result).toBe('[TEAM-1] - deploy');
