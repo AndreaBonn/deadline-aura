@@ -214,9 +214,16 @@ function readCodexUsage({ env = process.env, home = os.homedir() } = {}) {
       break;
     }
     const parsed = parseFileSafely(filePath);
+    const supplies = (!result.fiveHour && parsed.fiveHour) || (!result.sevenDay && parsed.sevenDay);
     result.fiveHour = result.fiveHour || parsed.fiveHour;
     result.sevenDay = result.sevenDay || parsed.sevenDay;
-    result.capturedAt = result.capturedAt || parsed.capturedAt;
+    // A window taken from an older file is only as fresh as that file's capture.
+    if (supplies && parsed.capturedAt !== null) {
+      result.capturedAt =
+        result.capturedAt === null
+          ? parsed.capturedAt
+          : Math.min(result.capturedAt, parsed.capturedAt);
+    }
   }
 
   return result;

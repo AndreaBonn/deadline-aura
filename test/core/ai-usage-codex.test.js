@@ -261,6 +261,46 @@ describe('readCodexUsage', () => {
     });
   });
 
+  it('stamps capturedAt with the oldest capture that supplied a window, not the newest file', () => {
+    const olderCapture = '2026-10-05T08:00:00.000Z';
+    const newerCapture = '2026-10-06T12:00:00.000Z';
+    writeRollout(tmpHome, ['2026', '10', '05'], 'rollout-old.jsonl', [
+      eventLine({
+        timestamp: olderCapture,
+        rateLimits: {
+          primary: { used_percent: 10, window_minutes: 10080, resets_at: 1791378000 },
+          secondary: null,
+        },
+      }),
+    ]);
+    writeRollout(tmpHome, ['2026', '10', '06'], 'rollout-new.jsonl', [
+      eventLine({
+        timestamp: newerCapture,
+        rateLimits: {
+          primary: { used_percent: 23, window_minutes: 300, resets_at: 1791324600 },
+          secondary: null,
+        },
+      }),
+    ]);
+    const base = path.join(tmpHome, '.codex', 'sessions', '2026', '10');
+    fs.utimesSync(path.join(base, '05', 'rollout-old.jsonl'), 1791200000, 1791200000);
+    fs.utimesSync(path.join(base, '06', 'rollout-new.jsonl'), 1791288000, 1791288000);
+
+    const result = readCodexUsage({ env: {}, home: tmpHome });
+
+    expect(result.fiveHour).toEqual({ pct: 23, resetsAt: 1791324600 });
+    expect(result.sevenDay).toEqual({ pct: 10, resetsAt: 1791378000 });
+    expect(result.capturedAt).toBe(Date.parse(olderCapture) / 1000);
+  });
+
+  it('uses the newest capture when it supplies every window (paired positive case)', () => {
+    writeCompleteRollout('rollout-a-newer.jsonl', 1791288060);
+
+    const result = readCodexUsage({ env: {}, home: tmpHome });
+
+    expect(result.capturedAt).toBe(Date.parse('2026-10-06T12:00:00.000Z') / 1000);
+  });
+
   it('stops before opening an older unreadable rollout once both windows are known', () => {
     const older = writeCompleteRollout('rollout-z-older.jsonl', 1791288000);
     const newer = writeCompleteRollout('rollout-a-newer.jsonl', 1791288060);
