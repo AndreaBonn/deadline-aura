@@ -89,12 +89,12 @@ describe('renderWallpaper', () => {
     });
   });
 
-  it('offers dynamic and gradient only, preselected from the config', () => {
+  it('offers dynamic, gradient and custom, preselected from the config', () => {
     const config = clone(DEFAULTS);
     config.wallpaper.background_mode = 'gradient';
     const [wallpaper] = render('renderWallpaper', config);
     const select = field(wallpaper, 'settings.background_mode').querySelector('select');
-    expect([...select.options].map((o) => o.value)).toEqual(['dynamic', 'gradient']);
+    expect([...select.options].map((o) => o.value)).toEqual(['dynamic', 'gradient', 'custom']);
     expect(select.value).toBe('gradient');
   });
 
@@ -107,11 +107,121 @@ describe('renderWallpaper', () => {
     expect(config.wallpaper).not.toHaveProperty('use_backgrounds');
   });
 
-  it('keeps a stored custom mode untouched until the user picks another one', () => {
+  it('renders the image control for a stored custom mode and leaves it untouched', () => {
     const config = clone(DEFAULTS);
     config.wallpaper.background_mode = 'custom';
-    render('renderWallpaper', config);
+    win.api = { backgroundStatus: async () => ({ state: 'none', file: null }) };
+    const [wallpaper] = render('renderWallpaper', config);
+    // select.value is not asserted: happy-dom misreports it when the last option is selected.
+    expect(field(wallpaper, 'settings.background_image')).toBeDefined();
     expect(config.wallpaper.background_mode).toBe('custom');
+  });
+
+  describe('custom image control', () => {
+    const flush = async () => {
+      for (let i = 0; i < 10; i += 1) {
+        await Promise.resolve();
+      }
+    };
+    const customConfig = (mode = 'custom') => {
+      const config = clone(DEFAULTS);
+      config.wallpaper.background_mode = mode;
+      return config;
+    };
+    const setApi = (status, pick) => {
+      win.api = { backgroundStatus: async () => status, pickBackground: pick };
+    };
+    const imageField = (wallpaper) => field(wallpaper, 'settings.background_image');
+    const statusText = (wallpaper) =>
+      imageField(wallpaper).querySelector('.background-status').textContent;
+    const errorEl = (wallpaper) => imageField(wallpaper).querySelector('.background-error');
+
+    it('shows the pick button only in custom mode', async () => {
+      setApi({ state: 'none', file: null });
+      const [dyn] = render('renderWallpaper', customConfig('dynamic'));
+      expect(imageField(dyn)).toBeUndefined();
+      const [custom] = render('renderWallpaper', customConfig());
+      expect(imageField(custom).querySelector('button').textContent).toBe(
+        'settings.background_pick',
+      );
+    });
+
+    it.each([
+      [{ state: 'none', file: null }, 'settings.background_status_none'],
+      [{ state: 'ok', file: 'a.jpg', width: 3840, height: 2160 }, 'a.jpg, 3840 \u00d7 2160 px'],
+      [{ state: 'missing', file: 'a.jpg' }, 'settings.background_status_missing'],
+      [{ state: 'unreadable', file: 'a.jpg' }, 'settings.background_status_unreadable'],
+    ])('renders the status %j', async (status, expected) => {
+      setApi(status);
+      const [wallpaper] = render('renderWallpaper', customConfig());
+      await flush();
+      expect(statusText(wallpaper)).toContain(expected);
+      const status_el = imageField(wallpaper).querySelector('.background-status');
+      expect(status_el.getAttribute('aria-live')).toBe('polite');
+    });
+
+    it('adds the dynamic fallback note only when the state is not ok', async () => {
+      setApi({ state: 'missing', file: 'a.jpg' });
+      const [bad] = render('renderWallpaper', customConfig());
+      await flush();
+      expect(statusText(bad)).toContain('settings.background_fallback');
+      setApi({ state: 'ok', file: 'a.jpg', width: 10, height: 20 });
+      const [good] = render('renderWallpaper', customConfig());
+      await flush();
+      expect(statusText(good)).not.toContain('settings.background_fallback');
+    });
+
+    it('mirrors the picked file in the config and updates the status', async () => {
+      const config = customConfig();
+      setApi({ state: 'none', file: null }, async () => ({
+        ok: true,
+        file: 'custom-background.jpg',
+        width: 3840,
+        height: 2160,
+      }));
+      const [wallpaper] = render('renderWallpaper', config);
+      await flush();
+      imageField(wallpaper).querySelector('button').click();
+      await flush();
+      expect(config.wallpaper.custom_background).toBe('custom-background.jpg');
+      expect(statusText(wallpaper)).toContain('custom-background.jpg, 3840 \u00d7 2160 px');
+    });
+
+    it('disables the button while the pick is pending', async () => {
+      let finish;
+      setApi({ state: 'none', file: null }, () => new Promise((resolve) => (finish = resolve)));
+      const [wallpaper] = render('renderWallpaper', customConfig());
+      const button = imageField(wallpaper).querySelector('button');
+      button.click();
+      expect(button.disabled).toBe(true);
+      finish({ ok: false, error: 'CANCELLED' });
+      await flush();
+      expect(button.disabled).toBe(false);
+    });
+
+    it('shows a translated error linked to the button and leaves the config alone', async () => {
+      const config = customConfig();
+      const before = config.wallpaper.custom_background;
+      setApi({ state: 'none', file: null }, async () => ({ ok: false, error: 'TOO_LARGE' }));
+      const [wallpaper] = render('renderWallpaper', config);
+      imageField(wallpaper).querySelector('button').click();
+      await flush();
+      expect(errorEl(wallpaper).textContent).toBe('settings.background_error_TOO_LARGE');
+      const button = imageField(wallpaper).querySelector('button');
+      expect(button.getAttribute('aria-describedby')).toBe(errorEl(wallpaper).id);
+      expect(config.wallpaper.custom_background).toBe(before);
+    });
+
+    it('shows nothing when the dialog is cancelled', async () => {
+      setApi({ state: 'none', file: null }, async () => ({ ok: false, error: 'CANCELLED' }));
+      const [wallpaper] = render('renderWallpaper', customConfig());
+      imageField(wallpaper).querySelector('button').click();
+      await flush();
+      expect(errorEl(wallpaper).textContent).toBe('');
+      expect(imageField(wallpaper).querySelector('button').hasAttribute('aria-describedby')).toBe(
+        false,
+      );
+    });
   });
 
   it('hides the custom resolution field while the resolution is auto', () => {

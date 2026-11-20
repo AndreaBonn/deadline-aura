@@ -1,7 +1,8 @@
 'use strict';
 
 /* global t, createField, createFieldGroup, createToggle, createNumberInput, createRangeWithValue,
-   createSelect, createTextInput, renderCaptureControl, buildBackgroundModeField */
+   createSelect, createTextInput, renderCaptureControl, buildBackgroundModeField,
+   buildBackgroundImageField */
 /* Display tabs: Wallpaper, AI usage, Sidebar, Notifications and UI. Rendered with the tab
    context of settings.js: { getConfig, defaults, api, rerender, rerenderSoon }. */
 
@@ -52,8 +53,9 @@ function buildResolutionSelect(config, rerender) {
 function buildWallpaperBackgroundFields(config, ctx) {
   const fields = [
     buildBackgroundModeField(config, ctx),
+    buildBackgroundImageField(config, ctx),
     createField(t('settings.resolution'), buildResolutionSelect(config, ctx.rerender)),
-  ];
+  ].filter(Boolean);
   if (config.wallpaper.resolution !== 'auto') {
     fields.push(
       createField(

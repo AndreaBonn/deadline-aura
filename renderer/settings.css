@@ -961,3 +961,8 @@ input[type='range'] {
 .action-result-text--error {
   color: #ff8a80;
 }
+
+.background-status,
+.background-error {
+  margin-top: 6px;
+}
