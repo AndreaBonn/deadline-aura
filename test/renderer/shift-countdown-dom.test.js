@@ -87,6 +87,14 @@ describe('updateShiftCountdown', () => {
     expect(element('shiftTime').textContent).toBe('06:44:30');
   });
 
+  it('shows the literal Off before translations are ready when no shift is coming', () => {
+    vi.stubGlobal('_i18nReady', false);
+    setShiftConfig({ ...schedule, regular: { ...schedule.regular, work_days: [] } });
+    updateShiftCountdown();
+    expect(element('shiftLabel').textContent).toBe('Off');
+    expect(element('shiftTime').textContent).toBe('--:--');
+  });
+
   it('shows off when the computed remaining time is exactly zero', () => {
     vi.setSystemTime(new Date('2026-10-07T16:59:00'));
     vi.spyOn(Date.prototype, 'getSeconds').mockReturnValue(60);
