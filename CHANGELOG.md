@@ -1,3 +1,11 @@
+## Versione 1.9.1
+
+> La release v1.9.1 rende leggibili le voci dei menu a tendina su Linux.
+
+### Correzioni
+
+- Le opzioni dei menu a tendina hanno uno sfondo scuro: su Linux il popup nativo le disegnava su fondo chiaro e il testo bianco spariva (09cfe72)
+
 ## Versione 1.9.0
 
 > La release v1.9.0 permette di usare un'immagine personale come sfondo del desktop e corregge una serie di problemi di sincronizzazione, di concorrenza fra finestre e di salvataggio delle impostazioni.

@@ -1,3 +1,11 @@
+## What's Changed in v1.9.1
+
+> This release makes dropdown menu entries readable on Linux.
+
+### Bug fixes
+
+- Dropdown options now have a dark background: on Linux the native popup painted them on a light surface and the white text disappeared (09cfe72)
+
 ## What's Changed in v1.9.0
 
 > This release lets you use your own image as the desktop background and fixes a set of sync, cross-window and settings-save issues.
