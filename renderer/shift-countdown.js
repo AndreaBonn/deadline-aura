@@ -99,29 +99,15 @@ function shiftFormatRemainingMs(ms) {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-/**
- * Update the shift countdown DOM elements.
- * Called every second from the clock interval.
- */
-function updateShiftCountdown() {
-  const container = document.getElementById('shiftCountdown');
-  const labelEl = document.getElementById('shiftLabel');
-  const timeEl = document.getElementById('shiftTime');
-
-  if (!container || !labelEl || !timeEl) {
-    return;
+function shiftComputeStatus(now, config) {
+  if (!config || !config.enabled) {
+    return { enabled: false, working: false, label: 'off', remainingMs: 0 };
   }
 
-  if (!_shiftConfig || !_shiftConfig.enabled) {
-    container.style.display = 'none';
-    return;
-  }
-
-  const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const currentMs = now.getHours() * 3600000 + now.getMinutes() * 60000 + now.getSeconds() * 1000;
 
-  const todaySlots = shiftGetSlotsForDate(now, _shiftConfig);
+  const todaySlots = shiftGetSlotsForDate(now, config);
 
   let working = false;
   let remainingMs = 0;
@@ -149,9 +135,9 @@ function updateShiftCountdown() {
   }
 
   if (!working && label === 'off') {
-    const nextDay = shiftFindNextWorkDay(now, _shiftConfig);
+    const nextDay = shiftFindNextWorkDay(now, config);
     if (nextDay) {
-      const nextSlots = shiftGetSlotsForDate(nextDay, _shiftConfig);
+      const nextSlots = shiftGetSlotsForDate(nextDay, config);
       if (nextSlots.length > 0) {
         const nextStart = nextSlots[0].start;
         const nextDayStart = new Date(nextDay);
@@ -160,6 +146,28 @@ function updateShiftCountdown() {
         label = 'shift_starts';
       }
     }
+  }
+
+  return { enabled: true, working, label, remainingMs };
+}
+
+/**
+ * Update the shift countdown DOM elements.
+ * Called every second from the clock interval.
+ */
+function updateShiftCountdown() {
+  const container = document.getElementById('shiftCountdown');
+  const labelEl = document.getElementById('shiftLabel');
+  const timeEl = document.getElementById('shiftTime');
+
+  if (!container || !labelEl || !timeEl) {
+    return;
+  }
+
+  const { enabled, working, label, remainingMs } = shiftComputeStatus(new Date(), _shiftConfig);
+  if (!enabled) {
+    container.style.display = 'none';
+    return;
   }
 
   container.style.display = 'flex';
@@ -183,5 +191,6 @@ if (typeof module !== 'undefined') {
     shiftGetSlotsForDate,
     shiftFindNextWorkDay,
     shiftFormatRemainingMs,
+    shiftComputeStatus,
   };
 }

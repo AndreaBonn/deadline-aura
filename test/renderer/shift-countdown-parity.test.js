@@ -30,6 +30,50 @@ const VARIABLE = {
 };
 
 describe('shift-countdown parity with core/work-shift', () => {
+  const boundaries = [
+    [9, 0],
+    [12, 30],
+    [14, 0],
+    [18, 0],
+  ];
+  const statusCases = [
+    ...['regular', 'variable'].flatMap((mode) =>
+      boundaries.flatMap(([hour, minute]) =>
+        [-1, 0, 1].map((offset) => [
+          `${mode} ${hour}:${minute} offset ${offset}`,
+          new Date(2026, 9, 7, hour, minute + offset, 0),
+          mode === 'regular' ? REGULAR : VARIABLE,
+        ]),
+      ),
+    ),
+    ...[
+      [10, 0],
+      [13, 0],
+    ].flatMap(([hour, minute]) =>
+      [-1, 0, 1].map((offset) => [
+        `variable weekend ${hour}:${minute} offset ${offset}`,
+        new Date(2026, 9, 10, hour, minute + offset, 0),
+        VARIABLE,
+      ]),
+    ),
+    ['regular break', new Date(2026, 9, 7, 13, 0, 0), REGULAR],
+    ['variable break', new Date(2026, 9, 7, 13, 0, 0), VARIABLE],
+    ['holiday', new Date(2026, 9, 12, 9, 0, 0), REGULAR],
+    ['weekend', new Date(2026, 9, 10, 9, 0, 0), REGULAR],
+    ['empty variable day', new Date(2026, 9, 8, 9, 0, 0), VARIABLE],
+    ['missing variable month', new Date(2026, 10, 7, 9, 0, 0), VARIABLE],
+    [
+      'no work day in 60 days',
+      new Date(2026, 9, 7, 9, 0, 0),
+      { ...REGULAR, regular: { ...REGULAR.regular, work_days: [] } },
+    ],
+  ];
+
+  it.each(statusCases)('computes status parity: %s', (_name, now, config) => {
+    const { working, label, remainingMs } = core.getShiftStatus(config, now);
+    expect(renderer.shiftComputeStatus(now, config)).toMatchObject({ working, label, remainingMs });
+  });
+
   it.each(['00:00', '00:01', '09:05', '12:30', '23:59'])('parses %s', (time) => {
     const expected = core.parseTime(time);
 
