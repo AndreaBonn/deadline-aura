@@ -35,7 +35,7 @@ SIGNAL: n/a, perché è un'app desktop locale senza telemetria né ambiente di r
 
 ## Assunzioni
 
-- Node 20-23 ed Electron della versione in `package.json`; node-canvas `^3.2.3` decodifica WebP. UNVERIFIED: da training data. T006 lo verifica con una fixture `.webp` reale; se fallisce, la premessa di D7 cade e si torna al piano (togliere webp o decodificarlo diversamente), non si aggira.
+- Node 20-23 ed Electron della versione in `package.json`. Premessa smentita in T006: il node-canvas `^3.2.3` installato NON decodifica WebP (misurato), quindi WebP è escluso (risposta Q1 A). T006 lo verifica con una fixture `.webp` reale; se fallisce, la premessa di D7 cade e si torna al piano (togliere webp o decodificarlo diversamente), non si aggira.
 - La scelta dell'immagine è un'azione committata come l'autorizzazione Google: il canale di pick copia il file **e** salva subito `custom_background` (via `applySettings`, che forza il ridisegno). Il cambio di modalità passa invece dal normale Salva. Il renderer rispecchia il nome restituito nel proprio oggetto config, così un Salva successivo non lo sovrascrive con il valore vecchio. Alternativa scartata: copiare al pick e salvare solo al Salva; se l'utente chiude senza salvare, la copia con estensione diversa è già stata rimossa e la config punta a un file che non c'è.
 - Selezionare `custom` senza immagine e salvare è permesso: il render ricade su `dynamic` (D5) e le Impostazioni dicono "nessuna immagine scelta". Nessun `refine` sullo schema, perché una config rifiutata dal loader ricade per intero sui default.
 - Il velo neutro è nero: `rgba(0, 0, 0, CUSTOM_VEIL_ALPHA)` con `CUSTOM_VEIL_ALPHA = 0.15`.
@@ -87,7 +87,7 @@ Flusso:
 - `core/ipc/wallpaper-handlers.js` -> R6 | segue il pattern esistente un gruppo di handler per dominio (`ai-usage-handlers.js`, `flyby-handlers.js`); scartata l'aggiunta a `settings-handlers.js`, che mescolerebbe config e file system.
 - `renderer/settings-background-field.js` -> R1, R8 | obbligato dal limite di 300 righe su `settings-tab-display.js` (278).
 - Getter `getWindow()` su `SettingsWindow` -> R6 (parent del dialog, modale sopra le Impostazioni) | scartato il dialog senza parent, che può aprirsi dietro la finestra delle Impostazioni.
-- Nessuna dipendenza esterna nuova.
+- `image-size` 2.0.4 (pinnata) -> R6, rilievi P1/P2 del security-reviewer | legge dimensioni e formato dall'header senza decodificare, così il limite dei 40 MP scatta prima di allocare l'immagine | più semplice scartata: parser a mano di PNG/JPEG/WebP, dove la scansione dei marker JPEG è il punto in cui un controllo di sicurezza scritto in casa sbaglia (decisione D8 dell'utente).
 
 ## Operazioni
 
@@ -109,6 +109,12 @@ Fasi mergiabili: dopo T001-T005 + T008 le modalità `dynamic` e `gradient` funzi
 
 - `dialog.showOpenDialog` reale e la finestra parent: iniettati come funzione nei test, verificati nel click-through.
 - Applicazione su GNOME (`gsettings`) e resa reale su due monitor: click-through.
+
+## Integrazioni dopo la code review
+
+- `wallpaper:pick-background` restituisce `COPY_FAILED` o `SAVE_FAILED` invece di una rejection IPC con path nel messaggio; il dettaglio va nel log del main.
+- `createUpdateCycle` ricorda un `{ force: true }` arrivato durante un ciclo in corso e lo riesegue una volta a fine ciclo: senza, R9 falliva quando il Salva cadeva durante un aggiornamento.
+- Remediation di `/analyze` (A2, A5, A8): log con codice d'errore nei catch dell'import, cleanup del `.tmp` protetto, log sulla foto dinamica mancante. A8 non applicato: `runUpdateCycle` cattura e logga ogni errore al suo interno, il rilancio non può rigettare; due test lo fissano.
 
 ## Rischi e mitigazioni
 
