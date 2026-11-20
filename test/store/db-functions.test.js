@@ -384,6 +384,35 @@ describe('db module exported functions', () => {
       const cached = db.getAiCache('old_hash');
       expect(cached).toBeUndefined();
     });
+
+    it('keeps a non-stale task last synced 49 hours ago while removing a stale one of the same age', () => {
+      const oldTime = Date.now() - 49 * 3600000;
+      db.upsertTask({ ...SAMPLE_TASK, id: 'old_local_fresh', synced_at: oldTime });
+      db.upsertTask({ ...SAMPLE_TASK, id: 'old_stale_gone', synced_at: oldTime });
+      db.getDb().prepare('UPDATE tasks SET is_stale = 1 WHERE id = ?').run('old_stale_gone');
+
+      db.cleanupOldRecords();
+
+      const ids = db
+        .getDb()
+        .prepare('SELECT id FROM tasks ORDER BY id')
+        .all()
+        .map((row) => row.id);
+      expect(ids).toEqual(['old_local_fresh']);
+    });
+
+    it('keeps a recent AI cache entry while removing one older than 7 days', () => {
+      const oldTime = Date.now() - 8 * 24 * 3600000;
+      db.getDb()
+        .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
+        .run('old_hash', '{}', oldTime);
+      db.setAiCache('recent_hash', '{"note":"keep"}');
+
+      db.cleanupOldRecords();
+
+      expect(db.getAiCache('old_hash')).toBeUndefined();
+      expect(db.getAiCache('recent_hash')).toBeDefined();
+    });
   });
 
   describe('getLatestAiCacheResponse', () => {
