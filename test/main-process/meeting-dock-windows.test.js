@@ -3,7 +3,7 @@ const childProcess = require('child_process');
 // The spy must exist before the module is required: meeting-dock-windows destructures execFile.
 const execSpy = vi.spyOn(childProcess, 'execFile');
 const { createMeetingDockWindows } = require('../../main-process/meeting-dock-windows');
-const { createFakeElectron } = require('./fakes');
+const { createFakeElectron, expectIsolatedPreload } = require('./fakes');
 
 const originalPlatform = process.platform;
 const originalDisplay = process.env.DISPLAY;
@@ -425,5 +425,17 @@ describe('registerIpc', () => {
       'meeting-dock:set-ignore-mouse',
       'meeting-dock:set-visible',
     ]);
+  });
+});
+
+describe('MeetingDockWindows security', () => {
+  it('loads every dock isolated from Node through preload-meeting-dock.js', () => {
+    setPlatform('darwin');
+    const { docks, electron } = setup();
+
+    docks.createMeetingDocks();
+
+    expect(electron.windows).toHaveLength(2);
+    electron.windows.forEach((window) => expectIsolatedPreload(window, 'preload-meeting-dock.js'));
   });
 });

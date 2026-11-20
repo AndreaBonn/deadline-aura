@@ -3,7 +3,7 @@ const childProcess = require('child_process');
 // The spy must exist before the module is required: strip-windows destructures execFile.
 const execSpy = vi.spyOn(childProcess, 'execFile');
 const { createStripWindows } = require('../../main-process/strip-windows');
-const { createFakeElectron } = require('./fakes');
+const { createFakeElectron, expectIsolatedPreload } = require('./fakes');
 
 const originalPlatform = process.platform;
 const originalDisplay = process.env.DISPLAY;
@@ -346,5 +346,17 @@ describe('StripWindows hidden mark of a removed display', () => {
     strips.createStrips();
     electron.windows.slice(-2).forEach((w) => w.finishLoad());
     expect(electron.windows.slice(-2).map((w) => w.visible)).toEqual([true, true]);
+  });
+});
+
+describe('StripWindows security', () => {
+  it('loads every strip isolated from Node through preload.js', () => {
+    setPlatform('darwin');
+    const { strips, electron } = setup();
+
+    strips.createStrips();
+
+    expect(electron.windows).toHaveLength(2);
+    electron.windows.forEach((window) => expectIsolatedPreload(window, 'preload.js'));
   });
 });

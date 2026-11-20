@@ -1,5 +1,8 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
 // Test doubles for Electron's BrowserWindow and screen. Windows record what
 // the app did to them (visibility, bounds, sent messages) so tests assert on
 // observable behavior instead of constructor options.
@@ -131,4 +134,15 @@ function createFakeElectron() {
   return { BrowserWindow: FakeBrowserWindow, windows, screen, state, primary, secondary };
 }
 
-module.exports = { createFakeElectron, makeDisplay };
+/**
+ * Assert that a window runs its page isolated from Node, through the named preload script.
+ */
+function expectIsolatedPreload(window, preloadFile) {
+  const prefs = window.options.webPreferences;
+  expect(prefs.contextIsolation).toBe(true);
+  expect(prefs.nodeIntegration).toBe(false);
+  expect(path.basename(prefs.preload)).toBe(preloadFile);
+  expect(fs.existsSync(prefs.preload)).toBe(true);
+}
+
+module.exports = { createFakeElectron, makeDisplay, expectIsolatedPreload };

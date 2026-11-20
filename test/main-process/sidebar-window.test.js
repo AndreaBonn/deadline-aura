@@ -1,5 +1,5 @@
 const { createSidebarWindow } = require('../../main-process/sidebar-window');
-const { createFakeElectron } = require('./fakes');
+const { createFakeElectron, expectIsolatedPreload } = require('./fakes');
 
 const SIDEBAR_WIDTH = 300;
 
@@ -202,5 +202,15 @@ describe('SidebarWindow checkDesktopState', () => {
     world.occupied = new Set(['1', '2']);
     sidebar.checkDesktopState();
     expect(window.visible).toBe(true);
+  });
+});
+
+describe('SidebarWindow security', () => {
+  it('loads the sidebar isolated from Node through preload.js', () => {
+    const { sidebar, electron } = setup();
+
+    sidebar.create();
+
+    expectIsolatedPreload(electron.windows[0], 'preload.js');
   });
 });

@@ -1,5 +1,5 @@
 const { createOverlayWindow } = require('../../main-process/overlay-window');
-const { createFakeElectron } = require('./fakes');
+const { createFakeElectron, expectIsolatedPreload } = require('./fakes');
 
 function setup() {
   const electron = createFakeElectron();
@@ -168,5 +168,15 @@ describe('OverlayWindow when the window cannot be created', () => {
 
     expect(() => overlay.open('2')).toThrow('no GPU');
     expect(overlayStates.at(-1) ?? false).toBe(false);
+  });
+});
+
+describe('OverlayWindow security', () => {
+  it('loads the overlay isolated from Node through preload-overlay.js', () => {
+    const { overlay, electron } = setup();
+
+    overlay.open('2');
+
+    expectIsolatedPreload(electron.windows[0], 'preload-overlay.js');
   });
 });

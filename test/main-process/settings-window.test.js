@@ -1,5 +1,5 @@
 const { createSettingsWindow } = require('../../main-process/settings-window');
-const { createFakeElectron } = require('./fakes');
+const { createFakeElectron, expectIsolatedPreload } = require('./fakes');
 
 function setup() {
   const electron = createFakeElectron();
@@ -49,5 +49,15 @@ describe('SettingsWindow', () => {
     settings.open();
     expect(electron.windows).toHaveLength(2);
     expect(electron.windows[0].focusCount).toBe(0);
+  });
+});
+
+describe('SettingsWindow security', () => {
+  it('loads the settings page isolated from Node through preload-settings.js', () => {
+    const { settings, electron } = setup();
+
+    settings.open();
+
+    expectIsolatedPreload(electron.windows[0], 'preload-settings.js');
   });
 });
