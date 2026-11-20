@@ -47,3 +47,37 @@ describe('planBackground', () => {
     expect(planBackground({ mode, score: 0.1 }).file).toMatch(/calmo\.png$/);
   });
 });
+
+describe('custom background inspection', () => {
+  it('rejects symlinks and oversized headers before decoding, while decoding a valid image', async () => {
+    const fs = require('fs');
+    const os = require('os');
+    const { loadBackground } = require('../../core/wallpaper-background');
+    const fixtures = path.join(__dirname, '../fixtures/backgrounds');
+    const valid = path.join(fixtures, 'small.png');
+    const huge = path.join(fixtures, 'huge.png');
+    const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wallpaper-link-')), 'link.png');
+    fs.symlinkSync(valid, link);
+    const loadImage = vi.fn(async (file) => ({ file }));
+    const log = { warn: vi.fn() };
+    for (const [file, reason] of [
+      [link, 'SYMLINK'],
+      [huge, 'TOO_MANY_PIXELS'],
+    ]) {
+      const result = await loadBackground(
+        { kind: 'custom', file, veil: 'neutral' },
+        { loadImage, log, score: 0.1 },
+      );
+      expect(result.veil).toBe('tint');
+      expect(loadImage).not.toHaveBeenCalledWith(file);
+      expect(log.warn).toHaveBeenCalledWith(expect.stringContaining(reason));
+    }
+    expect(
+      await loadBackground(
+        { kind: 'custom', file: valid, veil: 'neutral' },
+        { loadImage, log, score: 0.1 },
+      ),
+    ).toEqual({ image: { file: valid }, veil: 'neutral' });
+    expect(loadImage).toHaveBeenCalledWith(valid);
+  });
+});

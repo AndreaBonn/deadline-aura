@@ -13,7 +13,7 @@
   require('dotenv').config();
 }
 
-const { app, BrowserWindow, screen, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, nativeImage, dialog } = require('electron');
 const { execFileSync, spawn } = require('child_process');
 const { openExternalUrl } = require('./core/open-external');
 const externalBrowserDependencies = {
@@ -31,6 +31,8 @@ const { createOverlayWindow } = require('./main-process/overlay-window');
 const deadlineEngine = require('./core/deadline-engine');
 const colorMapper = require('./core/color-mapper');
 const wallpaperChanger = require('./core/wallpaper-changer');
+const { importCustomBackground, describeCustomBackground } = require('./core/custom-background');
+const { loadImage } = require('canvas');
 const db = require('./store/db');
 const pinnedQueries = require('./store/pinned-queries');
 const localQueries = require('./store/local-queries');
@@ -206,6 +208,16 @@ function startPeriodicJobs() {
   setInterval(checkBurnout, burnoutIntervalMs(config));
 }
 
+function wallpaperIpcDependencies() {
+  return {
+    showOpenDialog: (options) => dialog.showOpenDialog(settings.getWindow(), options),
+    importCustomBackground,
+    describeCustomBackground,
+    dataDir: path.join(os.homedir(), '.local', 'share', 'deadlineaura'),
+    loadImage,
+  };
+}
+
 function appIpcDependencies(applier) {
   return {
     sidebar,
@@ -228,6 +240,7 @@ function appIpcDependencies(applier) {
     refresh: runUpdateCycle,
     saveConfig,
     getLastSyncStatus: dataSync.getLastStatus,
+    ...wallpaperIpcDependencies(),
     applySettings: applier.applySettings,
     applyFlyby: applier.applyFlyby,
   };

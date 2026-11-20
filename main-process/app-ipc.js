@@ -4,6 +4,7 @@ const { mergeIpcGroups } = require('../core/ipc/register-ipc');
 const { createLocalTaskHandlers } = require('../core/ipc/local-task-handlers');
 const { createCalendarHandlers } = require('../core/ipc/calendar-handlers');
 const { createSettingsHandlers } = require('../core/ipc/settings-handlers');
+const { createWallpaperHandlers } = require('../core/ipc/wallpaper-handlers');
 const { createFlybyHandlers } = require('../core/ipc/flyby-handlers');
 const { createAppStateHandlers } = require('../core/ipc/app-state-handlers');
 const { createIntegrationHandlers } = require('../core/ipc/integration-handlers');
@@ -39,6 +40,20 @@ function createConfigGroup(deps) {
       }),
       ...createFlybyHandlers({ getConfig: deps.getConfig, applyConfig: deps.applyFlyby }),
     },
+  };
+}
+
+function createWallpaperGroup(deps) {
+  return {
+    handle: createWallpaperHandlers({
+      showOpenDialog: deps.showOpenDialog,
+      importCustomBackground: deps.importCustomBackground,
+      describeCustomBackground: deps.describeCustomBackground,
+      getConfig: deps.getConfig,
+      applyConfig: deps.applySettings,
+      dataDir: deps.dataDir,
+      loadImage: deps.loadImage,
+    }),
   };
 }
 
@@ -85,6 +100,7 @@ function createAppIpcGroups(deps) {
   return mergeIpcGroups(
     createWindowHandlers({ sidebar: deps.sidebar, settings: deps.settings }),
     ...createServiceGroups(deps),
+    createWallpaperGroup(deps),
     createConfigGroup(deps),
   );
 }

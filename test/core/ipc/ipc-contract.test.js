@@ -3,6 +3,7 @@ const path = require('path');
 const { createLocalTaskHandlers } = require('../../../core/ipc/local-task-handlers');
 const { createCalendarHandlers } = require('../../../core/ipc/calendar-handlers');
 const { createSettingsHandlers } = require('../../../core/ipc/settings-handlers');
+const { createWallpaperHandlers } = require('../../../core/ipc/wallpaper-handlers');
 const { createFlybyHandlers } = require('../../../core/ipc/flyby-handlers');
 const { createAppStateHandlers } = require('../../../core/ipc/app-state-handlers');
 const { createIntegrationHandlers } = require('../../../core/ipc/integration-handlers');
@@ -50,6 +51,14 @@ describe('IPC channel contract with preload scripts', () => {
       channelsWithPrefix(invoked, ['settings:', 'jira:']),
     );
     expect(channelsWithPrefix(invoked, ['settings:', 'jira:'])).toHaveLength(5);
+  });
+
+  it('wallpaper handlers match invoked channels', () => {
+    const invoked = preloadChannels(/ipcRenderer\.invoke\(\s*'([^']+)'/g);
+    expect(Object.keys(createWallpaperHandlers({})).sort()).toEqual(
+      channelsWithPrefix(invoked, ['wallpaper:']),
+    );
+    expect(channelsWithPrefix(invoked, ['wallpaper:'])).toHaveLength(2);
   });
 
   it('flyby handlers match invoked channels, excluding event-based window controls', () => {

@@ -42,6 +42,8 @@ const INVOKE_DEFAULTS = {
   captureStatus: () => ({ installed: false }),
   captureInstall: () => ({ ok: true }),
   captureUninstall: () => ({ ok: true }),
+  pickBackground: () => ({ ok: false, error: 'CANCELLED' }),
+  backgroundStatus: () => ({ state: 'none', file: null }),
 };
 const SEND_METHODS = ['close', 'openLink'];
 

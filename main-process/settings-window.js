@@ -37,6 +37,10 @@ class SettingsWindow {
     });
   }
 
+  getWindow() {
+    return this.#window;
+  }
+
   close() {
     if (this.#window && !this.#window.isDestroyed()) {
       this.#window.close();

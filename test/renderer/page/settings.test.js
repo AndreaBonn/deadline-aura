@@ -60,7 +60,7 @@ describe('bridge fake contract', () => {
     const fakeKeys = [...Object.keys(INVOKE_DEFAULTS), ...SEND_METHODS];
 
     expect(contract.name).toBe('settingsApi');
-    expect(contract.keys).toHaveLength(12);
+    expect(contract.keys).toHaveLength(14);
     expect([...fakeKeys].sort()).toEqual([...contract.keys].sort());
   });
 });

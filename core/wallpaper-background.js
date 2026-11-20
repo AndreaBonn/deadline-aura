@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { inspectCustomBackground } = require('./custom-background');
 
 // node-canvas reads image files in native C++, bypassing Electron's asar fs
 // shim. Inside a packaged app the assets live in app.asar.unpacked (declared in
@@ -93,6 +94,10 @@ async function loadBackground(plan, deps) {
     return loadFallback(plan.fallbackReason, deps);
   }
   if (plan.kind === 'custom') {
+    const inspection = inspectCustomBackground(plan.file);
+    if (!inspection.ok) {
+      return loadFallback(inspection.error, deps);
+    }
     try {
       return { image: await deps.loadImage(plan.file), veil: plan.veil };
     } catch (err) {
