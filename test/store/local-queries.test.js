@@ -235,3 +235,35 @@ describe('local-queries', () => {
     });
   });
 });
+
+describe('local-queries — pins of tasks that are not local', () => {
+  function jiraTask(id) {
+    return {
+      id,
+      source: 'jira',
+      title: 'Pinned Jira task',
+      due_at: null,
+      priority: 2,
+      is_done: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+  }
+
+  it.each(['deleteLocalTask', 'completeLocalTask'])(
+    '%s leaves the pins of a Jira task in place and removes those of a local task',
+    (operation) => {
+      db.upsertTask(jiraTask(`jira_pinned_${operation}`));
+      const local = localQueries.createLocalTask({ title: `Local ${operation}`, priority: 2 });
+      pinnedQueries.pinTask({ taskId: `jira_pinned_${operation}`, displayId: 'eDP-1' });
+      pinnedQueries.pinTask({ taskId: local.id, displayId: 'eDP-1' });
+
+      localQueries[operation](`jira_pinned_${operation}`);
+      localQueries[operation](local.id);
+
+      expect(pinnedQueries.isPinned(`jira_pinned_${operation}`)).toBe(true);
+      expect(pinnedQueries.isPinned(local.id)).toBe(false);
+    },
+  );
+});

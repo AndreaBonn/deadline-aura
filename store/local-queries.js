@@ -54,14 +54,26 @@ function updateLocalTask({ id, title, dueAt, priority }) {
     .run(...params);
 }
 
+// Unpin only when the statement matched a local task: an id from another source keeps its pins.
+function changeLocalTaskAndUnpin(sql, id) {
+  return getDb().transaction(() => {
+    const result = getDb().prepare(sql).run(id);
+    if (result.changes > 0) {
+      unpinTaskFromAll(id);
+    }
+    return result;
+  })();
+}
+
 function deleteLocalTask(id) {
-  unpinTaskFromAll(id);
-  return getDb().prepare("DELETE FROM tasks WHERE id = ? AND source = 'local'").run(id);
+  return changeLocalTaskAndUnpin("DELETE FROM tasks WHERE id = ? AND source = 'local'", id);
 }
 
 function completeLocalTask(id) {
-  unpinTaskFromAll(id);
-  return getDb().prepare("UPDATE tasks SET is_done = 1 WHERE id = ? AND source = 'local'").run(id);
+  return changeLocalTaskAndUnpin(
+    "UPDATE tasks SET is_done = 1 WHERE id = ? AND source = 'local'",
+    id,
+  );
 }
 
 function getAllLocalTasks() {
