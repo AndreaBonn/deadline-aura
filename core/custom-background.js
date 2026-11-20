@@ -69,9 +69,22 @@ function describeCustomBackground(file, { dataDir }) {
   return { state: result.error === 'MISSING' ? 'missing' : 'unreadable', ...empty };
 }
 
+function warnFailure(phase, err) {
+  console.warn(`[wallpaper] ${phase} failed:`, err.code || err.name, err.message);
+}
+
+// Cleanup is best effort: a failure here must never change an outcome already computed.
+function removeQuietly(filePath) {
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch (err) {
+    warnFailure('temporary cleanup', err);
+  }
+}
+
 function removeTemporaryFiles(dataDir) {
   for (const file of CUSTOM_BACKGROUND_FILES) {
-    fs.rmSync(path.join(dataDir, `${file}.tmp`), { force: true });
+    removeQuietly(path.join(dataDir, `${file}.tmp`));
   }
 }
 
@@ -84,7 +97,8 @@ function copySource(sourcePath, temporaryPath) {
       fs.closeSync(fd);
     }
     return true;
-  } catch {
+  } catch (err) {
+    warnFailure('copy', err);
     return false;
   }
 }
@@ -100,16 +114,18 @@ async function validateCopy(temporaryPath, format, loadImage) {
     }
     await loadImage(temporaryPath);
     return result;
-  } catch {
+  } catch (err) {
+    warnFailure('validation', err);
     return { ok: false, error: 'UNREADABLE' };
   }
 }
 
 function checkSource(sourcePath, dataDir) {
+  removeTemporaryFiles(dataDir);
   try {
-    removeTemporaryFiles(dataDir);
     return fs.statSync(sourcePath).size > MAX_CUSTOM_BACKGROUND_BYTES ? 'TOO_LARGE' : null;
-  } catch {
+  } catch (err) {
+    warnFailure('source check', err);
     return 'UNREADABLE';
   }
 }
@@ -143,10 +159,11 @@ async function importCustomBackground(sourcePath, { dataDir, loadImage }) {
     fs.renameSync(temporaryPath, path.join(dataDir, file));
     removeOtherBackgrounds(dataDir, file);
     return { ok: true, file, width: result.width, height: result.height };
-  } catch {
+  } catch (err) {
+    warnFailure('import', err);
     return { ok: false, error: 'COPY_FAILED' };
   } finally {
-    fs.rmSync(temporaryPath, { force: true });
+    removeQuietly(temporaryPath);
   }
 }
 

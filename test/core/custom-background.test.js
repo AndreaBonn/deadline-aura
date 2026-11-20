@@ -171,6 +171,123 @@ describe('custom background import', () => {
   });
 });
 
+describe('custom background import diagnostics', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function throwingRm(shouldThrow) {
+    const realRm = fs.rmSync;
+    return vi.spyOn(fs, 'rmSync').mockImplementation((target, options) => {
+      if (shouldThrow(String(target))) {
+        throw Object.assign(new Error('rm denied'), { code: 'EACCES' });
+      }
+      return realRm(target, options);
+    });
+  }
+
+  it('keeps ok:true and warns when the final temporary cleanup throws', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const imported = path.join(dataDir, 'custom-background.png');
+      throwingRm((target) => target.endsWith('.tmp') && fs.existsSync(imported));
+      const result = await importCustomBackground(fixture('small.png'), { dataDir, loadImage });
+      expect(result).toEqual({ ok: true, file: 'custom-background.png', width: 64, height: 48 });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[wallpaper]'),
+        'EACCES',
+        'rm denied',
+      );
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('does not warn when an import succeeds without errors', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = await importCustomBackground(fixture('small.png'), { dataDir, loadImage });
+      expect(result.ok).toBe(true);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('warns with the error code and still returns COPY_FAILED when the copy fails', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(fs, 'writeFileSync').mockImplementationOnce(() => {
+        throw Object.assign(new Error('no space left'), { code: 'ENOSPC' });
+      });
+      const result = await importCustomBackground(fixture('small.png'), { dataDir, loadImage });
+      expect(result).toEqual({ ok: false, error: 'COPY_FAILED' });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('copy'), 'ENOSPC', 'no space left');
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('warns and returns UNREADABLE when decoding the copy fails', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const failDecode = vi.fn().mockRejectedValue(new Error('bad image'));
+      const result = await importCustomBackground(fixture('small.png'), {
+        dataDir,
+        loadImage: failDecode,
+      });
+      expect(result).toEqual({ ok: false, error: 'UNREADABLE' });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('validation'),
+        'Error',
+        'bad image',
+      );
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('does not turn a readable source into UNREADABLE when stale .tmp cleanup throws', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      throwingRm((target) => target.endsWith('.tmp'));
+      const result = await importCustomBackground(fixture('small.png'), { dataDir, loadImage });
+      expect(result.ok).toBe(true);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[wallpaper]'),
+        'EACCES',
+        'rm denied',
+      );
+    } finally {
+      cleanup(root);
+    }
+  });
+
+  it('still reports UNREADABLE and warns when the source itself cannot be read', async () => {
+    const { root, dataDir } = setup();
+    try {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const result = await importCustomBackground(path.join(root, 'missing.png'), {
+        dataDir,
+        loadImage,
+      });
+      expect(result).toEqual({ ok: false, error: 'UNREADABLE' });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('source'),
+        'ENOENT',
+        expect.any(String),
+      );
+    } finally {
+      cleanup(root);
+    }
+  });
+});
+
 describe('custom background inspection', () => {
   it('rejects symlinks and reads the regular image dimensions', () => {
     const { root } = setup();
