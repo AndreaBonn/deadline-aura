@@ -44,38 +44,8 @@ async function sync(config) {
   let jiraCount = 0;
   let outlookCount = 0;
 
-  const gcalEvents = await fetchWithErrorCapture(
-    () => gcal.fetchEvents(config),
-    'google_calendar',
-    errors,
-  );
-
-  const googleTasks = await fetchWithErrorCapture(
-    () => gtasks.fetchTasks(config),
-    'google_tasks',
-    errors,
-  );
-
-  // Issues from the Jira sites that answered when another site did not.
-  let jiraPartialIssues = [];
-  const jiraIssues = await fetchWithErrorCapture(
-    async () => {
-      try {
-        return await jira.fetchIssues(config);
-      } catch (err) {
-        jiraPartialIssues = err.partialIssues || [];
-        throw err;
-      }
-    },
-    'jira',
-    errors,
-  );
-
-  const outlookEvents = await fetchWithErrorCapture(
-    () => outlook.fetchEvents(config),
-    'outlook',
-    errors,
-  );
+  const { gcalEvents, googleTasks, jiraIssues, jiraPartialIssues, outlookEvents } =
+    await fetchAllSources(config, errors);
 
   const database = db.getDb();
   const upsertMany = database.transaction((tasks, source) => {
@@ -133,6 +103,44 @@ async function sync(config) {
   }
 
   return { gcal: gcalCount, gtasks: gtasksCount, jira: jiraCount, outlook: outlookCount, errors };
+}
+
+// Issues from the Jira sites that answered when another site did not travel on the error.
+async function fetchJira(config) {
+  try {
+    return { issues: await jira.fetchIssues(config), partialIssues: [] };
+  } catch (err) {
+    return { issues: [], partialIssues: err.partialIssues || [], error: err };
+  }
+}
+
+async function fetchAllSources(config, errors) {
+  const gcalEvents = await fetchWithErrorCapture(
+    () => gcal.fetchEvents(config),
+    'google_calendar',
+    errors,
+  );
+  const googleTasks = await fetchWithErrorCapture(
+    () => gtasks.fetchTasks(config),
+    'google_tasks',
+    errors,
+  );
+  const jiraResult = await fetchJira(config);
+  if (jiraResult.error) {
+    errors.push({ source: 'jira', message: jiraResult.error.message });
+  }
+  const outlookEvents = await fetchWithErrorCapture(
+    () => outlook.fetchEvents(config),
+    'outlook',
+    errors,
+  );
+  return {
+    gcalEvents,
+    googleTasks,
+    jiraIssues: jiraResult.issues,
+    jiraPartialIssues: jiraResult.partialIssues,
+    outlookEvents,
+  };
 }
 
 async function runAiScoring(tasks, config, errors) {
