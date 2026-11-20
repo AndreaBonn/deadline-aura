@@ -125,6 +125,17 @@ function createAuthorizationUrl(oAuth2Client, oauthState) {
   });
 }
 
+function openConsentPage(authUrl) {
+  const { spawn } = require('child_process');
+  const opener = spawn('xdg-open', [authUrl], { detached: true, stdio: 'ignore' });
+  // A missing xdg-open is an asynchronous 'error' event; unhandled, it would crash
+  // the main process. The flow keeps waiting: the user can still reach the URL.
+  opener.on('error', (err) => {
+    console.error(`Google auth: could not open the browser with xdg-open: ${err.message}`);
+  });
+  opener.unref();
+}
+
 function startAuthFlow(oAuth2Client) {
   return new Promise((resolve, reject) => {
     const oauthState = crypto.randomBytes(16).toString('hex');
@@ -144,8 +155,7 @@ function startAuthFlow(oAuth2Client) {
       reject(new Error('OAuth timeout: flow not completed within 5 minutes'));
     }, OAUTH_TIMEOUT_MS);
     server.listen(OAUTH_PORT, () => {
-      const { spawn } = require('child_process');
-      spawn('xdg-open', [authUrl], { detached: true, stdio: 'ignore' }).unref();
+      openConsentPage(authUrl);
     });
     server.on('error', (err) => {
       clearTimeout(authTimeout);

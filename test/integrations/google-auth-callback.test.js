@@ -33,7 +33,9 @@ describe('google-auth — OAuth callback security', () => {
       handler = h;
       return fakeServer();
     });
-    vi.spyOn(childProcess, 'spawn').mockReturnValue({ unref: vi.fn() });
+    vi.spyOn(childProcess, 'spawn').mockReturnValue(
+      Object.assign(new EventEmitter(), { unref: vi.fn() }),
+    );
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {});
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});

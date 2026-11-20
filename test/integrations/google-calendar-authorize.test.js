@@ -28,6 +28,13 @@ function fakeServer() {
   return server;
 }
 
+// Like a real ChildProcess: an 'error' event with no listener throws.
+function fakeChild() {
+  const child = new EventEmitter();
+  child.unref = vi.fn();
+  return child;
+}
+
 function callback(handler, state) {
   const res = { writeHead: vi.fn(), end: vi.fn() };
   return handler({ url: `/oauth/callback?state=${state}&code=abc` }, res);
@@ -46,7 +53,7 @@ describe('google-calendar — shared OAuth flow', () => {
       handler = h;
       return server;
     });
-    vi.spyOn(childProcess, 'spawn').mockReturnValue({ unref: vi.fn() });
+    vi.spyOn(childProcess, 'spawn').mockReturnValue(fakeChild());
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
     vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {});
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
@@ -75,6 +82,21 @@ describe('google-calendar — shared OAuth flow', () => {
     expect(childProcess.spawn).toHaveBeenCalledTimes(1);
     expect(clientA.credentials).toEqual(TOKENS);
     expect(clientB.credentials).toEqual(TOKENS);
+  });
+
+  it('survives xdg-open being missing, logging the failure instead of crashing', async () => {
+    const child = fakeChild();
+    childProcess.spawn.mockReturnValue(child);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const first = getAuthenticatedClient('id', 'secret');
+
+    const missing = Object.assign(new Error('spawn xdg-open ENOENT'), { code: 'ENOENT' });
+    expect(() => child.emit('error', missing)).not.toThrow();
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('xdg-open'));
+
+    // The consent URL is still reachable by the user: the flow itself keeps waiting.
+    await callback(handler, stateFromAuthUrl());
+    await expect(first).resolves.toBeDefined();
   });
 
   it('starts a fresh flow after the previous one has finished', async () => {
