@@ -4,7 +4,7 @@
    updateShiftCountdown, setShiftConfig, extractJiraKey, buildEventSummary,
    formatScore100, formatSyncStatus, applyFlybyIcon, initFlybyToggle,
    renderClinicalNote, renderStressForecast, updateAiNotesToggle, initAiNotesToggle,
-   initScoreBreakdown, TimerController, renderTaskList, commitPendingDelete */
+   initScoreBreakdown, TimerController, renderTaskList, commitPendingDelete, isActionMenuOpen */
 
 const sidebarState = {
   jiraFilter: '',
@@ -25,11 +25,44 @@ const sidebarState = {
   addFormVisible: false,
   editingTaskId: null,
   firstRunHintDismissed: false,
+  // Something was typed or chosen in a form of the list since it was last rebuilt.
+  formTouched: false,
 };
 
 function rerender() {
+  // A rebuilt list holds no draft: typing starts over in whatever panel is open now.
+  sidebarState.formTouched = false;
   renderTaskList(sidebarState.lastTasks, sidebarState.lastPalette);
 }
+
+const CARD_PANEL_KEYS = ['editingTaskId', 'timeLogTaskId', 'timerPickerTaskId'];
+
+// A form or an actions menu open on the list survives the update sent every minute: rebuilding
+// the list would wipe what is being typed, re-enable a send still in flight or close the menu
+// under the pointer. It holds while the user is on the window, or while the form has a draft;
+// an untouched form left open elsewhere does not freeze the list. A panel whose task left the
+// list is closed, so the list cannot stay frozen on a task that no longer exists.
+function keepsOpenForm(tasks) {
+  const ids = new Set(tasks.map((task) => task.id));
+  for (const key of CARD_PANEL_KEYS) {
+    if (sidebarState[key] !== null && !ids.has(sidebarState[key])) {
+      sidebarState[key] = null;
+    }
+  }
+  const panelOpen =
+    sidebarState.addFormVisible || CARD_PANEL_KEYS.some((key) => sidebarState[key] !== null);
+  if (!panelOpen) {
+    sidebarState.formTouched = false;
+    return isActionMenuOpen();
+  }
+  return document.hasFocus() || sidebarState.formTouched;
+}
+
+['input', 'change'].forEach((type) =>
+  document.getElementById('tasksContainer').addEventListener(type, function () {
+    sidebarState.formTouched = true;
+  }),
+);
 
 const timerController = new TimerController({
   state: sidebarState,
@@ -130,7 +163,13 @@ window.deadlineAura.onUpdate(function (data) {
   renderClinicalNote(data.clinicalNote);
   renderStressForecast(data.stressForecast);
   updateAiNotesToggle(Boolean(data.clinicalNote), (data.stressForecast || []).length > 0);
-  renderTaskList(data.engineResult.tasks, data.palette);
+  if (keepsOpenForm(data.engineResult.tasks)) {
+    // Shown by the rerender that closes the form.
+    sidebarState.lastTasks = data.engineResult.tasks;
+    sidebarState.lastPalette = data.palette;
+  } else {
+    renderTaskList(data.engineResult.tasks, data.palette);
+  }
   renderSyncStatus(data.syncStatus || null);
   if (!sidebarState.firstRunHintDismissed) {
     document.getElementById('firstRunHint').hidden = !data.showFirstRunHint;

@@ -43,15 +43,27 @@ function createTimerStopButton(task, active) {
   return stopBtn;
 }
 
+function toggleTimerPicker(task) {
+  sidebarState.timerPickerTaskId = sidebarState.timerPickerTaskId === task.id ? null : task.id;
+  sidebarState.timeLogTaskId = null;
+  rerender();
+}
+
 function handlePlayClick(task) {
-  window.deadlineAura.getDefaultLogCalendar().then(function (result) {
-    if (result.ok && result.calendarId) {
-      timerController.start(task, result.calendarId);
-    } else {
-      sidebarState.timerPickerTaskId = sidebarState.timerPickerTaskId === task.id ? null : task.id;
-      rerender();
-    }
-  });
+  window.deadlineAura.getDefaultLogCalendar().then(
+    function (result) {
+      if (result.ok && result.calendarId) {
+        timerController.start(task, result.calendarId);
+      } else {
+        toggleTimerPicker(task);
+      }
+    },
+    // Without the default calendar the user can still pick one by hand.
+    function (err) {
+      console.error('reading the default calendar failed:', err.message);
+      toggleTimerPicker(task);
+    },
+  );
 }
 
 function createTimerCalendarPicker(task) {

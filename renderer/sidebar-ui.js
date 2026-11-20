@@ -61,6 +61,12 @@ function createIconButton(spec) {
 
 let openActionMenu = null;
 
+/** Whether a "more actions" menu is open while the user is on the page. */
+function isActionMenuOpen() {
+  // A menu left open in a window the user moved away from must not freeze the list.
+  return openActionMenu !== null && openActionMenu.menu.isConnected && document.hasFocus();
+}
+
 function closeActionMenu() {
   if (!openActionMenu) {
     return;
@@ -174,6 +180,7 @@ if (typeof module !== 'undefined') {
     createIconButton,
     createActionMenu,
     closeActionMenu,
+    isActionMenuOpen,
     createUndoToast,
   };
 }

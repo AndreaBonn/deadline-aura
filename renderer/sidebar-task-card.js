@@ -78,6 +78,7 @@ function menuAction(id, task) {
     unpin: () => api.unpinTask(task.id),
     'log-time': () => {
       sidebarState.timeLogTaskId = sidebarState.timeLogTaskId === task.id ? null : task.id;
+      sidebarState.timerPickerTaskId = null;
       rerender();
     },
     'connect-google': () => api.openConfig(),
