@@ -262,12 +262,7 @@ function registerAppIpc() {
   registerIpc(ipcMain, createAppIpcGroups(appIpcDependencies(applier)));
 }
 
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-}
-
-app.whenReady().then(() => {
+function startApp() {
   if (nativeImage.createFromPath(APP_ICON_PATH).isEmpty()) {
     console.warn(
       `[icon] App icon missing or unreadable at ${APP_ICON_PATH} - dock will show the generic icon. ` +
@@ -293,7 +288,16 @@ app.whenReady().then(() => {
   startPeriodicJobs();
   registerAppIpc();
   dataSync.startupSync();
-});
+}
+
+// app.quit() is asynchronous: without the else branch a second launch would still reach
+// ready and open windows, sync and maybe the Google consent page while it quits.
+const gotLock = app.requestSingleInstanceLock();
+if (gotLock) {
+  app.whenReady().then(startApp);
+} else {
+  app.quit();
+}
 
 app.on('window-all-closed', () => {
   clearInterval(desktopCheckInterval);
