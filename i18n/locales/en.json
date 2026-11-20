@@ -22,6 +22,8 @@
     "days_short": "d",
     "in_minutes": "in {n} minutes",
     "in_hours": "in {n} hours",
+    "in_hour": "in {n} hour",
+    "in_minute": "in {n} minute",
     "now": "now",
     "ongoing": "ongoing",
     "ended": "ended"

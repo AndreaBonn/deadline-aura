@@ -47,6 +47,13 @@ describe('notifier', () => {
       expect(formatCountdown(3)).toBe('tra 3 ore');
     });
 
+    it('uses the singular for one hour and one minute', () => {
+      expect([formatCountdown(1.2), formatCountdown(1 / 60)]).toEqual([
+        'tra 1 ora',
+        'tra 1 minuto',
+      ]);
+    });
+
     it('rounds minutes correctly for fractional hours under 1', () => {
       expect(formatCountdown(0.25)).toBe('tra 15 minuti');
     });

@@ -47,9 +47,11 @@ function formatCountdown(hoursRemaining) {
     return t('countdown.expired');
   }
   if (hoursRemaining < 1) {
-    return t('countdown.in_minutes', { n: Math.round(hoursRemaining * 60) });
+    const minutes = Math.round(hoursRemaining * 60);
+    return t(minutes === 1 ? 'countdown.in_minute' : 'countdown.in_minutes', { n: minutes });
   }
-  return t('countdown.in_hours', { n: Math.round(hoursRemaining) });
+  const hours = Math.round(hoursRemaining);
+  return t(hours === 1 ? 'countdown.in_hour' : 'countdown.in_hours', { n: hours });
 }
 
 function send(engineResult, config) {

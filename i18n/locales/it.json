@@ -22,6 +22,8 @@
     "days_short": "g",
     "in_minutes": "tra {n} minuti",
     "in_hours": "tra {n} ore",
+    "in_hour": "tra {n} ora",
+    "in_minute": "tra {n} minuto",
     "now": "ora",
     "ongoing": "in corso",
     "ended": "terminato"
