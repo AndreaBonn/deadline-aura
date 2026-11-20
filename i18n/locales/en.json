@@ -181,7 +181,10 @@
       "failed": "Operation failed",
       "working": "…"
     },
-    "photo_backgrounds": "Photo backgrounds",
+    "background_mode": "Background",
+    "background_mode_dynamic": "Dynamic (changes with pressure)",
+    "background_mode_gradient": "Gradient only",
+    "background_mode_hint": "The gradient uses no photos.",
     "resolution": "Resolution",
     "auto": "Automatic",
     "custom": "Custom",

@@ -181,7 +181,10 @@
       "failed": "Operazione non riuscita",
       "working": "…"
     },
-    "photo_backgrounds": "Sfondi fotografici",
+    "background_mode": "Sfondo",
+    "background_mode_dynamic": "Dinamico (cambia con la pressione)",
+    "background_mode_gradient": "Solo gradiente",
+    "background_mode_hint": "Il gradiente non usa foto.",
     "resolution": "Risoluzione",
     "auto": "Automatica",
     "custom": "Personalizzata",

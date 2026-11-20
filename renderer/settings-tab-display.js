@@ -1,7 +1,7 @@
 'use strict';
 
 /* global t, createField, createFieldGroup, createToggle, createNumberInput, createRangeWithValue,
-   createSelect, createTextInput, renderCaptureControl */
+   createSelect, createTextInput, renderCaptureControl, buildBackgroundModeField */
 /* Display tabs: Wallpaper, AI usage, Sidebar, Notifications and UI. Rendered with the tab
    context of settings.js: { getConfig, defaults, api, rerender, rerenderSoon }. */
 
@@ -49,15 +49,10 @@ function buildResolutionSelect(config, rerender) {
   );
 }
 
-function buildWallpaperBackgroundFields(config, rerender) {
+function buildWallpaperBackgroundFields(config, ctx) {
   const fields = [
-    createField(
-      t('settings.photo_backgrounds'),
-      createToggle(config.wallpaper.use_backgrounds, (v) => {
-        config.wallpaper.use_backgrounds = v;
-      }),
-    ),
-    createField(t('settings.resolution'), buildResolutionSelect(config, rerender)),
+    buildBackgroundModeField(config, ctx),
+    createField(t('settings.resolution'), buildResolutionSelect(config, ctx.rerender)),
   ];
   if (config.wallpaper.resolution !== 'auto') {
     fields.push(
@@ -96,7 +91,7 @@ function renderWallpaper(ctx) {
   const config = ctx.getConfig();
   const group = createFieldGroup(t('settings.tabs.wallpaper'));
   group.append(...buildWallpaperBasicFields(config));
-  group.append(...buildWallpaperBackgroundFields(config, ctx.rerender));
+  group.append(...buildWallpaperBackgroundFields(config, ctx));
   return [group, buildPostitGroup(config)];
 }
 

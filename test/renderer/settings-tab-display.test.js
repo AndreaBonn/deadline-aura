@@ -28,7 +28,11 @@ beforeEach(() => {
     }`,
     win,
   );
-  for (const file of ['settings-fields.js', 'settings-tab-display.js']) {
+  for (const file of [
+    'settings-fields.js',
+    'settings-background-field.js',
+    'settings-tab-display.js',
+  ]) {
     vm.runInContext(fs.readFileSync(`renderer/${file}`, 'utf8'), win, {
       filename: require('node:path').resolve(`renderer/${file}`),
     });
@@ -71,7 +75,6 @@ describe('renderWallpaper', () => {
     const [wallpaper, postit] = render('renderWallpaper', config);
     setChecked(field(wallpaper, 'common.enabled').querySelector('input'), false);
     setChecked(field(wallpaper, 'settings.show_text').querySelector('input'), false);
-    setChecked(field(wallpaper, 'settings.photo_backgrounds').querySelector('input'), false);
     setValue(
       field(wallpaper, 'settings.min_score_delta').querySelector('input[type="number"]'),
       0.2,
@@ -81,10 +84,34 @@ describe('renderWallpaper', () => {
     expect(config.wallpaper).toMatchObject({
       enabled: false,
       show_text: false,
-      use_backgrounds: false,
       min_score_delta: 0.2,
       postit: { enabled: false, max_per_display: 7 },
     });
+  });
+
+  it('offers dynamic and gradient only, preselected from the config', () => {
+    const config = clone(DEFAULTS);
+    config.wallpaper.background_mode = 'gradient';
+    const [wallpaper] = render('renderWallpaper', config);
+    const select = field(wallpaper, 'settings.background_mode').querySelector('select');
+    expect([...select.options].map((o) => o.value)).toEqual(['dynamic', 'gradient']);
+    expect(select.value).toBe('gradient');
+  });
+
+  it('writes the chosen background mode and no use_backgrounds', () => {
+    const config = clone(DEFAULTS);
+    const [wallpaper] = render('renderWallpaper', config);
+    expect(field(wallpaper, 'settings.photo_backgrounds')).toBeUndefined();
+    setValue(field(wallpaper, 'settings.background_mode').querySelector('select'), 'gradient');
+    expect(config.wallpaper.background_mode).toBe('gradient');
+    expect(config.wallpaper).not.toHaveProperty('use_backgrounds');
+  });
+
+  it('keeps a stored custom mode untouched until the user picks another one', () => {
+    const config = clone(DEFAULTS);
+    config.wallpaper.background_mode = 'custom';
+    render('renderWallpaper', config);
+    expect(config.wallpaper.background_mode).toBe('custom');
   });
 
   it('hides the custom resolution field while the resolution is auto', () => {
