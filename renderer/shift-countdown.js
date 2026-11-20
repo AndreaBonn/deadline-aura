@@ -40,6 +40,12 @@ function shiftFormatMonthKey(date) {
   return `${y}-${mo}`;
 }
 
+function shiftToMinuteSlots(slots) {
+  return slots
+    .map((s) => ({ start: shiftParseTime(s.start), end: shiftParseTime(s.end) }))
+    .sort((a, b) => a.start - b.start);
+}
+
 function shiftGetSlotsForDate(date, config) {
   if (!config || !config.enabled) {
     return [];
@@ -57,9 +63,7 @@ function shiftGetSlotsForDate(date, config) {
     if (!daySlots || daySlots.length === 0) {
       return [];
     }
-    return daySlots
-      .map((s) => ({ start: shiftParseTime(s.start), end: shiftParseTime(s.end) }))
-      .sort((a, b) => a.start - b.start);
+    return shiftToMinuteSlots(daySlots);
   }
 
   const regular = config.regular;
@@ -72,9 +76,7 @@ function shiftGetSlotsForDate(date, config) {
   if (!regular.work_days?.includes(dayOfWeek)) {
     return [];
   }
-  return regular.slots
-    .map((s) => ({ start: shiftParseTime(s.start), end: shiftParseTime(s.end) }))
-    .sort((a, b) => a.start - b.start);
+  return shiftToMinuteSlots(regular.slots);
 }
 
 function shiftFindNextWorkDay(fromDate, config) {
@@ -99,6 +101,28 @@ function shiftFormatRemainingMs(ms) {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
+function shiftGetTodayStatus(todaySlots, currentMinutes, currentMs) {
+  for (const slot of todaySlots) {
+    if (currentMinutes >= slot.start && currentMinutes < slot.end) {
+      return {
+        working: true,
+        label: 'shift_ends',
+        remainingMs: slot.end * SHIFT_MS_PER_MINUTE - currentMs,
+      };
+    }
+  }
+  for (const slot of todaySlots) {
+    if (currentMinutes < slot.start) {
+      return {
+        working: false,
+        label: 'shift_starts',
+        remainingMs: slot.start * SHIFT_MS_PER_MINUTE - currentMs,
+      };
+    }
+  }
+  return { working: false, label: 'off', remainingMs: 0 };
+}
+
 function shiftComputeStatus(now, config) {
   if (!config || !config.enabled) {
     return { enabled: false, working: false, label: 'off', remainingMs: 0 };
@@ -109,30 +133,9 @@ function shiftComputeStatus(now, config) {
 
   const todaySlots = shiftGetSlotsForDate(now, config);
 
-  let working = false;
-  let remainingMs = 0;
-  let label = 'off';
-
-  if (todaySlots.length > 0) {
-    for (const slot of todaySlots) {
-      if (currentMinutes >= slot.start && currentMinutes < slot.end) {
-        working = true;
-        remainingMs = slot.end * SHIFT_MS_PER_MINUTE - currentMs;
-        label = 'shift_ends';
-        break;
-      }
-    }
-
-    if (!working) {
-      for (const slot of todaySlots) {
-        if (currentMinutes < slot.start) {
-          remainingMs = slot.start * SHIFT_MS_PER_MINUTE - currentMs;
-          label = 'shift_starts';
-          break;
-        }
-      }
-    }
-  }
+  const todayStatus = shiftGetTodayStatus(todaySlots, currentMinutes, currentMs);
+  const { working } = todayStatus;
+  let { label, remainingMs } = todayStatus;
 
   if (!working && label === 'off') {
     const nextDay = shiftFindNextWorkDay(now, config);
@@ -188,6 +191,7 @@ if (typeof module !== 'undefined') {
     shiftParseTime,
     shiftFormatDateKey,
     shiftFormatMonthKey,
+    shiftToMinuteSlots,
     shiftGetSlotsForDate,
     shiftFindNextWorkDay,
     shiftFormatRemainingMs,

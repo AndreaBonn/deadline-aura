@@ -93,7 +93,6 @@ module.exports = [
       'renderer/meeting-dock.js',
       'renderer/overlay.js',
       'renderer/settings-sections.js',
-      'renderer/shift-countdown.js',
       'renderer/sidebar-onboarding.js',
       'renderer/sidebar-ui.js',
     ],
