@@ -321,7 +321,8 @@ describe('sync-daemon — sync()', () => {
     expect(scoreSpy).not.toHaveBeenCalled();
   });
 
-  it('rescores over an unreadable cache row once the recalc window has passed', async () => {
+  it('rescores over an unreadable cache row and warns about it', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const event = {
       id: 'gcal_broken_cache',
       source: 'gcal',
@@ -337,7 +338,7 @@ describe('sync-daemon — sync()', () => {
     db.upsertTask(event);
     db.getDb()
       .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
-      .run(computeEventsHash([event]), '{not json', Date.now() - 7 * 3600000);
+      .run(computeEventsHash([event]), '{not json', Date.now());
     vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([event]);
     vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
     const scoreSpy = vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue(null);
@@ -350,6 +351,7 @@ describe('sync-daemon — sync()', () => {
 
     expect(scoreSpy).toHaveBeenCalledTimes(1);
     expect(result.errors).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[ai] unreadable cache row'));
   });
 
   it('rescores when the cached result does not record which tasks it scored', async () => {

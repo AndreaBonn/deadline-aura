@@ -167,7 +167,12 @@ async function runAiScoring(tasks, config, errors) {
 
     const cachedResult = cached && !needsRecalc ? readCachedResult(cached) : null;
     if (cachedResult && Array.isArray(cachedResult.task_ids)) {
-      applyAiScores(cachedResult, tasksScoredBy(cachedResult.task_ids, activeTasks));
+      const scoredTasks = tasksScoredBy(cachedResult.task_ids, activeTasks);
+      const stillActive = scoredTasks.filter(Boolean).length;
+      console.log(
+        `[ai] cache hit: ${stillActive} of ${scoredTasks.length} scored tasks still active`,
+      );
+      applyAiScores(cachedResult, scoredTasks);
       return;
     }
 
@@ -190,6 +195,8 @@ function readCachedResult(cached) {
   try {
     return JSON.parse(cached.response_json);
   } catch {
+    // The parse error quotes the row, which holds task titles: log the fact only.
+    console.warn('[ai] unreadable cache row, rescoring');
     return null;
   }
 }

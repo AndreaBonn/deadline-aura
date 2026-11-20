@@ -248,6 +248,7 @@ describe('sync-daemon — cached AI scores follow the tasks they were computed f
   });
 
   it('skips a cached score whose task is no longer active and keeps the others aligned', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const review = gcalEvent('gcal_review', 'Client review', 2);
     vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([review]);
     vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
@@ -276,5 +277,6 @@ describe('sync-daemon — cached AI scores follow the tasks they were computed f
 
     expect(aiScorer.scoreTasks).toHaveBeenCalledTimes(1);
     expect(aiStressOf('gcal_review')).toBe(8);
+    expect(logSpy).toHaveBeenCalledWith('[ai] cache hit: 1 of 2 scored tasks still active');
   });
 });
