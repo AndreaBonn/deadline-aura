@@ -208,3 +208,37 @@ describe('update cycle: re-entrancy and errors', () => {
     await expect(run()).resolves.toBeNull();
   });
 });
+
+describe('update cycle: forced call during a running cycle', () => {
+  function blockedCycle() {
+    const ctx = setup();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    ctx.deps.wallpaperChanger.update.mockImplementationOnce(() => gate);
+    return { ...ctx, release };
+  }
+
+  it('reruns once with force after the running cycle ends', async () => {
+    const { run, deps, release } = blockedCycle();
+    const first = run();
+    await run({ force: true });
+    await run({ force: true });
+    expect(deps.wallpaperChanger.update).toHaveBeenCalledTimes(1);
+    release();
+    await first;
+    await vi.waitFor(() => expect(deps.wallpaperChanger.update).toHaveBeenCalledTimes(2));
+    expect(deps.wallpaperChanger.update.mock.calls[1][1].force).toBe(true);
+  });
+
+  it('does not rerun when the call during the cycle was not forced', async () => {
+    const { run, deps, release } = blockedCycle();
+    const first = run();
+    await run();
+    release();
+    await first;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(deps.wallpaperChanger.update).toHaveBeenCalledTimes(1);
+  });
+});

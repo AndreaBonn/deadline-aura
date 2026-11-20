@@ -61,7 +61,8 @@ async function runCycle(deps, force) {
 
 /**
  * Build the update cycle: recompute the score and redraw wallpaper, strips,
- * meeting docks and sidebar. Re-entrant calls are ignored while one is running;
+ * meeting docks and sidebar. Re-entrant calls are ignored while one is running, except a forced one,
+ * which is remembered and replayed once when the cycle ends;
  * a failure is logged and yields null.
  *
  * @param {object} deps - Injected collaborators (config accessor, engine, stores,
@@ -70,8 +71,10 @@ async function runCycle(deps, force) {
  */
 function createUpdateCycle(deps) {
   let running = false;
+  let pendingForce = false;
   return async function runUpdateCycle({ force = false } = {}) {
     if (running) {
+      pendingForce = pendingForce || force;
       return undefined;
     }
     running = true;
@@ -86,6 +89,10 @@ function createUpdateCycle(deps) {
       return null;
     } finally {
       running = false;
+      if (pendingForce) {
+        pendingForce = false;
+        void runUpdateCycle({ force: true });
+      }
     }
   };
 }
