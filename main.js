@@ -242,6 +242,7 @@ function registerAppIpc() {
     },
     scheduleDataSync: dataSync.scheduleDataSync,
     notifySidebar: (next) => sidebar.send('config-changed', next),
+    refresh: (options) => runUpdateCycle(options),
   });
   meetingDocks.registerIpc(ipcMain);
   overlay.registerIpc(ipcMain);

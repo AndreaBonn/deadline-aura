@@ -19,12 +19,13 @@ function setupApplier() {
     setConfig: (config) => calls.push(['set', config]),
     scheduleDataSync: () => calls.push(['schedule']),
     notifySidebar: (config) => calls.push(['notify', config]),
+    refresh: (options) => calls.push(['refresh', options]),
   });
   return { applier, calls };
 }
 
 describe('createConfigApplier', () => {
-  it('applySettings saves, reloads, publishes, reschedules the sync, then notifies', () => {
+  it('applySettings saves, reloads, publishes, reschedules the sync, notifies, then forces a redraw', () => {
     const { applier, calls } = setupApplier();
     applier.applySettings({ raw: 1 });
     expect(calls).toEqual([
@@ -33,10 +34,11 @@ describe('createConfigApplier', () => {
       ['set', { loaded: true }],
       ['schedule'],
       ['notify', { loaded: true }],
+      ['refresh', { force: true }],
     ]);
   });
 
-  it('applyFlyby saves, reloads, publishes and notifies, without touching the sync schedule', () => {
+  it('applyFlyby saves, reloads, publishes and notifies, without touching the sync schedule or redrawing', () => {
     const { applier, calls } = setupApplier();
     applier.applyFlyby({ raw: 2 });
     expect(calls).toEqual([
@@ -57,6 +59,7 @@ describe('createConfigApplier', () => {
       setConfig: () => calls.push('set'),
       scheduleDataSync: () => calls.push('schedule'),
       notifySidebar: () => calls.push('notify'),
+      refresh: () => calls.push('refresh'),
     });
     expect(() => applier[method]({})).toThrow('disk');
     expect(calls).toEqual([]);
@@ -96,6 +99,7 @@ function setupWiring(sidebarState = 'live') {
     },
     scheduleDataSync: () => calls.push(['scheduleDataSync', state.config.language]),
     notifySidebar: (config) => sidebar.send('config-changed', config),
+    refresh: (options) => calls.push(['refresh', options]),
   });
   const handlers = {};
   registerIpc(
@@ -132,7 +136,12 @@ describe('config IPC wiring against the real sidebar send guard', () => {
         globalThis.structuredClone(DEFAULTS),
       );
       expect(reply).toEqual({ ok: true });
-      expect(calls).toEqual(['saveConfig', 'loadConfig', ['scheduleDataSync', 'en']]);
+      expect(calls).toEqual([
+        'saveConfig',
+        'loadConfig',
+        ['scheduleDataSync', 'en'],
+        ['refresh', { force: true }],
+      ]);
       const expectedSends = sidebarState === 'live' ? 1 : 0;
       expect(sidebarSends()).toHaveLength(expectedSends);
       if (expectedSends) {
