@@ -68,12 +68,16 @@ function createBackgroundPicker(config, api) {
   statusEl.setAttribute('aria-live', 'polite');
   const errorEl = document.createElement('div');
   errorEl.id = BACKGROUND_ERROR_ID;
+  errorEl.setAttribute('role', 'alert');
   errorEl.className = 'background-error ai-capture-message ai-capture-message--error';
   button.addEventListener('click', () =>
     pickBackgroundImage(config, api, { button, statusEl, errorEl }),
   );
   box.append(button, statusEl, errorEl);
-  api.backgroundStatus().then((status) => showBackgroundStatus(statusEl, status));
+  api
+    .backgroundStatus()
+    .then((status) => showBackgroundStatus(statusEl, status))
+    .catch(() => showBackgroundStatus(statusEl, { state: 'unreadable' }));
   return box;
 }
 

@@ -212,6 +212,23 @@ describe('renderWallpaper', () => {
       expect(config.wallpaper.custom_background).toBe(before);
     });
 
+    it('marks the error element as an alert', async () => {
+      setApi({ state: 'none', file: null });
+      const [wallpaper] = render('renderWallpaper', customConfig());
+      expect(errorEl(wallpaper).getAttribute('role')).toBe('alert');
+    });
+
+    it('shows the unreadable status when the status request rejects', async () => {
+      win.api = {
+        backgroundStatus: async () => {
+          throw new Error('ipc down');
+        },
+      };
+      const [wallpaper] = render('renderWallpaper', customConfig());
+      await flush();
+      expect(statusText(wallpaper)).toContain('settings.background_status_unreadable');
+    });
+
     it('shows nothing when the dialog is cancelled', async () => {
       setApi({ state: 'none', file: null }, async () => ({ ok: false, error: 'CANCELLED' }));
       const [wallpaper] = render('renderWallpaper', customConfig());
