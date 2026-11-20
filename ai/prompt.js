@@ -32,65 +32,89 @@ function sanitizeField(value, maxLength) {
     .slice(0, maxLength);
 }
 
-function buildScoringPrompt(events, language = 'it') {
-  const outputLanguage = language === 'en' ? 'English' : 'Italian';
-  const now = new Date().toISOString();
+function describeRawFlags(raw) {
+  const parts = [];
+  if (raw.eventType && raw.eventType !== 'default') {
+    parts.push(`eventType: ${raw.eventType}`);
+  }
+  if (raw.transparency) {
+    parts.push(`transparency: ${raw.transparency}`);
+  }
+  const isAllDay = !!(raw.start && !raw.start.dateTime && raw.start.date);
+  if (isAllDay) {
+    parts.push(`all_day: true`);
+  }
+  return parts;
+}
 
+/**
+ * Describe the optional fields of an event's raw_json as prompt parts.
+ * An unparseable raw_json yields no parts.
+ */
+function describeRawEvent(rawJson) {
+  const parts = [];
+  try {
+    const raw = JSON.parse(rawJson);
+    parts.push(...describeRawFlags(raw));
+    if (raw.description) {
+      parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
+    }
+    if (raw.location) {
+      parts.push(`location: ${sanitizeField(raw.location, MAX_FIELD_LENGTH)}`);
+    }
+    if (raw.start) {
+      parts.push(`start: ${raw.start.dateTime || raw.start.date}`);
+    }
+    if (raw.end) {
+      parts.push(`end: ${raw.end.dateTime || raw.end.date}`);
+    }
+    if (raw.organizer) {
+      const org = raw.organizer.email || raw.organizer.displayName;
+      parts.push(`organizer: ${sanitizeField(org, MAX_FIELD_LENGTH)}`);
+    }
+    if (raw.attendees) {
+      parts.push(`attendees: ${raw.attendees.length}`);
+    }
+  } catch {
+    // raw_json not parseable, skip extra fields
+  }
+  return parts;
+}
+
+function formatEventLine(event, index) {
+  const title = sanitizeField(event.title, MAX_TITLE_LENGTH);
+  const parts = [`${index + 1}. "${title}"`];
+  if (event.due_at) {
+    parts.push(`due: ${new Date(event.due_at).toISOString()}`);
+  }
+  if (event.source) {
+    parts.push(`source: ${event.source}`);
+  }
+  if (event.raw_json) {
+    parts.push(...describeRawEvent(event.raw_json));
+  }
+  return parts.join(' | ');
+}
+
+function splitBySchedule(events) {
   const calendarEvents = [];
   const backlogTasks = [];
-
   events.forEach((e, i) => {
-    const title = sanitizeField(e.title, MAX_TITLE_LENGTH);
-    const parts = [`${i + 1}. "${title}"`];
-    if (e.due_at) {
-      parts.push(`due: ${new Date(e.due_at).toISOString()}`);
-    }
-    if (e.source) {
-      parts.push(`source: ${e.source}`);
-    }
-    if (e.raw_json) {
-      try {
-        const raw = JSON.parse(e.raw_json);
-        if (raw.eventType && raw.eventType !== 'default') {
-          parts.push(`eventType: ${raw.eventType}`);
-        }
-        if (raw.transparency) {
-          parts.push(`transparency: ${raw.transparency}`);
-        }
-        const isAllDay = !!(raw.start && !raw.start.dateTime && raw.start.date);
-        if (isAllDay) {
-          parts.push(`all_day: true`);
-        }
-        if (raw.description) {
-          parts.push(`desc: ${sanitizeField(raw.description, MAX_DESCRIPTION_LENGTH)}`);
-        }
-        if (raw.location) {
-          parts.push(`location: ${sanitizeField(raw.location, MAX_FIELD_LENGTH)}`);
-        }
-        if (raw.start) {
-          parts.push(`start: ${raw.start.dateTime || raw.start.date}`);
-        }
-        if (raw.end) {
-          parts.push(`end: ${raw.end.dateTime || raw.end.date}`);
-        }
-        if (raw.organizer) {
-          const org = raw.organizer.email || raw.organizer.displayName;
-          parts.push(`organizer: ${sanitizeField(org, MAX_FIELD_LENGTH)}`);
-        }
-        if (raw.attendees) {
-          parts.push(`attendees: ${raw.attendees.length}`);
-        }
-      } catch {
-        // raw_json not parseable, skip extra fields
-      }
-    }
-    const line = parts.join(' | ');
+    const line = formatEventLine(e, i);
     if (isCalendarSource(e.source)) {
       calendarEvents.push(line);
     } else {
       backlogTasks.push(line);
     }
   });
+  return { calendarEvents, backlogTasks };
+}
+
+function buildScoringPrompt(events, language = 'it') {
+  const outputLanguage = language === 'en' ? 'English' : 'Italian';
+  const now = new Date().toISOString();
+
+  const { calendarEvents, backlogTasks } = splitBySchedule(events);
 
   const scheduleSections = [];
   if (calendarEvents.length > 0) {
