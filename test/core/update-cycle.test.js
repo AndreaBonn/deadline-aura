@@ -64,6 +64,23 @@ describe('update cycle: full run', () => {
       electronScreen: deps.screen,
       calendarEvents: ['event'],
       usageRows: ['usage-row'],
+      background: { mode: undefined, customFile: undefined },
+    });
+  });
+
+  it('passes the configured background mode and custom file to the wallpaper', async () => {
+    const { run, deps } = setup({
+      wallpaper: {
+        enabled: true,
+        show_ai_usage: false,
+        background_mode: 'custom',
+        custom_background: 'custom-background.jpg',
+      },
+    });
+    await run();
+    expect(deps.wallpaperChanger.update.mock.calls[0][1].background).toEqual({
+      mode: 'custom',
+      customFile: 'custom-background.jpg',
     });
   });
 

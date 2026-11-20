@@ -17,13 +17,15 @@ function collectUsageRows(deps, wallpaper) {
 
 async function updateWallpaper(deps, { engineResult, palette, force }) {
   const calendarEvents = deps.db.getUpcomingCalendarEvents(ONE_DAY_MS);
-  const usageRows = collectUsageRows(deps, deps.getConfig().wallpaper);
+  const { wallpaper } = deps.getConfig();
+  const usageRows = collectUsageRows(deps, wallpaper);
   await deps.wallpaperChanger.update(palette, {
     engineResult,
     force,
     electronScreen: deps.screen,
     calendarEvents,
     usageRows,
+    background: { mode: wallpaper.background_mode, customFile: wallpaper.custom_background },
   });
 }
 

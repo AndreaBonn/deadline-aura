@@ -8,6 +8,7 @@ const wallpaperRenderer = require('./wallpaper-renderer');
 const { detectDisplays } = require('./display-manager');
 const pinnedQueries = require('../store/pinned-queries');
 const { usageSignature } = require('./ai-usage');
+const { CUSTOM_BACKGROUND_FILES } = require('../config/schema');
 
 const DATA_DIR = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
 const WALLPAPER_PATH = path.join(DATA_DIR, 'wallpaper.png');
@@ -217,6 +218,18 @@ function gatherRenderInputs(engineResult, electronScreen) {
 }
 
 /**
+ * Build the renderer's background request. The custom file name comes from
+ * the config, so it is only trusted when it is one of the known names.
+ *
+ * @param {{mode?: string, customFile?: string|null}} background
+ * @returns {{mode: string, customPath: string|null}}
+ */
+function resolveBackground({ mode = 'dynamic', customFile = null } = {}) {
+  const allowed = CUSTOM_BACKGROUND_FILES.includes(customFile);
+  return { mode, customPath: allowed ? path.join(DATA_DIR, customFile) : null };
+}
+
+/**
  * Apply the freshly rendered wallpaper to the desktop, clean up stale PNGs,
  * and persist the module-level render state.
  *
@@ -246,6 +259,7 @@ async function update(
     calendarEvents = null,
     usageRows = [],
     nowMs = Date.now(),
+    background = {},
   } = {},
 ) {
   const decision = decideRerender(palette, { force, usageRows, nowMs });
@@ -253,19 +267,15 @@ async function update(
     return { changed: false, reason: decision.reason };
   }
 
-  const { displays, score, pinnedByDisplay, allTasks } = gatherRenderInputs(
-    engineResult,
-    electronScreen,
-  );
+  const { allTasks, ...renderInputs } = gatherRenderInputs(engineResult, electronScreen);
 
   const timestampedPath = await renderAndWriteWallpaper({
-    displays,
+    ...renderInputs,
     palette,
-    score,
-    pinnedByDisplay,
     calendarEvents: calendarEvents || allTasks,
     usageRows,
     nowMs,
+    background: resolveBackground(background),
   });
 
   return applyRenderResult(timestampedPath, palette.hsl.h, decision.nextSignature, nowMs);

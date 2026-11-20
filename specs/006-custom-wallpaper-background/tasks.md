@@ -34,7 +34,7 @@ Integrazioni dal security-reviewer (prevalgono sul testo delle righe della tabel
 - [x] T001 Config: background_mode + custom_background, migrazione di use_backgrounds
 - [x] T002 Contratto planBackground (logica pura)
 - [x] T003 Renderer: loadBackground con fallback e velo neutro | dip: T002
-- [ ] T004 Changer e update-cycle: customPath, guardia sul cleanup | dip: T001,T002
+- [x] T004 Changer e update-cycle: customPath, guardia sul cleanup | dip: T001,T002
 - [x] T005 applySettings forza il ridisegno
 - [ ] T006 Import: header (image-size), magic bytes, copia atomica | dip: T001
 - [ ] T007 IPC pick-background / background-status + preload | dip: T005,T006

@@ -386,3 +386,59 @@ describe('wallpaper-changer — buildPinnedByDisplay (re-exported)', () => {
     expect(buildPinnedByDisplay([], displays)).toEqual({});
   });
 });
+
+describe('wallpaper-changer - custom background', () => {
+  const fakePalette = { hsl: { h: 20, s: 50, l: 8 } };
+  const dataDir = path.join(os.homedir(), '.local', 'share', 'deadlineaura');
+
+  beforeEach(() => {
+    vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
+  });
+
+  afterEach(() => {
+    resetState();
+    vi.restoreAllMocks();
+  });
+
+  it('resolves customPath inside the data dir for an allowed file name', async () => {
+    await update(fakePalette, {
+      force: true,
+      background: { mode: 'custom', customFile: 'custom-background.jpg' },
+    });
+    expect(renderSpy.mock.calls[0][0].background).toEqual({
+      mode: 'custom',
+      customPath: path.join(dataDir, 'custom-background.jpg'),
+    });
+  });
+
+  it.each(['../x', '/etc/passwd', 'other.png', null, undefined])(
+    'refuses customFile %s and passes customPath null',
+    async (customFile) => {
+      await update(fakePalette, { force: true, background: { mode: 'custom', customFile } });
+      expect(renderSpy.mock.calls[0][0].background).toEqual({ mode: 'custom', customPath: null });
+    },
+  );
+
+  it('defaults to dynamic mode without a custom path when background is omitted', async () => {
+    await update(fakePalette, { force: true });
+    expect(renderSpy.mock.calls[0][0].background).toEqual({ mode: 'dynamic', customPath: null });
+  });
+
+  it('cleanup keeps the custom background and its tmp file but removes stale wallpapers', async () => {
+    // Guard test: green before the feature too, it pins the cleanup filter.
+    fs.mkdirSync(dataDir, { recursive: true });
+    const keep = ['custom-background.jpg', 'custom-background.jpg.tmp'];
+    const stale = path.join(dataDir, 'wallpaper-123.png');
+    for (const name of keep) {
+      fs.writeFileSync(path.join(dataDir, name), 'x');
+    }
+    fs.writeFileSync(stale, 'x');
+
+    await update(fakePalette, { force: true });
+
+    expect(fs.existsSync(stale)).toBe(false);
+    for (const name of keep) {
+      expect(fs.existsSync(path.join(dataDir, name))).toBe(true);
+    }
+  });
+});
