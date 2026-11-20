@@ -214,7 +214,9 @@ describe('live timer', () => {
 describe('timer restored from localStorage', () => {
   const stored = {
     taskId: 't1',
-    startTime: '2026-10-19T09:00:00.000Z',
+    // Relative to the real clock: a fixed date made the elapsed hours outgrow
+    // two digits a few days after it was written.
+    startTime: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
     calendarId: 'work',
     eventId: 'event-1',
     summary: 'Write report',
