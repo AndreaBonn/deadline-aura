@@ -213,7 +213,7 @@ function wallpaperIpcDependencies() {
     showOpenDialog: (options) => dialog.showOpenDialog(settings.getWindow(), options),
     importCustomBackground,
     describeCustomBackground,
-    dataDir: path.join(os.homedir(), '.local', 'share', 'deadlineaura'),
+    dataDir: wallpaperChanger.DATA_DIR,
     loadImage,
   };
 }

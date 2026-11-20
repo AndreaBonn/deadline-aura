@@ -290,4 +290,5 @@ module.exports = {
   shouldRerender,
   resetState,
   WALLPAPER_PATH,
+  DATA_DIR,
 };
