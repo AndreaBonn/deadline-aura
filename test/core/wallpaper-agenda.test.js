@@ -2,6 +2,7 @@
 
 const { createCanvas } = require('canvas');
 const { filterUpcomingEvents, drawDailyAgenda } = require('../../core/wallpaper-agenda');
+const { setLanguage, getLanguage } = require('../../i18n');
 
 const HOUR_MS = 3600 * 1000;
 const REGION = { x: 0, y: 0, width: 1280, height: 720 };
@@ -64,6 +65,23 @@ describe('wallpaper-agenda — drawDailyAgenda', () => {
       expect(texts.slice(-2)).toEqual(['JIRA', 'External review']);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ['it', 'PERSONALE'],
+    ['en', 'PERSONAL'],
+  ])('labels a personal (local) task with its own badge in %s', (language, badge) => {
+    const previous = getLanguage();
+    setLanguage(language);
+    try {
+      const personal = { ...event('Pay rent', HOUR_MS), source: 'local' };
+
+      const texts = drawnTexts([personal]);
+
+      expect(texts.slice(-2)).toEqual([badge, 'Pay rent']);
+    } finally {
+      setLanguage(previous);
     }
   });
 

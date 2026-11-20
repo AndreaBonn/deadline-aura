@@ -344,6 +344,7 @@
     "tasks_badge": "TASKS",
     "jira_badge": "JIRA",
     "outlook_badge": "OUTLOOK",
+    "local_badge": "PERSONAL",
     "ai_usage": {
       "claude": "CLAUDE",
       "codex": "CODEX",
