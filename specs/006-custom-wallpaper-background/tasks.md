@@ -32,7 +32,7 @@ Integrazioni dal security-reviewer (prevalgono sul testo delle righe della tabel
 ## Checklist (fonte di verità dell'avanzamento)
 
 - [x] T001 Config: background_mode + custom_background, migrazione di use_backgrounds
-- [ ] T002 Contratto planBackground (logica pura)
+- [x] T002 Contratto planBackground (logica pura)
 - [ ] T003 Renderer: loadBackground con fallback e velo neutro | dip: T002
 - [ ] T004 Changer e update-cycle: customPath, guardia sul cleanup | dip: T001,T002
 - [ ] T005 applySettings forza il ridisegno
