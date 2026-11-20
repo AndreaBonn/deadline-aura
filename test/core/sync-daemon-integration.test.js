@@ -299,7 +299,11 @@ describe('sync-daemon — sync()', () => {
     db.upsertTask(event);
 
     const hash = computeEventsHash([event]);
-    const cachedResponse = JSON.stringify({ per_event: [], global_stress: 5 });
+    const cachedResponse = JSON.stringify({
+      per_event: [],
+      global_stress: 5,
+      task_ids: ['gcal_cached'],
+    });
     db.setAiCache(hash, cachedResponse);
     db.saveGlobalScore(0.5);
 
@@ -315,6 +319,65 @@ describe('sync-daemon — sync()', () => {
     await sync(configWithAi);
 
     expect(scoreSpy).not.toHaveBeenCalled();
+  });
+
+  it('rescores over an unreadable cache row once the recalc window has passed', async () => {
+    const event = {
+      id: 'gcal_broken_cache',
+      source: 'gcal',
+      title: 'Broken Cache Task',
+      due_at: Date.now() + 3600000,
+      start_at: null,
+      priority: 3,
+      is_done: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+    db.upsertTask(event);
+    db.getDb()
+      .prepare('INSERT INTO ai_cache (events_hash, response_json, computed_at) VALUES (?, ?, ?)')
+      .run(computeEventsHash([event]), '{not json', Date.now() - 7 * 3600000);
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([event]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    const scoreSpy = vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue(null);
+
+    const result = await sync({
+      ...BASE_CONFIG,
+      ai: { enabled: true, recalc_hours: 6 },
+      sync: { lookahead_hours: 72 },
+    });
+
+    expect(scoreSpy).toHaveBeenCalledTimes(1);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rescores when the cached result does not record which tasks it scored', async () => {
+    const event = {
+      id: 'gcal_legacy_cache',
+      source: 'gcal',
+      title: 'Legacy Cache Task',
+      due_at: Date.now() + 3600000,
+      start_at: null,
+      priority: 3,
+      is_done: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+    db.upsertTask(event);
+    db.setAiCache(computeEventsHash([event]), JSON.stringify({ per_event: [], global_stress: 5 }));
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([event]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    const scoreSpy = vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue(null);
+
+    await sync({
+      ...BASE_CONFIG,
+      ai: { enabled: true, recalc_hours: 6 },
+      sync: { lookahead_hours: 72 },
+    });
+
+    expect(scoreSpy).toHaveBeenCalledTimes(1);
   });
 
   it('captures AI error in errors array without throwing', async () => {

@@ -144,20 +144,39 @@ async function runAiScoring(tasks, config, errors) {
 
     const activeTasks = db.getActiveTasks(config.sync.lookahead_hours * 3600000);
 
-    if (cached && !needsRecalc) {
-      applyAiScores(JSON.parse(cached.response_json), activeTasks);
+    const cachedResult = cached && !needsRecalc ? readCachedResult(cached) : null;
+    if (cachedResult && Array.isArray(cachedResult.task_ids)) {
+      applyAiScores(cachedResult, tasksScoredBy(cachedResult.task_ids, activeTasks));
       return;
     }
 
     const result = await aiScorer.scoreTasks(activeTasks, config);
 
     if (result) {
-      db.setAiCache(currentHash, JSON.stringify(result));
+      // per_event ids index the list that was scored: keep its task ids so a later cache hit
+      // still lands on the same tasks after the active list has changed.
+      const taskIds = activeTasks.map((task) => task.id);
+      db.setAiCache(currentHash, JSON.stringify({ ...result, task_ids: taskIds }));
       applyAiScores(result, activeTasks);
     }
   } catch (err) {
     errors.push({ source: 'ai', message: err.message });
   }
+}
+
+// An unreadable cache row is a miss: scoring again rewrites it.
+function readCachedResult(cached) {
+  try {
+    return JSON.parse(cached.response_json);
+  } catch {
+    return null;
+  }
+}
+
+// Rebuild the scored list in its original order; a task no longer active leaves a gap.
+function tasksScoredBy(taskIds, activeTasks) {
+  const activeById = new Map(activeTasks.map((task) => [task.id, task]));
+  return taskIds.map((id) => activeById.get(id) || null);
 }
 
 function applyAiScores(aiResult, activeTasks) {
@@ -169,7 +188,7 @@ function applyAiScores(aiResult, activeTasks) {
     const idx = event.id - 1; // AI uses 1-based index from prompt
     const task = activeTasks[idx];
     if (!task) {
-      console.warn(`[ai] per_event id=${event.id} has no matching task (index out of bounds)`);
+      console.warn(`[ai] per_event id=${event.id} has no matching active task`);
       continue;
     }
     db.updateAiScores(task.id, {

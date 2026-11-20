@@ -192,3 +192,89 @@ describe('sync-daemon — markStale during sync', () => {
     expect(newTask.is_stale).toBe(0);
   });
 });
+
+describe('sync-daemon — cached AI scores follow the tasks they were computed for', () => {
+  function gcalEvent(id, title, hoursAhead) {
+    return {
+      id,
+      source: 'gcal',
+      title,
+      due_at: Date.now() + hoursAhead * 3600000,
+      start_at: null,
+      priority: 3,
+      is_done: 0,
+      web_url: null,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    };
+  }
+
+  function aiStressOf(id) {
+    return db.getDb().prepare('SELECT ai_stress FROM tasks WHERE id = ?').get(id).ai_stress;
+  }
+
+  it('applies a cache hit by task id when a local task joined the active list', async () => {
+    const review = gcalEvent('gcal_review', 'Client review', 2);
+    const lunch = gcalEvent('gcal_lunch', 'Lunch', 4);
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([review, lunch]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue({
+      global_stress: 6,
+      per_event: [
+        { id: 1, stress: 9, category: 'work-critical', reasoning: 'review' },
+        { id: 2, stress: 2, category: 'personal', reasoning: 'lunch' },
+      ],
+    });
+    await sync(BASE_CONFIG);
+    // A local task sorts before calendar events in getActiveTasks, shifting every index.
+    db.upsertTask({
+      id: 'local_note',
+      source: 'local',
+      title: 'Write notes',
+      due_at: Date.now() + 3600000,
+      priority: 3,
+      is_done: 0,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    });
+    db.getDb().prepare('UPDATE tasks SET ai_stress = NULL').run();
+
+    await sync(BASE_CONFIG);
+
+    expect(aiScorer.scoreTasks).toHaveBeenCalledTimes(1);
+    expect([aiStressOf('gcal_review'), aiStressOf('gcal_lunch'), aiStressOf('local_note')]).toEqual(
+      [9, 2, null],
+    );
+  });
+
+  it('skips a cached score whose task is no longer active and keeps the others aligned', async () => {
+    const review = gcalEvent('gcal_review', 'Client review', 2);
+    vi.spyOn(gcal, 'fetchEvents').mockResolvedValue([review]);
+    vi.spyOn(jira, 'fetchIssues').mockResolvedValue([]);
+    db.upsertTask({
+      id: 'local_done_later',
+      source: 'local',
+      title: 'Pay invoice',
+      due_at: Date.now() + 3600000,
+      priority: 3,
+      is_done: 0,
+      raw_json: '{}',
+      synced_at: Date.now(),
+    });
+    vi.spyOn(aiScorer, 'scoreTasks').mockResolvedValue({
+      global_stress: 4,
+      per_event: [
+        { id: 1, stress: 3, category: 'admin', reasoning: 'invoice' },
+        { id: 2, stress: 8, category: 'work-critical', reasoning: 'review' },
+      ],
+    });
+    await sync(BASE_CONFIG);
+    db.deleteTask('local_done_later');
+    db.getDb().prepare('UPDATE tasks SET ai_stress = NULL').run();
+
+    await sync(BASE_CONFIG);
+
+    expect(aiScorer.scoreTasks).toHaveBeenCalledTimes(1);
+    expect(aiStressOf('gcal_review')).toBe(8);
+  });
+});
