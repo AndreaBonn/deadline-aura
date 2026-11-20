@@ -111,3 +111,32 @@ describe('settings page: start-up when the IPC calls reject', () => {
     expect(log).not.toHaveBeenCalled();
   });
 });
+
+describe('settings page: what the save state machine reports', () => {
+  it('an edit made while the save is in flight stays unsaved', async () => {
+    let finish;
+    await loadDirtyPage({ saveConfig: () => new Promise((resolve) => (finish = resolve)) });
+    await page.click($('#btnSave'));
+
+    await page.edit(widthInput(), '320');
+    finish({ ok: true });
+    await page.settle();
+
+    expect(page.bridge.callsTo('saveConfig')[0][0].sidebar.width).toBe(300);
+    expect(dirtyShown()).toBe(true);
+  });
+
+  it('the timeout of an earlier "saved" message does not wipe a later error', async () => {
+    await loadDirtyPage({ saveConfig: { ok: true } });
+    await page.click($('#btnSave'));
+    page.bridge.answer('saveConfig', () => {
+      throw new Error('ipc down');
+    });
+    await page.edit(widthInput(), '320');
+    await page.click($('#btnSave'));
+
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 2100));
+
+    expect(feedback().textContent).toBe(S.action_failed);
+  });
+});

@@ -199,3 +199,39 @@ describe('jira:verify', () => {
     );
   });
 });
+
+describe('saving keeps the fields other windows change while Settings is open', () => {
+  function openSettingsThenChangeElsewhere() {
+    const { handlers, replaceConfig, deps } = setup();
+    const snapshot = handlers['settings:get-config']();
+    const live = globalThis.structuredClone(DEFAULTS);
+    live.meeting_flyby = { ...live.meeting_flyby, enabled: false, snoozed_until: 1893456000000 };
+    live.sources.google_calendar.default_log_calendar = 'work';
+    replaceConfig(live);
+    return { handlers, deps, snapshot };
+  }
+
+  it('the cat-menu snooze and the calendar remembered by the timer survive a save', () => {
+    const { handlers, deps, snapshot } = openSettingsThenChangeElsewhere();
+    snapshot.language = 'en';
+
+    expect(handlers['settings:save-config'](snapshot)).toEqual({ ok: true });
+
+    const saved = deps.applyConfig.mock.calls[0][0];
+    expect(saved.language).toBe('en');
+    expect(saved.meeting_flyby).toMatchObject({ enabled: false, snoozed_until: 1893456000000 });
+    expect(saved.sources.google_calendar.default_log_calendar).toBe('work');
+  });
+
+  it('does not invent a flyby block the live config does not have', () => {
+    const { handlers, deps, replaceConfig } = setup();
+    const snapshot = handlers['settings:get-config']();
+    const live = globalThis.structuredClone(DEFAULTS);
+    delete live.meeting_flyby;
+    replaceConfig(live);
+
+    expect(handlers['settings:save-config'](snapshot)).toEqual({ ok: true });
+
+    expect(deps.applyConfig.mock.calls[0][0]).not.toHaveProperty('meeting_flyby');
+  });
+});

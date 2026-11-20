@@ -15,6 +15,8 @@ const feedback = document.getElementById('saveFeedback');
 const dirtyIndicator = document.getElementById('dirtyIndicator');
 const unsavedDialog = document.getElementById('unsavedDialog');
 const FEEDBACK_MS = 2000;
+// Pending clear of the "saved" message: a later message cancels it, so it cannot wipe an error.
+let feedbackTimeout = null;
 
 // Tabs fill in missing config blocks when they render. Until the user edits something,
 // every render refreshes the saved snapshot; after that, only the filled-in keys are
@@ -93,9 +95,9 @@ document.getElementById('settingsNav').addEventListener('click', (e) => {
 });
 
 // A rejected IPC call is not a validation answer: it carries no issues to point at.
-async function requestSave() {
+async function requestSave(sent) {
   try {
-    return await settingsApi.saveConfig(config);
+    return await settingsApi.saveConfig(sent);
   } catch (err) {
     console.error('settings save failed:', err.message);
     return { ok: false, rejected: true };
@@ -104,22 +106,31 @@ async function requestSave() {
 
 // The error stays until the next save: the user needs time to find the field.
 function showSaveError(message) {
+  clearTimeout(feedbackTimeout);
   feedback.classList.add('save-feedback--error');
   feedback.textContent = message;
 }
 
+function showSavedFeedback() {
+  feedback.classList.remove('save-feedback--error');
+  feedback.textContent = t('settings.saved');
+  clearTimeout(feedbackTimeout);
+  feedbackTimeout = setTimeout(() => {
+    feedbackTimeout = null;
+    feedback.textContent = '';
+  }, FEEDBACK_MS);
+}
+
 async function saveSettings() {
-  const result = await requestSave();
+  // What was sent is what got saved: edits made while the answer travels stay unsaved.
+  const sent = JSON.parse(JSON.stringify(config));
+  const result = await requestSave(sent);
   if (result.ok) {
-    savedConfig = JSON.parse(JSON.stringify(config));
-    userTouched = false;
+    savedConfig = sent;
+    userTouched = isConfigDirty(config, savedConfig);
     updateDirtyState();
     refreshSourceStatus(settingsApi);
-    feedback.classList.remove('save-feedback--error');
-    feedback.textContent = t('settings.saved');
-    setTimeout(() => {
-      feedback.textContent = '';
-    }, FEEDBACK_MS);
+    showSavedFeedback();
     return true;
   }
   showSaveError(
