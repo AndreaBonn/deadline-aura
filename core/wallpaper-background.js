@@ -60,22 +60,24 @@ function planBackground({ mode, customPath, score }) {
   return mode === 'custom' ? { ...plan, fallbackReason: 'NOT_SET' } : plan;
 }
 
-async function loadDynamicImage(file, loadImage) {
+async function loadDynamicImage(file, { loadImage, log }) {
   if (!file) {
     return null;
   }
   try {
     return await loadImage(file);
-  } catch {
+  } catch (err) {
     // Photo unavailable: the caller paints the fallback gradient
+    log.warn('[wallpaper] dynamic background unavailable:', file, err.message);
     return null;
   }
 }
 
-async function loadFallback(reason, { loadImage, log, score }) {
+async function loadFallback(reason, deps) {
+  const { log, score } = deps;
   log.warn(`[wallpaper] custom background unavailable (${reason}), falling back to dynamic`);
   const plan = planBackground({ mode: 'dynamic', score });
-  return { image: await loadDynamicImage(plan.file, loadImage), veil: plan.veil };
+  return { image: await loadDynamicImage(plan.file, deps), veil: plan.veil };
 }
 
 /**
@@ -104,7 +106,7 @@ async function loadBackground(plan, deps) {
       return loadFallback(err.message, deps);
     }
   }
-  return { image: await loadDynamicImage(plan.file, deps.loadImage), veil: plan.veil };
+  return { image: await loadDynamicImage(plan.file, deps), veil: plan.veil };
 }
 
 module.exports = {

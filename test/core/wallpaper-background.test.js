@@ -81,3 +81,32 @@ describe('custom background inspection', () => {
     expect(loadImage).toHaveBeenCalledWith(valid);
   });
 });
+
+describe('dynamic background loading diagnostics', () => {
+  const { loadBackground } = require('../../core/wallpaper-background');
+  const plan = { kind: 'dynamic', file: '/photos/calmo.png', veil: 'tint' };
+
+  it('warns with the file and message, and returns no image, when the photo cannot load', async () => {
+    const log = { warn: vi.fn() };
+    const loadImage = vi.fn().mockRejectedValue(new Error('Image given has not completed loading'));
+    expect(await loadBackground(plan, { loadImage, log, score: 0.1 })).toEqual({
+      image: null,
+      veil: 'tint',
+    });
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.stringContaining('dynamic background unavailable'),
+      '/photos/calmo.png',
+      'Image given has not completed loading',
+    );
+  });
+
+  it('does not warn when the dynamic photo loads', async () => {
+    const log = { warn: vi.fn() };
+    const loadImage = vi.fn(async (file) => ({ file }));
+    expect(await loadBackground(plan, { loadImage, log, score: 0.1 })).toEqual({
+      image: { file: '/photos/calmo.png' },
+      veil: 'tint',
+    });
+    expect(log.warn).not.toHaveBeenCalled();
+  });
+});
