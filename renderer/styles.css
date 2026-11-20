@@ -1222,6 +1222,13 @@ body {
   color-scheme: dark;
 }
 
+/* The native popup on Linux ignores the select's translucent background and
+   paints options on a light surface, so the inherited white text vanished. */
+select option {
+  background: #1a1d29;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .time-log-or-label {
   font-size: 9px;
   color: rgba(255, 255, 255, 0.62);
