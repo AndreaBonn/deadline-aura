@@ -205,3 +205,72 @@ describe('describeMechanicalScore — volume amplification values', () => {
     expect(detail.score).toBe(1);
   });
 });
+
+describe('deadline-engine — filters, weights and AI fallback', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('drops off-category tasks from the base and counts them as filtered', () => {
+    const scored = [
+      { id: 'a', source: 'gcal', priority: 3, urgency_score: 0.4, ai_category: 'off' },
+      { id: 'b', source: 'gcal', priority: 3, urgency_score: 0.2 },
+    ];
+
+    const detail = describeMechanicalScore(scored, [2.0, 1.5, 1.0, 0.5]);
+
+    expect(detail).toMatchObject({
+      score: 0.2,
+      base: 0.2,
+      active_count: 1,
+      ooo_filtered_count: 1,
+      reason_key: 'no_imminent_urgency',
+    });
+  });
+
+  it('weights the base by ai_stress / 5 when the AI scored a task', () => {
+    // weights 10/5 = 2 and 1.0 (priority 3): (0.6 * 2 + 0 * 1) / 3
+    const scored = [
+      { id: 'a', source: 'jira', priority: 3, urgency_score: 0.6, ai_stress: 10 },
+      { id: 'b', source: 'jira', priority: 3, urgency_score: 0 },
+    ];
+
+    expect(describeMechanicalScore(scored, [2.0, 1.5, 1.0, 0.5]).base).toBe(0.4);
+  });
+
+  it('falls back to the mechanical score when reading the AI score from the DB throws', () => {
+    vi.spyOn(db, 'getLatestAiScore').mockImplementation(() => {
+      throw new Error('database closed');
+    });
+    const task = {
+      id: 't',
+      source: 'gcal',
+      title: 'Call',
+      priority: 3,
+      due_at: Date.now() + 3600000,
+    };
+
+    const result = computeGlobalScore([task]);
+
+    expect(result.breakdown.ai).toBeNull();
+    expect(result.breakdown.blend).toEqual({ ai_weight: 0, mechanical_weight: 1 });
+    expect(result.global_score).toBe(result.breakdown.mechanical.score);
+  });
+
+  it('blends a fresh AI score read from the DB at 0.7 / 0.3', () => {
+    vi.spyOn(db, 'getLatestAiScore').mockReturnValue({ global_stress: 8, computed_at: Date.now() });
+    const task = {
+      id: 't',
+      source: 'gcal',
+      title: 'Call',
+      priority: 3,
+      due_at: Date.now() + 3600000,
+    };
+
+    const result = computeGlobalScore([task]);
+    const mechanical = result.breakdown.mechanical.score;
+
+    expect(result.breakdown.ai.fresh).toBe(true);
+    expect(result.global_score).toBeCloseTo(0.8 * 0.7 + mechanical * 0.3, 3);
+  });
+});

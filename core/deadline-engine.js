@@ -108,6 +108,8 @@ function amplifyByVolume(rawBase, active) {
   const effectiveVolume = calendarCount + backlogCount * BACKLOG_VOLUME_WEIGHT;
   const excessEvents = Math.max(0, effectiveVolume - VOLUME_THRESHOLD);
   const volumeBoost = excessEvents * VOLUME_AMPLIFIER;
+  // Volume only compounds urgency that is already there: a calendar full of distant events
+  // must not manufacture stress for any user with a populated multi-day calendar.
   const applied = rawBase >= VOLUME_AMP_MIN_BASE && volumeBoost > 0;
   const finalBase = applied ? Math.min(1, rawBase + volumeBoost * (1 - rawBase)) : rawBase;
   return { calendarCount, backlogCount, effectiveVolume, applied, finalBase };
@@ -125,6 +127,8 @@ function mechanicalReasonKey(rawBase, volumeAmpApplied) {
  * result was reached. Used by the score-explainability breakdown.
  */
 function describeMechanicalScore(scored, priorityWeights) {
+  // OOO/vacation tasks represent absence, not load: without this filter a week of all-day
+  // "ferie" events saturates the volume amplifier and pegs the mechanical score at 1.0.
   const active = scored.filter((task) => task.ai_category !== 'off');
   const oooCount = scored.length - active.length;
   if (active.length === 0) {
@@ -199,6 +203,19 @@ function describeAiScore(aiScore, computedAt) {
   };
 }
 
+// A fresh AI score is authoritative, blended with the mechanical one for recency sensitivity.
+function blendGlobalScore(aiBreakdown, mechanicalScore) {
+  if (!aiBreakdown?.fresh) {
+    return { globalScore: mechanicalScore, blend: { ai_weight: 0, mechanical_weight: 1 } };
+  }
+  const blended =
+    aiBreakdown.normalized * AI_BLEND_WEIGHT + mechanicalScore * MECHANICAL_BLEND_WEIGHT;
+  return {
+    globalScore: Math.round(blended * 1000) / 1000,
+    blend: { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT },
+  };
+}
+
 function computeGlobalScore(tasks, options = {}) {
   const { priorityWeights = DEFAULT_PRIORITY_WEIGHTS } = options;
   const computedAt = Date.now();
@@ -210,13 +227,7 @@ function computeGlobalScore(tasks, options = {}) {
   }
   const mechanicalDetail = describeMechanicalScore(scored, priorityWeights);
   const aiBreakdown = describeAiScore(resolveAiScore(options), computedAt);
-  const globalScore = aiBreakdown?.fresh
-    ? Math.round(
-        (aiBreakdown.normalized * AI_BLEND_WEIGHT +
-          mechanicalDetail.score * MECHANICAL_BLEND_WEIGHT) *
-          1000,
-      ) / 1000
-    : mechanicalDetail.score;
+  const { globalScore, blend } = blendGlobalScore(aiBreakdown, mechanicalDetail.score);
   const sortedTasks = scored.sort((a, b) => b.urgency_score - a.urgency_score);
   return {
     global_score: globalScore,
@@ -226,9 +237,7 @@ function computeGlobalScore(tasks, options = {}) {
       global_score: globalScore,
       ai: aiBreakdown,
       mechanical: mechanicalDetail,
-      blend: aiBreakdown?.fresh
-        ? { ai_weight: AI_BLEND_WEIGHT, mechanical_weight: MECHANICAL_BLEND_WEIGHT }
-        : { ai_weight: 0, mechanical_weight: 1 },
+      blend,
       top_drivers: pickTopDrivers(sortedTasks, TOP_DRIVERS_COUNT),
       computed_at: computedAt,
     },
