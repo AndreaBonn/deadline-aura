@@ -39,70 +39,83 @@ function shouldRecalcAi(config) {
 
 async function sync(config) {
   const errors = [];
-  let gcalCount = 0;
-  let gtasksCount = 0;
-  let jiraCount = 0;
-  let outlookCount = 0;
-
-  const { gcalEvents, googleTasks, jiraIssues, jiraPartialIssues, outlookEvents } =
-    await fetchAllSources(config, errors);
-
-  const database = db.getDb();
-  const upsertMany = database.transaction((tasks, source) => {
-    const activeIds = tasks.map((t) => t.id);
-    db.markStale(source, activeIds);
-
-    for (const task of tasks) {
-      db.upsertTask(task);
-    }
-
-    return tasks.length;
-  });
-
-  const failedSources = new Set(errors.map((e) => e.source));
-
-  if (
-    !failedSources.has('google_calendar') &&
-    (gcalEvents.length > 0 || config.sources.google_calendar.enabled)
-  ) {
-    gcalCount = upsertMany(gcalEvents, 'gcal');
-  }
-
-  if (!failedSources.has('google_tasks') && config.sources.google_calendar.enabled) {
-    gtasksCount = upsertMany(googleTasks, 'gtasks');
-  }
-
-  if (!failedSources.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
-    jiraCount = upsertMany(jiraIssues, 'jira');
-  } else if (jiraPartialIssues.length > 0) {
-    // Refresh what the healthy sites returned, but mark nothing stale: the issues of the
-    // failed site would otherwise vanish from the desktop.
-    database.transaction((tasks) => tasks.forEach((task) => db.upsertTask(task)))(
-      jiraPartialIssues,
-    );
-    jiraCount = jiraPartialIssues.length;
-  }
-
-  if (
-    !failedSources.has('outlook') &&
-    (outlookEvents.length > 0 || config.sources.outlook?.enabled)
-  ) {
-    outlookCount = upsertMany(outlookEvents, 'outlook');
-  }
+  const fetched = await fetchAllSources(config, errors);
+  const counts = persistAllSources(fetched, config, errors);
 
   const allTasks = [
-    ...gcalEvents,
-    ...googleTasks,
-    ...jiraIssues,
-    ...jiraPartialIssues,
-    ...outlookEvents,
+    ...fetched.gcalEvents,
+    ...fetched.googleTasks,
+    ...fetched.jiraIssues,
+    ...fetched.jiraPartialIssues,
+    ...fetched.outlookEvents,
   ];
 
   if (config.ai?.enabled && allTasks.length > 0) {
     await runAiScoring(allTasks, config, errors);
   }
 
-  return { gcal: gcalCount, gtasks: gtasksCount, jira: jiraCount, outlook: outlookCount, errors };
+  return { ...counts, errors };
+}
+
+// Replace a source: whatever it no longer returns is marked stale.
+const replaceSourceTasks = (tasks, source) => {
+  db.markStale(
+    source,
+    tasks.map((task) => task.id),
+  );
+  tasks.forEach((task) => db.upsertTask(task));
+  return tasks.length;
+};
+
+// Each source decides on its own whether an empty or failed fetch may touch the stored tasks.
+function persistAllSources(fetched, config, errors) {
+  const failed = new Set(errors.map((error) => error.source));
+  const replace = db.getDb().transaction(replaceSourceTasks);
+
+  return {
+    gcal: persistGcal(fetched.gcalEvents, config, failed, replace),
+    gtasks: persistGtasks(fetched.googleTasks, config, failed, replace),
+    jira: persistJira(fetched, config, failed, replace),
+    outlook: persistOutlook(fetched.outlookEvents, config, failed, replace),
+  };
+}
+
+function persistGcal(events, config, failed, replace) {
+  if (failed.has('google_calendar')) {
+    return 0;
+  }
+  const hasEvents = events.length > 0;
+  return hasEvents || config.sources.google_calendar.enabled ? replace(events, 'gcal') : 0;
+}
+
+// Google Tasks has no switch of its own: it follows the calendar one.
+function persistGtasks(tasks, config, failed, replace) {
+  if (failed.has('google_tasks') || !config.sources.google_calendar.enabled) {
+    return 0;
+  }
+  return replace(tasks, 'gtasks');
+}
+
+function persistOutlook(events, config, failed, replace) {
+  if (failed.has('outlook')) {
+    return 0;
+  }
+  return events.length > 0 || config.sources.outlook?.enabled ? replace(events, 'outlook') : 0;
+}
+
+function persistJira({ jiraIssues, jiraPartialIssues }, config, failed, replace) {
+  if (!failed.has('jira') && (jiraIssues.length > 0 || config.sources.jira.enabled)) {
+    return replace(jiraIssues, 'jira');
+  }
+  if (jiraPartialIssues.length === 0) {
+    return 0;
+  }
+  // Refresh what the healthy sites returned, but mark nothing stale: the issues of the
+  // failed site would otherwise vanish from the desktop.
+  db.getDb().transaction((tasks) => tasks.forEach((task) => db.upsertTask(task)))(
+    jiraPartialIssues,
+  );
+  return jiraPartialIssues.length;
 }
 
 // Issues from the Jira sites that answered when another site did not travel on the error.

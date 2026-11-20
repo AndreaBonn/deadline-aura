@@ -85,7 +85,6 @@ module.exports = [
       'core/ics-parser.js',
       'core/meeting-flyby.js',
       'core/postit-renderer.js',
-      'core/sync-daemon.js',
       'core/wallpaper-agenda.js',
       'core/work-shift.js',
       'integrations/google-tasks.js',
