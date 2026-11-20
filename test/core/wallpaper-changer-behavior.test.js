@@ -146,6 +146,32 @@ describe('wallpaper-changer — update()', () => {
     expect(result.reason).toBe('delta below threshold');
   });
 
+  it('redraws when the hue moves past the visible threshold and not when it moves less', async () => {
+    vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
+    const nowMs = new Date('2026-05-11T12:00:00Z').getTime();
+    const withHue = (h) => ({ hsl: { h, s: 50, l: 8 } });
+
+    await update(withHue(20), { force: true, nowMs });
+    const moved = await update(withHue(23.3), { nowMs });
+    const barely = await update(withHue(24.5), { nowMs });
+
+    expect(moved.changed).toBe(true);
+    expect(barely).toEqual({ changed: false, reason: 'delta below threshold' });
+  });
+
+  it('measures the hue change from the last drawn hue, in both directions', async () => {
+    vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
+    const nowMs = new Date('2026-05-11T12:00:00Z').getTime();
+    const withHue = (h) => ({ hsl: { h, s: 50, l: 8 } });
+
+    await update(withHue(40), { force: true, nowMs });
+    const down = await update(withHue(36.7), { nowMs });
+    const tiny = await update(withHue(35.5), { nowMs });
+
+    expect(down.changed).toBe(true);
+    expect(tiny.changed).toBe(false);
+  });
+
   it('returns changed:true when force is true regardless of delta', async () => {
     vi.spyOn(childProcess, 'spawnSync').mockReturnValue({ status: 0 });
 
